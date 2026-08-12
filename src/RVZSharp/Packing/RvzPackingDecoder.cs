@@ -16,6 +16,7 @@ public sealed class RvzPackingDecoder : Stream
     private readonly Stream _input;
     private readonly bool _leaveOpen;
     private readonly long _dataOffset;
+    private long _emitted;
     private readonly LaggedFibonacciPrng _prng = new();
     private readonly byte[] _buffer = new byte[LaggedFibonacciPrng.BufferSize];
     private int _bufferStart;
@@ -56,6 +57,7 @@ public sealed class RvzPackingDecoder : Stream
             Array.Copy(_buffer, _bufferStart, buffer, offset + total, take);
             _bufferStart += take;
             _segmentRemaining -= (uint)take;
+            _emitted += take;
             total += take;
         }
 
@@ -124,7 +126,9 @@ public sealed class RvzPackingDecoder : Stream
             }
 
             _prng.SetSeed(seed);
-            _prng.Forward((int)(_dataOffset % 0x8000));
+            // Skip to the PRNG position of this segment: the writer recovers the seed for
+            // the running data offset (chunk start + bytes already emitted in this chunk).
+            _prng.Forward((int)((_dataOffset + _emitted) % 0x8000));
         }
 
         return true;

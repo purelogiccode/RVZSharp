@@ -54,7 +54,7 @@ public partial class ChunkDecoderPackingTests
         ChunkDecoder.DecodeChunk(file, disc, CompressionCodecFactory.Create(compression),
             new ChunkDecodeRequest
             {
-                Group = group,
+                Group = GroupEntry.FromRvz(group),
                 IsPartition = isPartition,
                 ExpectedSize = expectedSize,
                 DataOffset = dataOffset,
@@ -109,7 +109,7 @@ public partial class ChunkDecoderPackingTests
         var paddedPart = payload.AsSpan(10_000).ToArray();
         var seed = new byte[68];
         new Random(8).NextBytes(seed);
-        var junk = ReferencePrng.Generate(seed, 0x20000, paddedPart.Length);
+        var junk = ReferencePrng.Generate(seed, 0x20000 + 10_000, paddedPart.Length);
         // The seed must reproduce the padding: re-seed until it matches.
         if (!junk.SequenceEqual(paddedPart))
         {

@@ -21,11 +21,14 @@ public readonly struct WiaFileHead
     public static ReadOnlySpan<byte> RvzMagic => "RVZ\x01"u8;
     public static ReadOnlySpan<byte> WiaMagic => "WIA\x01"u8;
 
-    /// <summary>RVZ format version this library implements (Dolphin: RVZ_VERSION).</summary>
-    public const uint RvzVersion = 0x01000000;
+    /// <summary>Version this library implements for both formats (Dolphin: RVZ_VERSION / WIA_VERSION).</summary>
+    public const uint ImplementedVersion = 0x01000000;
 
     /// <summary>Lowest file version this library can read (Dolphin: RVZ_VERSION_READ_COMPATIBLE).</summary>
     public const uint RvzVersionReadCompatible = 0x00030000;
+
+    /// <summary>Lowest file version this library can read (Dolphin: WIA_VERSION_READ_COMPATIBLE).</summary>
+    public const uint WiaVersionReadCompatible = 0x00080000;
 
     /// <summary>The 4 magic bytes ("RVZ\x01" for RVZ, "WIA\x01" for WIA).</summary>
     public byte[] Magic { get; }
@@ -89,40 +92,45 @@ public readonly struct WiaFileHead
             isoFileSize, rvzFileSize, fileHeadHash);
     }
 
+    /// <summary>Validates this header as an RVZ file head.</summary>
+    public void Validate(ReadOnlySpan<byte> rawHeader, long actualFileSize) =>
+        Validate(rawHeader, actualFileSize, WiaRvzFormat.Rvz);
+
     /// <summary>
     /// Validates magic, version compatibility, declared file size and the file-head SHA-1.
     /// </summary>
     /// <param name="rawHeader">The first <see cref="Size"/> bytes of the file (must match this struct).</param>
     /// <param name="actualFileSize">Length of the underlying stream.</param>
+    /// <param name="format">Which format the magic and version rules belong to.</param>
     /// <exception cref="RvzFormatException">Bad magic or file size mismatch.</exception>
-    /// <exception cref="RvzUnsupportedException">WIA files or unsupported versions.</exception>
+    /// <exception cref="RvzUnsupportedException">Unsupported versions.</exception>
     /// <exception cref="RvzHashMismatchException">The file head hash does not match.</exception>
-    public void Validate(ReadOnlySpan<byte> rawHeader, long actualFileSize)
+    public void Validate(ReadOnlySpan<byte> rawHeader, long actualFileSize, WiaRvzFormat format)
     {
-        if (!IsRvz)
+        var expectedMagic = format == WiaRvzFormat.Wia ? WiaMagic : RvzMagic;
+        if (!Magic.AsSpan().SequenceEqual(expectedMagic))
         {
-            if (IsWia)
-            {
-                throw new RvzUnsupportedException(
-                    "This file uses the WIA format, which RVZSharp does not support yet.");
-            }
-
-            throw new RvzFormatException($"Bad magic: expected \"RVZ\x01\", got "
+            throw new RvzFormatException(
+                $"Bad magic: expected \"{System.Text.Encoding.ASCII.GetString(expectedMagic)}\", got "
                 + $"0x{Convert.ToHexString(Magic)}.");
         }
 
-        if (Version < RvzVersionReadCompatible)
+        var formatName = format == WiaRvzFormat.Wia ? "WIA" : "RVZ";
+        var readCompatible =
+            format == WiaRvzFormat.Wia ? WiaVersionReadCompatible : RvzVersionReadCompatible;
+
+        if (Version < readCompatible)
         {
             throw new RvzUnsupportedException(
-                $"RVZ version {FormatVersion(Version)} is too old; this library requires "
-                + $"at least {FormatVersion(RvzVersionReadCompatible)}.");
+                $"{formatName} version {FormatVersion(Version)} is too old; this library requires "
+                + $"at least {FormatVersion(readCompatible)}.");
         }
 
-        if (RvzVersion < VersionCompatible)
+        if (ImplementedVersion < VersionCompatible)
         {
             throw new RvzUnsupportedException(
-                $"RVZ version {FormatVersion(Version)} is too new for this library "
-                + $"(compatible from {FormatVersion(RvzVersion)}).");
+                $"{formatName} version {FormatVersion(Version)} is too new for this library "
+                + $"(compatible from {FormatVersion(ImplementedVersion)}).");
         }
 
         if ((long)RvzFileSize != actualFileSize)

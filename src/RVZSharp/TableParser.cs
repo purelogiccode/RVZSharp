@@ -83,7 +83,11 @@ public static class TableParser
     }
 
     /// <summary>Reads the group table (compressed with the disc's method at group_off).</summary>
-    public static RvzGroupEntry[] ParseGroupEntries(Stream file, WiaDisc disc)
+    public static GroupEntry[] ParseGroupEntries(Stream file, WiaDisc disc) =>
+        ParseGroupEntries(file, disc, WiaRvzFormat.Rvz);
+
+    /// <summary>Reads the group table for WIA (8-byte entries) or RVZ (12-byte entries).</summary>
+    public static GroupEntry[] ParseGroupEntries(Stream file, WiaDisc disc, WiaRvzFormat format)
     {
         var count = disc.NumGroups;
         if (count == 0)
@@ -91,14 +95,17 @@ public static class TableParser
             return [];
         }
 
-        var tableSize = checked((long)count * RvzGroupEntry.Size);
+        var entrySize = format == WiaRvzFormat.Wia ? WiaGroupEntry.Size : RvzGroupEntry.Size;
+        var tableSize = checked((long)count * entrySize);
         var bytes = ReadCompressedTable(file, disc, (long)disc.GroupEntriesOffset,
             disc.GroupEntriesSize, tableSize, "group");
 
-        var entries = new RvzGroupEntry[count];
+        var entries = new GroupEntry[count];
         for (var i = 0; i < count; i++)
         {
-            entries[i] = RvzGroupEntry.Parse(bytes.AsSpan(i * RvzGroupEntry.Size, RvzGroupEntry.Size));
+            entries[i] = format == WiaRvzFormat.Wia
+                ? GroupEntry.FromWia(WiaGroupEntry.Parse(bytes.AsSpan(i * entrySize, entrySize)))
+                : GroupEntry.FromRvz(RvzGroupEntry.Parse(bytes.AsSpan(i * entrySize, entrySize)));
         }
 
         return entries;
@@ -108,6 +115,13 @@ public static class TableParser
         uint compressedSize, long expectedSize, string name)
     {
         using var section = new SectionStream(file, offset, compressedSize);
+
+        // PURGE is not a streaming codec; the table is a single PURGE stream with a SHA-1 trailer.
+        if (disc.Compression == CompressionType.Purge)
+        {
+            return PurgeDecoder.Decode(ReadAll(section), [], (int)expectedSize);
+        }
+
         var decoder = CompressionCodecFactory.Create(disc.Compression);
         using var decompressor = decoder.CreateDecompressor(
             section, disc.ComprData.AsSpan(0, disc.ComprDataLen), compressedSize, expectedSize);
@@ -138,5 +152,18 @@ public static class TableParser
         }
 
         return output;
+    }
+
+    private static byte[] ReadAll(Stream stream)
+    {
+        var output = new MemoryStream();
+        var buffer = new byte[8192];
+        int read;
+        while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            output.Write(buffer, 0, read);
+        }
+
+        return output.ToArray();
     }
 }

@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
-using System.Text;
 using RVZSharp;
+using RVZSharp.Blobs;
 using RVZSharp.Format;
 
 namespace RVZSharp.Cli;
@@ -21,12 +21,19 @@ internal static class Program
                 return Decode(args[1], args[2], args);
             }
 
+            if (args.Length >= 3 && args[0] == "convert")
+            {
+                return ConvertToRvz(args[1], args[2], args);
+            }
+
             Console.Error.WriteLine("""
-                RVZSharp — Dolphin RVZ disc image tool
+                RVZSharp — Dolphin disc image tool
 
                 Usage:
-                  rvzsharp info <file.rvz>
-                  rvzsharp decode <file.rvz> <out.iso> [--sha1 <expected-hex>]
+                  rvzsharp info <file.rvz|wia|gcz|ciso|wbfs|tgc|nfs|iso>
+                  rvzsharp decode <file> <out.iso> [--sha1 <expected-hex>]
+                  rvzsharp convert <file> <out.rvz> [--compression <none|zstd|bzip2|lzma|lzma2>]
+                                        [--level <1-9>] [--chunk-size <kib>] [--no-packing]
                 """);
             return 1;
         }
@@ -40,37 +47,52 @@ internal static class Program
     private static int Info(string path)
     {
         using var file = File.OpenRead(path);
-        using var reader = RvzReader.Open(file, leaveOpen: true);
+        using var reader = Blob.Open(file, filePath: path, leaveOpen: true);
 
         Console.WriteLine($"file:            {path}");
-        Console.WriteLine($"format:          RVZ (version {WiaFileHead.FormatVersion(reader.FileHead.Version)})");
-        Console.WriteLine($"disc type:       {reader.Disc.DiscType} ({(uint)reader.Disc.DiscType})");
+        Console.WriteLine($"format:          {Blob.GetName(reader.Type)}");
         Console.WriteLine($"iso size:        {reader.Length} bytes (0x{reader.Length:X})");
-        Console.WriteLine($"compression:     {reader.Disc.Compression} (level {reader.Disc.ComprLevel})");
-        Console.WriteLine($"chunk size:      0x{reader.Disc.ChunkSize:X}");
-        Console.WriteLine($"partitions:      {reader.Partitions.Length}");
-        Console.WriteLine($"raw data areas:  {reader.RawDataEntries.Length}");
-        Console.WriteLine($"groups:          {reader.GroupEntries.Length}");
 
-        foreach (var part in reader.Partitions)
+        if (reader is RvzReader rvz)
         {
-            for (var s = 0; s < 2; s++)
-            {
-                var pd = part.Data[s];
-                if (pd.NumSectors == 0)
-                {
-                    continue;
-                }
+            Console.WriteLine($"version:         {WiaFileHead.FormatVersion(rvz.FileHead.Version)}");
+            Console.WriteLine($"disc type:       {rvz.Disc.DiscType} ({(uint)rvz.Disc.DiscType})");
+            Console.WriteLine($"compression:     {rvz.Disc.Compression} (level {rvz.Disc.ComprLevel})");
+            Console.WriteLine($"chunk size:      0x{rvz.Disc.ChunkSize:X}");
+            Console.WriteLine($"partitions:      {rvz.Partitions.Length}");
+            Console.WriteLine($"raw data areas:  {rvz.RawDataEntries.Length}");
+            Console.WriteLine($"groups:          {rvz.GroupEntries.Length}");
 
-                Console.WriteLine($"  partition @ sector {pd.FirstSector}: {pd.NumSectors} sectors, "
-                    + $"{pd.NumGroups} groups (key {Convert.ToHexString(part.Key)})");
+            foreach (var part in rvz.Partitions)
+            {
+                for (var s = 0; s < 2; s++)
+                {
+                    var pd = part.Data[s];
+                    if (pd.NumSectors == 0)
+                    {
+                        continue;
+                    }
+
+                    Console.WriteLine($"  partition @ sector {pd.FirstSector}: {pd.NumSectors} sectors, "
+                        + $"{pd.NumGroups} groups (key {Convert.ToHexString(part.Key)})");
+                }
+            }
+
+            foreach (var raw in rvz.RawDataEntries)
+            {
+                Console.WriteLine($"  raw data @ 0x{raw.RawDataOffset:X}: 0x{raw.RawDataSize:X} bytes, "
+                    + $"{raw.NumGroups} groups");
             }
         }
-
-        foreach (var raw in reader.RawDataEntries)
+        else if (reader is GczBlob gcz)
         {
-            Console.WriteLine($"  raw data @ 0x{raw.RawDataOffset:X}: 0x{raw.RawDataSize:X} bytes, "
-                + $"{raw.NumGroups} groups");
+            Console.WriteLine($"block size:      0x{gcz.BlockSize:X}");
+            Console.WriteLine($"blocks:          {gcz.NumBlocks}");
+            Console.WriteLine($"compression:     Deflate");
+        }
+        else if (reader.BlockSize != 0)
+        {
+            Console.WriteLine($"block size:      0x{reader.BlockSize:X}");
         }
 
         return 0;
@@ -88,7 +110,7 @@ internal static class Program
         }
 
         using var input = File.OpenRead(inputPath);
-        using var reader = RvzReader.Open(input, leaveOpen: true);
+        using var reader = Blob.Open(input, filePath: inputPath, leaveOpen: true);
         using var output = File.Create(outputPath);
         using var sha1 = SHA1.Create();
 
@@ -140,4 +162,50 @@ internal static class Program
         Console.WriteLine($"decoded {reader.Length} bytes to {outputPath}");
         return 0;
     }
+
+    private static int ConvertToRvz(string inputPath, string outputPath, string[] args)
+    {
+        var options = new RvzWriteOptions();
+        for (var i = 3; i < args.Length - 1; i++)
+        {
+            switch (args[i])
+            {
+                case "--compression":
+                    options = options with { Compression = ParseCompression(args[i + 1]) };
+                    break;
+                case "--level":
+                    options = options with { CompressionLevel = int.Parse(args[i + 1]) };
+                    break;
+                case "--chunk-size":
+                    options = options with { ChunkSize = int.Parse(args[i + 1]) * 1024 };
+                    break;
+                case "--no-packing":
+                    options = options with { Packing = false };
+                    break;
+            }
+        }
+
+        using var input = File.OpenRead(inputPath);
+        using var blob = Blob.Open(input, filePath: inputPath, leaveOpen: true);
+        using var output = File.Create(outputPath);
+        RvzWriter.Write(blob, output, options);
+
+        Console.WriteLine($"converted {blob.Length} bytes ({Blob.GetName(blob.Type)}) to {outputPath} "
+            + $"({options.Compression}, level {options.CompressionLevel}, "
+            + $"chunk 0x{options.ChunkSize:X}, packing {(options.Packing ? "on" : "off")})");
+        return 0;
+    }
+
+    private static CompressionType ParseCompression(string name) =>
+        name.ToLowerInvariant() switch
+        {
+            "none" => CompressionType.None,
+            "purge" => CompressionType.Purge,
+            "bzip2" or "bzip" => CompressionType.Bzip2,
+            "lzma" => CompressionType.Lzma,
+            "lzma2" => CompressionType.Lzma2,
+            "zstd" or "zstandard" => CompressionType.Zstd,
+            _ => throw new RvzFormatException(
+                $"Unknown compression method '{name}' (expected none, zstd, bzip2, lzma or lzma2)."),
+        };
 }

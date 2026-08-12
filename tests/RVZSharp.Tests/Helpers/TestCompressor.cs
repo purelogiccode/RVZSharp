@@ -47,9 +47,79 @@ public static class TestCompressor
                 return BuildLzma2Stream(data);
             }
 
+            case CompressionType.Purge:
+                return CompressPurge(data);
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(compression), compression, null);
         }
+    }
+
+    /// <summary>
+    /// The WIA PURGE codec (mirrors Dolphin's PurgeCompressor): non-zero runs are stored as
+    /// (u32 BE offset, u32 BE length) descriptors followed by the run's bytes; runs of more
+    /// than 8 zeroes are skipped (they decode to zero-fill). The SHA-1 trailer covers the
+    /// segment stream plus the exception lists that precede it in the group
+    /// (Dolphin: AddPrecedingDataOnlyForPurgeHashing).
+    /// </summary>
+    public static byte[] CompressPurge(byte[] data, byte[]? precedingData = null)
+    {
+        const int segmentSize = 8;
+        using var segments = new MemoryStream();
+        var bytesRead = 0;
+        while (true)
+        {
+            var firstNonZero = bytesRead;
+            while (firstNonZero < data.Length && data[firstNonZero] == 0)
+            {
+                firstNonZero++;
+            }
+
+            if (firstNonZero == data.Length)
+            {
+                break;
+            }
+
+            var nonZeroEnd = firstNonZero;
+            var sequenceLength = 0;
+            for (var i = firstNonZero; i < data.Length; i++)
+            {
+                if (data[i] == 0)
+                {
+                    if (++sequenceLength > segmentSize)
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    sequenceLength = 0;
+                    nonZeroEnd = i + 1;
+                }
+            }
+
+            var length = nonZeroEnd - firstNonZero;
+            WriteBe32(segments, (uint)firstNonZero);
+            WriteBe32(segments, (uint)length);
+            segments.Write(data, firstNonZero, length);
+            bytesRead = nonZeroEnd;
+        }
+
+        var segmentBytes = segments.ToArray();
+        var output = new MemoryStream();
+        output.Write(segmentBytes);
+        var hash = System.Security.Cryptography.SHA1.HashData(
+            precedingData == null ? segmentBytes : precedingData.Concat(segmentBytes).ToArray());
+        output.Write(hash);
+        return output.ToArray();
+    }
+
+    private static void WriteBe32(Stream stream, uint value)
+    {
+        stream.WriteByte((byte)(value >> 24));
+        stream.WriteByte((byte)(value >> 16));
+        stream.WriteByte((byte)(value >> 8));
+        stream.WriteByte((byte)value);
     }
 
     /// <summary>Raw LZMA1: 5-byte 7-Zip properties + data (with EOS marker, Dolphin style).</summary>

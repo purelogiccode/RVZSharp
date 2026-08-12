@@ -8,7 +8,7 @@ namespace RVZSharp.Chunks;
 /// <summary>What is needed to decode one group chunk.</summary>
 public readonly struct ChunkDecodeRequest
 {
-    public required RvzGroupEntry Group { get; init; }
+    public required GroupEntry Group { get; init; }
 
     /// <summary>True for Wii partition chunks (they start with hash exception lists).</summary>
     public required bool IsPartition { get; init; }
@@ -80,24 +80,35 @@ public static class ChunkDecoder
     }
 
     private static ChunkDecodeResult DecodeChunkCore(Stream file, WiaDisc disc,
-        ICompressionDecoder codec, ChunkDecodeRequest request, RvzGroupEntry group, int expectedSize)
+        ICompressionDecoder codec, ChunkDecodeRequest request, GroupEntry group, int expectedSize)
     {
         var exceptionListCount = request.IsPartition ? ExceptionListCount(expectedSize) : 0;
 
-        using Stream input = group.UsesDiscCompression
+        // PURGE is not a streaming codec: its data sits right after the exception lists in the
+        // raw group bytes, so the whole group is read as one section and decoded in one go.
+        var isPurge = group.UsesDiscCompression && disc.Compression == CompressionType.Purge;
+        var usesDecompressor = group.UsesDiscCompression && !isPurge;
+
+        using Stream input = usesDecompressor
             ? OpenDecompressor(file, disc, codec, group)
             : new SectionStream(file, (long)group.FileOffset, group.StoredSize);
 
         // Exception lists are padded to 4 bytes only when the effective compression method
-        // (the flag clears to NONE) is NONE — regardless of the flag bit itself.
+        // (the flag clears to NONE for RVZ) is NONE or PURGE — the methods that store the
+        // lists uncompressed (Dolphin: compressed_exception_lists = method > Purge).
         var effectiveCompression = group.UsesDiscCompression
             ? disc.Compression
             : CompressionType.None;
         var exceptionLists = ParseExceptionLists(input, exceptionListCount,
-            alignTo4: effectiveCompression == CompressionType.None);
+            alignTo4: effectiveCompression is CompressionType.None or CompressionType.Purge,
+            out var listBytes);
 
         byte[] payload;
-        if (group.RvzPackedSize != 0)
+        if (isPurge)
+        {
+            payload = PurgeDecoder.Decode(ReadAll(input), listBytes, expectedSize);
+        }
+        else if (group.RvzPackedSize != 0)
         {
             var packed = ReadExactly(input, (int)group.RvzPackedSize, "RVZ packed data");
             payload = DecodePacking(packed, expectedSize, request.DataOffset);
@@ -111,7 +122,7 @@ public static class ChunkDecoder
     }
 
     private static Stream OpenDecompressor(Stream file, WiaDisc disc, ICompressionDecoder codec,
-        RvzGroupEntry group)
+        GroupEntry group)
     {
         var section = new SectionStream(file, (long)group.FileOffset, group.StoredSize);
         try
@@ -126,24 +137,29 @@ public static class ChunkDecoder
         }
     }
 
-    private static HashExceptionEntry[][] ParseExceptionLists(Stream input, int listCount, bool alignTo4)
+    private static HashExceptionEntry[][] ParseExceptionLists(Stream input, int listCount, bool alignTo4,
+        out byte[] consumedBytes)
     {
         if (listCount == 0)
         {
+            consumedBytes = [];
             return [];
         }
 
+        using var consumed = new MemoryStream();
         var lists = new HashExceptionEntry[listCount][];
         var totalBytes = 0;
         for (var listIndex = 0; listIndex < listCount; listIndex++)
         {
             var countBytes = ReadExactly(input, 2, "exception list count");
+            consumed.Write(countBytes);
             var count = (ushort)((countBytes[0] << 8) | countBytes[1]);
 
             var entries = new HashExceptionEntry[count];
             for (var i = 0; i < count; i++)
             {
                 var entryBytes = ReadExactly(input, HashExceptionEntry.Size, "hash exception");
+                consumed.Write(entryBytes);
                 entries[i] = HashExceptionEntry.Parse(entryBytes);
             }
 
@@ -155,7 +171,8 @@ public static class ChunkDecoder
                 var padding = (4 - totalBytes % 4) % 4;
                 if (padding > 0)
                 {
-                    ReadExactly(input, padding, "exception list padding");
+                    var pad = ReadExactly(input, padding, "exception list padding");
+                    consumed.Write(pad);
                     totalBytes += padding;
                 }
             }
@@ -166,6 +183,7 @@ public static class ChunkDecoder
             }
         }
 
+        consumedBytes = consumed.ToArray();
         return lists;
     }
 
@@ -174,6 +192,19 @@ public static class ChunkDecoder
         using var input = new MemoryStream(packed, writable: false);
         using var decoder = new RvzPackingDecoder(input, dataOffset);
         return ReadExactly(decoder, expectedSize, "RVZ packing output");
+    }
+
+    private static byte[] ReadAll(Stream stream)
+    {
+        var output = new MemoryStream();
+        var buffer = new byte[8192];
+        int read;
+        while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            output.Write(buffer, 0, read);
+        }
+
+        return output.ToArray();
     }
 
     private static byte[] ReadExactly(Stream stream, int count, string what)

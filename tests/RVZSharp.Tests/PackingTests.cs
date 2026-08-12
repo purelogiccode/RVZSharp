@@ -89,8 +89,8 @@ public class PackingTests
         var seed2 = MakeSeed(2);
         var literal = new byte[3000];
         new Random(9).NextBytes(literal);
-        var junk1 = GenerateJunk(seed1, 0x20000, 1000);
-        var junk2 = GenerateJunk(seed2, 0x20000, 2000);
+        var junk1 = GenerateJunk(seed1, 0x20000 + literal.Length, 1000);
+        var junk2 = GenerateJunk(seed2, 0x20000 + literal.Length + 1000, 2000);
 
         var packed = Concat(
             Be32((uint)literal.Length), literal,

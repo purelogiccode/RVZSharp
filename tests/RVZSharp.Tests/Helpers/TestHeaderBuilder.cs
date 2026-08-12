@@ -7,7 +7,7 @@ namespace RVZSharp.Tests.Helpers;
 public sealed class TestHeaderBuilder
 {
     public byte[] Magic { get; set; } = WiaFileHead.RvzMagic.ToArray();
-    public uint Version { get; set; } = WiaFileHead.RvzVersion;
+    public uint Version { get; set; } = WiaFileHead.ImplementedVersion;
     public uint VersionCompatible { get; set; } = WiaFileHead.RvzVersionReadCompatible;
     public uint DiscSize { get; set; } = 0xDC;
     public byte[] DiscHash { get; set; } = new byte[WiaFileHead.HashSize];

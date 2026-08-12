@@ -57,7 +57,7 @@ public class ChunkDecoderTests
         ChunkDecoder.DecodeChunk(file, disc, CompressionCodecFactory.Create(compression),
             new ChunkDecodeRequest
             {
-                Group = group,
+                Group = GroupEntry.FromRvz(group),
                 IsPartition = isPartition,
                 ExpectedSize = expectedSize,
                 DataOffset = dataOffset,

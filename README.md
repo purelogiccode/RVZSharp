@@ -2,9 +2,7 @@
 
 A pure C# (.NET 10) library and CLI for decoding **Dolphin RVZ** disc images (GameCube/Wii).
 RVZ is the successor of the WIA format; RVZSharp decodes RVZ files back to the original
-disc image (`.iso`) **byte-for-byte**, including:
-
-- all five compression methods: NONE, BZIP2, LZMA, LZMA2, Zstandard (100% managed codecs —
+disc image (`.iso`) **byte-for-byte**, including:- all five compression methods: NONE, BZIP2, LZMA, LZMA2, Zstandard (100% managed codecs —
   ZstdSharp.Port, SharpZipLib, and a vendored 7-Zip LZMA/LZMA2 decoder, see THIRD-PARTY-NOTICES.md);
 - the RVZ packing scheme (Lagged Fibonacci PRNG padding reconstruction);
 - Wii partition reconstruction: SHA-1 hash trees (h0/h1/h2), hash exceptions, and
@@ -35,19 +33,37 @@ decoded bytes at any offset; `ReadFully()` decodes the entire image.
 ### CLI
 
 ```
-dotnet run --project src/RVZSharp.Cli -- info <file.rvz>
-dotnet run --project src/RVZSharp.Cli -- decode <file.rvz> out.iso [--sha1 <expected-hex>]
+dotnet run --project src/RVZSharp.Cli -- info <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
+dotnet run --project src/RVZSharp.Cli -- decode <file> out.iso [--sha1 <expected-hex>]
+dotnet run --project src/RVZSharp.Cli -- convert <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso> out.rvz \
+    [--compression none|zstd|bzip2|lzma|lzma2] [--level <1-9>] [--chunk-size <kib>] [--no-packing]
 ```
+
+`convert` accepts **any** readable blob (a plain ISO or one of the legacy formats) and
+writes an RVZ file, mirroring Dolphin's converter: Wii partitions are stored decrypted with
+hash exceptions, raw data as-is, PRNG junk is packed with a recovered seed (Lagged
+Fibonacci `GetSeed`), and the tables carry all SHA-1 checksums.
+
+## Documentation
+
+The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki covering the
+[CLI](docs/usage-cli.md), the [library API](docs/usage-library.md),
+[architecture](docs/architecture.md), the [RVZ container format](docs/format/rvz.md),
+[compression & packing](docs/format/compression-packing.md),
+[Wii partitions](docs/format/wii-partitions.md), the
+[legacy formats](docs/format/legacy.md), [testing](docs/testing.md),
+[roadmap](docs/roadmap.md) and a [FAQ](docs/faq.md).
 
 ## Project layout
 
 - `src/RVZSharp` — the library: `Format` (container structs), `Io` (big-endian reading,
-  section streams), `Compression` (codecs), `Chunks` (group decoding, exception lists),
-  `Packing` (RVZ packing + PRNG), `Wii` (hash tree + region rebuild), `RvzReader`.
-- `src/RVZSharp.Cli` — the `info`/`decode` tool.
-- `tests/RVZSharp.Tests` — 120 tests: unit (headers, tables, codecs, PRNG, packing,
+  section streams), `Compression` (codecs + `ICompressionEncoder`), `Chunks` (group decoding,
+  exception lists), `Packing` (RVZ packing + PRNG, encoder and decoder), `Wii` (hash tree +
+  region rebuild, partition extraction for the writer), `RvzReader`, `RvzWriter`.
+- `src/RVZSharp.Cli` — the `info`/`decode`/`convert` tool.
+- `tests/RVZSharp.Tests` — 221 tests: unit (headers, tables, codecs, PRNG, packing,
   exceptions, region rebuild) and end-to-end round-trips of synthetic RVZ files built by
-  `TestRvzBuilder` (a minimal writer following Dolphin's converter rules).
+  `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii, legacy → RVZ).
 
 ## Real-world validation
 
@@ -60,5 +76,9 @@ RVZ_REAL_FILE=C:\path\to\game.rvz RVZ_REAL_SHA1=<expected> dotnet test tests/RVZ
 
 ## Status
 
-Decoding is complete and covered by tests. Encoding (RVZ writing) is the next milestone;
-the codec abstraction and the test builder are designed to support it.
+RVZ **and** the legacy disc formats (WIA, GCZ, CISO/WBI, WBFS, TGC, NFS) are decoded
+byte-for-byte and covered by tests; the CLI `info`/`decode` commands accept any of them
+(auto-detected by magic). The RVZ writer (`rvzsharp convert`) encodes any of them back to
+RVZ (Zstd/Bzip2/LZMA1/LZMA2/None, optional packing, 32 KiB–2 MiB chunks), with the same
+SHA-1s Dolphin produces. Remaining work: validation against real game images (see
+`docs/roadmap.md`).

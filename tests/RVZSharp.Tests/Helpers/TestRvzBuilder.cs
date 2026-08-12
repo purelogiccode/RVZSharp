@@ -22,8 +22,11 @@ public sealed class RvzSpec
     /// <summary>Optional Wii partition.</summary>
     public PartitionSpec? Partition { get; set; }
 
-    /// <summary>Global chunk indices that use RVZ packing (empty = no packing).</summary>
+    /// <summary>Global chunk indices that use RVZ packing (empty = no packing; ignored for WIA).</summary>
     public HashSet<int> PackedChunks { get; set; } = [];
+
+    /// <summary>When true, builds a WIA file instead of an RVZ file (8-byte groups, no packing).</summary>
+    public bool IsWia { get; set; }
 
     public int Seed { get; set; } = 1;
 }
@@ -98,7 +101,7 @@ public static class TestRvzBuilder
             {
                 var split = size / 2;
                 var seedBytes = MakeSeed(spec.Seed ^ (int)chunkDiscOffset);
-                var junk = ReferencePrng.Generate(seedBytes, chunkDiscOffset, size - split);
+                var junk = ReferencePrng.Generate(seedBytes, chunkDiscOffset + split, size - split);
                 for (var i = 0; i < split; i++)
                 {
                     payload[i] = chunkDiscOffset + i < 0x80 && chunkDiscOffset == 0
@@ -151,7 +154,7 @@ public static class TestRvzBuilder
                     var size = partitionPayloads[c].Length;
                     var split = size / 2;
                     var seedBytes = MakeSeed(spec.Seed ^ (int)(c * partitionPayloadPerChunk));
-                    var junk = ReferencePrng.Generate(seedBytes, c * partitionPayloadPerChunk, size - split);
+                    var junk = ReferencePrng.Generate(seedBytes, c * partitionPayloadPerChunk + split, size - split);
                     rng.NextBytes(partitionPayloads[c].AsSpan(0, split));
                     junk.CopyTo(partitionPayloads[c], split);
                 }
@@ -284,7 +287,7 @@ public static class TestRvzBuilder
         byte[] payload, long dataOffset, bool isPartition, PartitionSpec? partition = null,
         long partitionDataOffset = 0)
     {
-        var usePacking = spec.PackedChunks.Contains(groupEntries.Count);
+        var usePacking = !spec.IsWia && spec.PackedChunks.Contains(groupEntries.Count);
         byte[] stored = payload;
         uint packedSize = 0;
         if (usePacking)
@@ -297,9 +300,23 @@ public static class TestRvzBuilder
             stored = PrependExceptionLists(stored, payload.Length, spec, partition!, partitionDataOffset);
         }
 
-        var compressed = spec.Compression == CompressionType.None
-            ? stored
-            : TestCompressor.Compress(spec.Compression, stored);
+        // For PURGE the exception lists stay uncompressed in front of the segment stream,
+        // and the SHA-1 trailer covers lists + segments (Dolphin: PurgeCompressor).
+        byte[] compressed;
+        if (spec.Compression == CompressionType.Purge)
+        {
+            var listsBytes = isPartition
+                ? BuildExceptionListBytes(payload.Length, spec, partition!, partitionDataOffset)
+                : [];
+            compressed = listsBytes.Concat(TestCompressor.CompressPurge(payload, listsBytes)).ToArray();
+        }
+        else
+        {
+            compressed = spec.Compression == CompressionType.None
+                ? stored
+                : TestCompressor.Compress(spec.Compression, stored);
+        }
+
         groupData.Add(compressed);
         groupEntries.Add(new RvzGroupEntry(0, 0, packedSize));
     }
@@ -312,7 +329,7 @@ public static class TestRvzBuilder
         var padded = payload.AsSpan(split).ToArray();
 
         var seedBytes = MakeSeed(seed);
-        var junk = ReferencePrng.Generate(seedBytes, dataOffset, padded.Length);
+        var junk = ReferencePrng.Generate(seedBytes, dataOffset + split, padded.Length);
 
         var stored = new byte[4 + literal.Length + 4 + 68 + junk.Length];
         var pos = 0;
@@ -327,7 +344,7 @@ public static class TestRvzBuilder
         return (stored, (uint)stored.Length);
     }
 
-    private static byte[] PrependExceptionLists(byte[] stored, int payloadLength, RvzSpec spec,
+    private static byte[] BuildExceptionListBytes(int payloadLength, RvzSpec spec,
         PartitionSpec partition, long partitionDataOffset)
     {
         // Every partition chunk starts with one exception list per 2 MiB region it covers
@@ -345,16 +362,17 @@ public static class TestRvzBuilder
             for (var i = 0; i < list.Length; i++)
             {
                 var entry = list[i];
-                header.WriteByte((byte)(entry.Offset >> 8));
-                header.WriteByte((byte)entry.Offset);
+                // Stored exception offsets are chunk-relative (the reader adds the chunk's
+                // position within its 2 MiB region); the spec's offsets are region-relative.
+                var offset = entry.Offset - (ushort)((partitionDataOffset % 0x1F0000) / 0x7C00 * 0x400);
+                header.WriteByte((byte)(offset >> 8));
+                header.WriteByte((byte)offset);
                 header.Write(entry.Hash);
             }
         }
 
         var headerBytes = header.ToArray();
-
-        // For NONE compression, pad the list end to a 4-byte boundary.
-        if (spec.Compression == CompressionType.None)
+        if (spec.Compression is CompressionType.None or CompressionType.Purge)
         {
             var padding = (4 - (headerBytes.Length % 4)) % 4;
             if (padding > 0)
@@ -363,8 +381,12 @@ public static class TestRvzBuilder
             }
         }
 
-        return headerBytes.Concat(stored).ToArray();
+        return headerBytes;
     }
+
+    private static byte[] PrependExceptionLists(byte[] stored, int payloadLength, RvzSpec spec,
+        PartitionSpec partition, long partitionDataOffset) =>
+        BuildExceptionListBytes(payloadLength, spec, partition, partitionDataOffset).Concat(stored).ToArray();
 
 
     private static byte[] BuildPartTable(RvzSpec spec, PartitionSpec? partition, int partitionChunkStart,
@@ -429,20 +451,29 @@ public static class TestRvzBuilder
 
         // The group entries' data_off4 depend on the group table's (compressed) length —
         // iterate until the layout is stable.
+        var groupEntrySize = spec.IsWia ? WiaGroupEntry.Size : RvzGroupEntry.Size;
         byte[] groupTableStored = [];
         for (var iteration = 0; iteration < 10; iteration++)
         {
-            var groupTable = new byte[groupEntries.Count * RvzGroupEntry.Size];
+            var groupTable = new byte[groupEntries.Count * groupEntrySize];
             var groupDataStart = AlignUp(0x48L + WiaDisc.Size + partTable.Length +
                 rawTableStored.Length + groupTableStored.Length, 4);
             var running = groupDataStart;
             for (var i = 0; i < groupEntries.Count; i++)
             {
                 var g = groupEntries[i];
-                var pos = i * RvzGroupEntry.Size;
+                var pos = i * groupEntrySize;
                 WriteBe32(groupTable, pos, (uint)(running / 4));
-                WriteBe32(groupTable, pos + 4, (uint)groupData[i].Length | 0x80000000u);
-                WriteBe32(groupTable, pos + 8, g.RvzPackedSize);
+                if (spec.IsWia)
+                {
+                    WriteBe32(groupTable, pos + 4, (uint)groupData[i].Length);
+                }
+                else
+                {
+                    WriteBe32(groupTable, pos + 4, (uint)groupData[i].Length | 0x80000000u);
+                    WriteBe32(groupTable, pos + 8, g.RvzPackedSize);
+                }
+
                 running += AlignUp(groupData[i].Length, 4);
             }
 
@@ -490,9 +521,9 @@ public static class TestRvzBuilder
 
         var result = outStream.ToArray();
         var fileHead = new byte[WiaFileHead.Size];
-        "RVZ"u8.CopyTo(fileHead);
+        (spec.IsWia ? "WIA"u8 : "RVZ"u8).CopyTo(fileHead);
         WriteBe32(fileHead, 4, 0x01000000);
-        WriteBe32(fileHead, 8, 0x00030000);
+        WriteBe32(fileHead, 8, spec.IsWia ? 0x01000000u : 0x00030000u);
         WriteBe32(fileHead, 12, WiaDisc.Size);
         discHash.CopyTo(fileHead, 16);
         WriteBe64(fileHead, 36, (ulong)iso.Length);
@@ -565,6 +596,8 @@ public static class TestRvzBuilder
             }
             case CompressionType.Lzma2:
                 return (1, [21, 0, 0, 0, 0, 0, 0]);
+            case CompressionType.Purge:
+                return (0, new byte[7]);
             default:
                 throw new ArgumentOutOfRangeException(nameof(compression));
         }

@@ -1,0 +1,133 @@
+namespace RVZSharp.Blobs;
+
+/// <summary>
+/// Opens any supported disc image format by sniffing the first bytes (Dolphin:
+/// CreateBlobReader). Every supported container starts with a 4-byte magic; anything else is
+/// treated as a plain ISO.
+/// </summary>
+public static class Blob
+{
+    /// <summary>
+    /// Detects and opens the container format of <paramref name="stream"/> and returns a reader
+    /// that decodes the original disc image bytes.
+    /// </summary>
+    /// <param name="stream">Seekable stream of the disc image file.</param>
+    /// <param name="filePath">
+    /// Optional path of the file. Only needed for NFS, to locate <c>code/htk.bin</c> and the
+    /// <c>hif_00000X.nfs</c> continuation files.
+    /// </param>
+    /// <param name="leaveOpen">Whether disposing the reader leaves <paramref name="stream"/> open.</param>
+    public static IBlobReader Open(Stream stream, string? filePath = null, bool leaveOpen = false)
+    {
+        if (!stream.CanSeek)
+        {
+            throw new ArgumentException("The stream must be seekable.", nameof(stream));
+        }
+
+        Span<byte> magic = stackalloc byte[4];
+        if (!ReadExactlyAt(stream, 0, magic))
+        {
+            throw new RvzFormatException("The file is too short to contain a magic number.");
+        }
+
+        if (magic.SequenceEqual("RVZ\x01"u8))
+        {
+            return RvzReader.Open(stream, leaveOpen);
+        }
+
+        if (magic.SequenceEqual("WIA\x01"u8))
+        {
+            return RvzReader.OpenWia(stream, leaveOpen);
+        }
+
+        if (magic.SequenceEqual("CISO"u8))
+        {
+            return CisoBlob.Open(stream, leaveOpen);
+        }
+
+        if (magic.SequenceEqual(GczBlob.Magic))
+        {
+            return GczBlob.Open(stream, leaveOpen);
+        }
+
+        if (magic.SequenceEqual("WBFS"u8))
+        {
+            return WbfsBlob.Open(stream, leaveOpen);
+        }
+
+        if (magic.SequenceEqual("EGGS"u8))
+        {
+            return NfsBlob.Open(stream, filePath, leaveOpen);
+        }
+
+        // TGC's magic (0xA2380FAE) is a big-endian u32.
+        if (magic.SequenceEqual(new byte[] { 0xA2, 0x38, 0x0F, 0xAE }))
+        {
+            return TgcBlob.Open(stream, leaveOpen);
+        }
+
+        return PlainBlob.Open(stream, leaveOpen);
+    }
+
+    /// <summary>
+    /// Opens an NFS file (magic "EGGS") with an explicit 16-byte AES key; all other formats
+    /// ignore the key. Use <see cref="Open(Stream, string?, bool)"/> to load the key from
+    /// <c>code/htk.bin</c> instead.
+    /// </summary>
+    public static IBlobReader Open(Stream stream, ReadOnlySpan<byte> nfsKey, bool leaveOpen = false)
+    {
+        if (!stream.CanSeek)
+        {
+            throw new ArgumentException("The stream must be seekable.", nameof(stream));
+        }
+
+        Span<byte> magic = stackalloc byte[4];
+        if (!ReadExactlyAt(stream, 0, magic))
+        {
+            throw new RvzFormatException("The file is too short to contain a magic number.");
+        }
+
+        if (magic.SequenceEqual("EGGS"u8))
+        {
+            return NfsBlob.Open(stream, nfsKey, leaveOpen);
+        }
+
+        return Open(stream, filePath: null, leaveOpen);
+    }
+
+    /// <summary>Human-readable name of a blob type (Dolphin: GetName).</summary>
+    public static string GetName(BlobType type) => type switch
+    {
+        BlobType.Plain => "ISO",
+        BlobType.Gcz => "GCZ",
+        BlobType.Ciso => "CISO",
+        BlobType.Wbfs => "WBFS",
+        BlobType.Tgc => "TGC",
+        BlobType.Wia => "WIA",
+        BlobType.Rvz => "RVZ",
+        BlobType.Nfs => "NFS",
+        _ => "",
+    };
+
+    private static bool ReadExactlyAt(Stream stream, long position, Span<byte> buffer)
+    {
+        if (stream.Position != position)
+        {
+            stream.Position = position;
+        }
+
+        var total = 0;
+        while (total < buffer.Length)
+        {
+            var read = stream.Read(buffer[total..]);
+            if (read <= 0)
+            {
+                return false;
+            }
+
+            total += read;
+        }
+
+        return true;
+    }
+}

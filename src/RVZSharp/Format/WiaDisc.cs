@@ -124,14 +124,20 @@ public readonly struct WiaDisc
             comprDataLen, comprData);
     }
 
+    /// <summary>Validates this disc struct as part of an RVZ file.</summary>
+    public void Validate(uint discSize, ReadOnlySpan<byte> rawDisc, ReadOnlySpan<byte> expectedDiscHash) =>
+        Validate(discSize, rawDisc, expectedDiscHash, WiaRvzFormat.Rvz);
+
     /// <summary>
     /// Validates the disc struct: disc size, compressor data bounds, SHA-1 of the disc bytes,
     /// disc type, compression method and chunk size. Follows Dolphin's rules.
     /// </summary>
-    /// <param name="discSize">The disc_size value from the file head.</param>
+    /// <param name="discSize">The disc_size / header_2_size value from the file head.</param>
     /// <param name="rawDisc">The raw disc struct bytes, exactly <paramref name="discSize"/> long.</param>
-    /// <param name="expectedDiscHash">The disc_hash value from the file head.</param>
-    public void Validate(uint discSize, ReadOnlySpan<byte> rawDisc, ReadOnlySpan<byte> expectedDiscHash)
+    /// <param name="expectedDiscHash">The disc_hash / header_2_hash value from the file head.</param>
+    /// <param name="format">Which format the compression and chunk-size rules belong to.</param>
+    public void Validate(uint discSize, ReadOnlySpan<byte> rawDisc, ReadOnlySpan<byte> expectedDiscHash,
+        WiaRvzFormat format)
     {
         if (discSize < MinSize)
         {
@@ -156,25 +162,37 @@ public readonly struct WiaDisc
             throw new RvzFormatException($"Invalid disc type {(uint)DiscType} (expected 1 or 2).");
         }
 
-        switch (Compression)
+        var isRvz = format == WiaRvzFormat.Rvz;
+        var allowed = isRvz
+            ? new[]
+            {
+                CompressionType.None, CompressionType.Bzip2, CompressionType.Lzma,
+                CompressionType.Lzma2, CompressionType.Zstd,
+            }
+            : new[]
+            {
+                CompressionType.None, CompressionType.Purge, CompressionType.Bzip2,
+                CompressionType.Lzma, CompressionType.Lzma2,
+            };
+        if (!allowed.Contains(Compression))
         {
-            case CompressionType.None:
-            case CompressionType.Bzip2:
-            case CompressionType.Lzma:
-            case CompressionType.Lzma2:
-            case CompressionType.Zstd:
-                break;
-            case CompressionType.Purge:
-                throw new RvzUnsupportedException("The PURGE compression method is WIA-only and not supported in RVZ.");
-            default:
-                throw new RvzUnsupportedException($"Unsupported compression method {(uint)Compression}.");
+            throw new RvzUnsupportedException(
+                $"Unsupported compression method {(uint)Compression} for "
+                + $"{(isRvz ? "RVZ" : "WIA")}.");
         }
 
-        // RVZ: chunk size must be >= 32 KiB and a power of two, or a multiple of 2 MiB.
+        // WIA: chunk size must be a multiple of 2 MiB. RVZ: >= 32 KiB power of two, or a
+        // multiple of 2 MiB (Dolphin: (!RVZ || small || !pow2) && not multiple of 2 MiB → fail).
+        if (ChunkSize == 0)
+        {
+            throw new RvzFormatException("Invalid chunk size 0.");
+        }
+
         var isPowerOfTwo = (ChunkSize & (ChunkSize - 1)) == 0;
-        var validRvzChunkSize = (ChunkSize >= SectorSize && isPowerOfTwo) ||
-                                ChunkSize % GroupSize == 0;
-        if (!validRvzChunkSize)
+        var validChunkSize = isRvz
+            ? (ChunkSize >= SectorSize && isPowerOfTwo) || ChunkSize % GroupSize == 0
+            : ChunkSize % GroupSize == 0;
+        if (!validChunkSize)
         {
             throw new RvzFormatException($"Invalid chunk size {ChunkSize}.");
         }

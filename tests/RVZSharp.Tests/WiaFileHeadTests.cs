@@ -49,13 +49,15 @@ public class WiaFileHeadTests
     }
 
     [Fact]
-    public void Validate_WiaMagic_ThrowsUnsupportedException()
+    public void Validate_WiaMagicWithRvzRules_ThrowsFormatException()
     {
         var builder = new TestHeaderBuilder { Magic = WiaFileHead.WiaMagic.ToArray() };
         var bytes = builder.Build();
         var head = WiaFileHead.Parse(bytes);
 
-        Assert.Throws<RvzUnsupportedException>(() => head.Validate(bytes, bytes.Length));
+        // The RVZ overload rejects WIA magic; the WIA overload accepts it.
+        Assert.Throws<RvzFormatException>(() => head.Validate(bytes, bytes.Length));
+        head.Validate(bytes, bytes.Length, WiaRvzFormat.Wia); // must not throw
     }
 
     [Fact]

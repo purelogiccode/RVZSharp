@@ -1,3 +1,4 @@
+using RVZSharp.Blobs;
 using RVZSharp.Chunks;
 using RVZSharp.Compression;
 using RVZSharp.Format;
@@ -6,18 +7,19 @@ using RVZSharp.Wii;
 namespace RVZSharp;
 
 /// <summary>
-/// Reads and decodes an RVZ disc image. Parses and validates the full container at
-/// <see cref="Open"/>, then serves the original disc image (ISO) bytes via
-/// <see cref="ReadAt"/> — byte-identical to the source disc, including re-encrypted Wii
-/// partition data and rebuilt hash trees.
+/// Reads and decodes an RVZ or WIA disc image. Parses and validates the full container at
+/// <see cref="Open(Stream, bool)"/> (RVZ) or <see cref="OpenWia(Stream, bool)"/> (WIA), then
+/// serves the original disc image (ISO) bytes via <see cref="ReadAt"/> — byte-identical to the
+/// source disc, including re-encrypted Wii partition data and rebuilt hash trees.
 /// </summary>
-public sealed class RvzReader : IDisposable
+public sealed class RvzReader : IBlobReader
 {
     /// <summary>Bytes of partition data per 2 MiB region (64 sectors × 0x7C00).</summary>
     public const int RegionDataSize = 64 * WiiHashCalculator.SectorDataSize; // 0x1F0000
 
     private readonly Stream _file;
     private readonly bool _leaveOpen;
+    private readonly WiaRvzFormat _format;
     private readonly ICompressionDecoder _codec;
     private readonly DataArea[] _areas;
 
@@ -37,17 +39,20 @@ public sealed class RvzReader : IDisposable
 
     private readonly record struct DataArea(long Start, long End, AreaKind Kind, int Index, int Segment);
 
-    private RvzReader(Stream file, bool leaveOpen, WiaFileHead fileHead, WiaDisc disc,
-        WiaPartEntry[] partitions, WiaRawDataEntry[] rawData, RvzGroupEntry[] groups)
+    private RvzReader(Stream file, bool leaveOpen, WiaRvzFormat format, WiaFileHead fileHead,
+        WiaDisc disc, WiaPartEntry[] partitions, WiaRawDataEntry[] rawData, GroupEntry[] groups)
     {
         _file = file;
         _leaveOpen = leaveOpen;
+        _format = format;
         FileHead = fileHead;
         Disc = disc;
         Partitions = partitions;
         RawDataEntries = rawData;
         GroupEntries = groups;
-        _codec = CompressionCodecFactory.Create(disc.Compression);
+        _codec = disc.Compression == CompressionType.Purge
+            ? null! // PURGE has no streaming codec; ChunkDecoder handles it directly (WIA only)
+            : CompressionCodecFactory.Create(disc.Compression);
         Length = (long)fileHead.IsoFileSize;
 
         var areas = new List<DataArea>();
@@ -81,27 +86,46 @@ public sealed class RvzReader : IDisposable
     public WiaDisc Disc { get; }
     public WiaPartEntry[] Partitions { get; }
     public WiaRawDataEntry[] RawDataEntries { get; }
-    public RvzGroupEntry[] GroupEntries { get; }
+    public GroupEntry[] GroupEntries { get; }
+
+    /// <summary>True when this reader decodes a WIA file; false for RVZ.</summary>
+    public bool IsWia => _format == WiaRvzFormat.Wia;
+
+    /// <summary>The blob format of the underlying file.</summary>
+    public BlobType Type => IsWia ? BlobType.Wia : BlobType.Rvz;
+
+    /// <summary>Chunk size of the file (0 for formats that do not use blocks).</summary>
+    public int BlockSize => (int)Disc.ChunkSize;
 
     /// <summary>Size of the original disc image in bytes.</summary>
     public long Length { get; }
 
     /// <summary>Parses and validates an RVZ file. The stream must be seekable.</summary>
-    public static RvzReader Open(Stream stream, bool leaveOpen = false)
+    public static RvzReader Open(Stream stream, bool leaveOpen = false) =>
+        Open(stream, leaveOpen, WiaRvzFormat.Rvz);
+
+    /// <summary>Parses and validates a WIA file. The stream must be seekable.</summary>
+    public static RvzReader OpenWia(Stream stream, bool leaveOpen = false) =>
+        Open(stream, leaveOpen, WiaRvzFormat.Wia);
+
+    private static RvzReader Open(Stream stream, bool leaveOpen, WiaRvzFormat format)
     {
         if (!stream.CanSeek)
         {
-            throw new ArgumentException("The RVZ stream must be seekable.", nameof(stream));
+            throw new ArgumentException(
+                $"The {(format == WiaRvzFormat.Wia ? "WIA" : "RVZ")} stream must be seekable.",
+                nameof(stream));
         }
 
         var headBytes = new byte[WiaFileHead.Size];
         if (!ReadExactlyAt(stream, 0, headBytes))
         {
-            throw new RvzFormatException("The file is too short to contain an RVZ file head.");
+            throw new RvzFormatException(
+                "The file is too short to contain a WIA/RVZ file head.");
         }
 
         var fileHead = WiaFileHead.Parse(headBytes);
-        fileHead.Validate(headBytes, stream.Length);
+        fileHead.Validate(headBytes, stream.Length, format);
 
         var discBytes = new byte[fileHead.DiscSize];
         if (!ReadExactlyAt(stream, WiaFileHead.Size, discBytes))
@@ -110,13 +134,13 @@ public sealed class RvzReader : IDisposable
         }
 
         var disc = WiaDisc.Parse(discBytes);
-        disc.Validate(fileHead.DiscSize, discBytes, fileHead.DiscHash);
+        disc.Validate(fileHead.DiscSize, discBytes, fileHead.DiscHash, format);
 
         var partitions = TableParser.ParsePartitions(stream, disc);
         var rawData = TableParser.ParseRawDataEntries(stream, disc);
-        var groups = TableParser.ParseGroupEntries(stream, disc);
+        var groups = TableParser.ParseGroupEntries(stream, disc, format);
 
-        return new RvzReader(stream, leaveOpen, fileHead, disc, partitions, rawData, groups);
+        return new RvzReader(stream, leaveOpen, format, fileHead, disc, partitions, rawData, groups);
     }
 
     /// <summary>
@@ -174,14 +198,20 @@ public sealed class RvzReader : IDisposable
         return total;
     }
 
-    /// <summary>Decodes the whole disc image into a single buffer.</summary>
+    /// <summary>
+    /// Decodes the whole disc image into a single buffer. The image must fit in memory
+    /// (byte arrays are capped at <see cref="int.MaxValue"/> elements, so this supports
+    /// discs up to 2 GiB — use <see cref="ReadAt"/> for larger images).
+    /// </summary>
     public byte[] ReadFully()
     {
         var output = new byte[Length];
         var position = 0L;
         while (position < Length)
         {
-            var read = ReadAt(position, output.AsSpan((int)position));
+            // Copy in bounded pieces so the span offsets stay within int range.
+            var take = (int)Math.Min(1 << 20, Length - position);
+            var read = ReadAt(position, output.AsSpan((int)position, take));
             if (read <= 0)
             {
                 throw new RvzFormatException($"Read stopped at offset 0x{position:X}.");
@@ -226,7 +256,15 @@ public sealed class RvzReader : IDisposable
         if (_cachedRawKey != key || _cachedRawPayload == null)
         {
             var entry = RawDataEntries[rawIndex];
-            var group = GroupEntries[entry.GroupIndex + chunkIndex];
+            var groupIndex = (long)entry.GroupIndex + chunkIndex;
+            if (groupIndex >= GroupEntries.Length)
+            {
+                throw new RvzFormatException(
+                    $"Raw-data entry {rawIndex} references group {groupIndex}, but only "
+                    + $"{GroupEntries.Length} groups exist.");
+            }
+
+            var group = GroupEntries[groupIndex];
             var expectedSize = (int)Math.Min(Disc.ChunkSize, areaSize - chunkIndex * Disc.ChunkSize);
             var result = ChunkDecoder.DecodeChunk(_file, Disc, _codec,
                 new ChunkDecodeRequest
@@ -256,7 +294,7 @@ public sealed class RvzReader : IDisposable
 
     private byte[] GetPartitionRegion(DataArea area, long regionIndex)
     {
-        var key = (long)area.Index << 32 | regionIndex;
+        var key = ((long)area.Index << 40) | ((long)area.Segment << 32) | regionIndex;
         if (_cachedRegionKey != key || _cachedRegion == null)
         {
             _cachedRegion = BuildPartitionRegion(area, regionIndex);
@@ -300,7 +338,15 @@ public sealed class RvzReader : IDisposable
             var remainingSectors = (long)pd.NumSectors - chunkIndex * sectorsPerChunk;
             var expectedSize = (int)(Math.Min(sectorsPerChunk, remainingSectors) * WiiHashCalculator.SectorDataSize);
 
-            var group = GroupEntries[pd.GroupIndex + chunkIndex];
+            var groupIndex = (long)pd.GroupIndex + chunkIndex;
+            if (groupIndex >= GroupEntries.Length)
+            {
+                throw new RvzFormatException(
+                    $"Partition data entry references group {groupIndex}, but only "
+                    + $"{GroupEntries.Length} groups exist.");
+            }
+
+            var group = GroupEntries[groupIndex];
             var result = ChunkDecoder.DecodeChunk(_file, Disc, _codec,
                 new ChunkDecodeRequest
                 {
@@ -327,11 +373,15 @@ public sealed class RvzReader : IDisposable
             return [];
         }
 
-        // Chunks start at 2 MiB region boundaries, so list offsets are region-relative.
+        // The writer stores exception offsets relative to the chunk; the chunk's position
+        // within its 2 MiB region shifts them to region-relative (Dolphin: additional_offset).
+        var additionalOffset = (int)((chunkIndex * PartitionChunkPayloadSize % RegionDataSize) /
+                                     WiiHashCalculator.SectorDataSize * WiiHashCalculator.HashBlockSize);
+
         // Each entry names a sector (offset >> 10) and a position within its hash area.
         return lists[listIndex]
-            .Where(e => (e.Offset >> 10) == (int)(sector % 64))
-            .Select(e => new HashExceptionEntry((ushort)(e.Offset & 0x3FF), e.Hash))
+            .Where(e => ((e.Offset + additionalOffset) >> 10) == (int)(sector % 64))
+            .Select(e => new HashExceptionEntry((ushort)((e.Offset + additionalOffset) & 0x3FF), e.Hash))
             .ToArray();
     }
 

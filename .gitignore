@@ -1,0 +1,27 @@
+# Build
+bin/
+obj/
+artifacts/
+*.user
+
+# IDE
+.vs/
+.idea/
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+
+# NuGet
+*.nupkg
+packages/
+
+# Reference material (third-party sources, re-downloadable)
+References/
+
+# OS
+Thumbs.db
+.DS_Store

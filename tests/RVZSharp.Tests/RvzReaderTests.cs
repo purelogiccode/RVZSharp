@@ -1,0 +1,290 @@
+using RVZSharp;
+using RVZSharp.Chunks;
+using RVZSharp.Format;
+using RVZSharp.Tests.Helpers;
+
+namespace RVZSharp.Tests;
+
+public class RvzReaderTests
+{
+    private static RvzSpec GcSpec(CompressionType compression, uint chunkSize, HashSet<int>? packed = null) =>
+        new()
+        {
+            Compression = compression,
+            ChunkSize = chunkSize,
+            DiscType = DiscType.GameCube,
+            RawSize = (int)(5 * chunkSize) + 0x12345,
+            PackedChunks = packed ?? [],
+            Seed = 7,
+        };
+
+    private static RvzSpec WiiSpec(CompressionType compression, uint chunkSize, bool exceptions,
+        HashSet<int>? packed = null) =>
+        new()
+        {
+            Compression = compression,
+            ChunkSize = chunkSize,
+            DiscType = DiscType.Wii,
+            RawSize = 0x18000,
+            RawTailSize = 0x28000,
+            Partition = new PartitionSpec
+            {
+                SectorCount = 70,
+                Exceptions = exceptions ? MakeExceptions() : [],
+            },
+            PackedChunks = packed ?? [],
+            Seed = 3,
+        };
+
+    private static HashExceptionEntry[][] MakeExceptions()
+    {
+        var e0 = new[]
+        {
+            new HashExceptionEntry(0x100, Enumerable.Range(0, 20).Select(i => (byte)i).ToArray()),
+            new HashExceptionEntry(0x3E0, Enumerable.Range(0, 20).Select(i => (byte)(0x80 + i)).ToArray()),
+        };
+        var e1 = new[]
+        {
+            new HashExceptionEntry(0x200, Enumerable.Range(0, 20).Select(i => (byte)(0x40 + i)).ToArray()),
+        };
+        return [e0, e1];
+    }
+
+    [Theory]
+    [InlineData(CompressionType.None)]
+    [InlineData(CompressionType.Zstd)]
+    [InlineData(CompressionType.Bzip2)]
+    [InlineData(CompressionType.Lzma)]
+    [InlineData(CompressionType.Lzma2)]
+    public void GameCube_FullDecode_EveryCodec(CompressionType compression)
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(GcSpec(compression, 0x200000));
+        using var reader = RvzReader.Open(new MemoryStream(rvz));
+
+        Assert.Equal(iso.Length, reader.Length);
+        Assert.Equal(iso, reader.ReadFully());
+    }
+
+    [Theory]
+    [InlineData(CompressionType.None)]
+    [InlineData(CompressionType.Zstd)]
+    [InlineData(CompressionType.Lzma2)]
+    public void GameCube_Packing(CompressionType compression)
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(
+            GcSpec(compression, 0x200000, packed: [0, 2, 4]));
+        using var reader = RvzReader.Open(new MemoryStream(rvz));
+
+        Assert.Equal(iso, reader.ReadFully());
+    }
+
+    [Fact]
+    public void GameCube_SmallChunks()
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(GcSpec(CompressionType.Zstd, 0x8000));
+        using var reader = RvzReader.Open(new MemoryStream(rvz));
+
+        Assert.Equal(iso, reader.ReadFully());
+    }
+
+    [Theory]
+    [InlineData(CompressionType.None)]
+    [InlineData(CompressionType.Zstd)]
+    public void Wii_FullDecode(CompressionType compression)
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(WiiSpec(compression, 0x200000, exceptions: true));
+        using var reader = RvzReader.Open(new MemoryStream(rvz));
+
+        Assert.Equal(iso, reader.ReadFully());
+    }
+
+    [Fact]
+    public void Wii_WithPackingAndExceptions()
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(
+            WiiSpec(CompressionType.Zstd, 0x200000, exceptions: true, packed: [1, 4]));
+        using var reader = RvzReader.Open(new MemoryStream(rvz));
+
+        Assert.Equal(iso, reader.ReadFully());
+    }
+
+    [Fact]
+    public void Wii_SmallChunks()
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(
+            WiiSpec(CompressionType.Lzma2, 0x8000, exceptions: true));
+        using var reader = RvzReader.Open(new MemoryStream(rvz));
+
+        Assert.Equal(iso, reader.ReadFully());
+    }
+
+    [Fact]
+    public void RandomAccess_MatchesFullDecode()
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(
+            WiiSpec(CompressionType.Zstd, 0x200000, exceptions: true, packed: [2, 5]));
+        using var reader = RvzReader.Open(new MemoryStream(rvz));
+
+        var offsets = new long[] { 0, 0x40, 0x80, 0x12345, 0x18000, 0x300000, 0x3FFFFF, 0x400000 };
+        foreach (var offset in offsets)
+        {
+            if (offset >= iso.Length)
+            {
+                continue;
+            }
+
+            var count = (int)Math.Min(0x12345, iso.Length - offset);
+            var expected = iso.AsSpan((int)offset, count).ToArray();
+            var actual = new byte[count];
+            var read = reader.ReadAt(offset, actual);
+            Assert.Equal(count, read);
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    [Fact]
+    public void Open_BadMagic_Throws()
+    {
+        var bytes = TestRvzBuilder.Build(GcSpec(CompressionType.None, 0x200000));
+        bytes[0] = (byte)'X';
+        Assert.Throws<RvzFormatException>(() => RvzReader.Open(new MemoryStream(bytes)));
+    }
+
+    [Fact]
+    public void Open_TruncatedFile_Throws()
+    {
+        var bytes = TestRvzBuilder.Build(GcSpec(CompressionType.None, 0x200000));
+        Assert.Throws<RvzFormatException>(() =>
+            RvzReader.Open(new MemoryStream(bytes.AsSpan(0, bytes.Length / 2).ToArray())));
+    }
+
+    [Fact]
+    public void Open_TamperedGroupTableHash_Throws()
+    {
+        // The disc hash covers the disc struct: tamper the stored part hash → disc hash mismatch
+        // is detected at Open (the part hash itself lives in the disc struct).
+        var bytes = TestRvzBuilder.Build(GcSpec(CompressionType.None, 0x200000));
+        bytes[0x48 + 0x10] ^= 0xFF; // inside dhead → disc hash mismatch
+        Assert.Throws<RvzHashMismatchException>(() => RvzReader.Open(new MemoryStream(bytes)));
+    }
+}
+
+public class RvzReaderMatrixTests
+{
+    [Theory]
+    [InlineData(CompressionType.Bzip2, 0x80000)]
+    [InlineData(CompressionType.Lzma, 0x80000)]
+    [InlineData(CompressionType.Lzma2, 0x10000)]
+    [InlineData(CompressionType.Zstd, 0x400000)] // 4 MiB chunks: 2 exception lists per partition chunk
+    [InlineData(CompressionType.None, 0x200000)]
+    public void Wii_MoreCombinations(CompressionType compression, uint chunkSize)
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(new RvzSpec
+        {
+            Compression = compression,
+            ChunkSize = chunkSize,
+            DiscType = DiscType.Wii,
+            RawSize = 0x28000,
+            RawTailSize = 0x18000,
+            Partition = new PartitionSpec
+            {
+                SectorCount = 130, // spans 3 regions
+                Exceptions = new[]
+                {
+                    new[] { new RVZSharp.Chunks.HashExceptionEntry(0x100, new byte[20]) },
+                    new[] { new RVZSharp.Chunks.HashExceptionEntry(0x500, new byte[20]) },
+                    Array.Empty<RVZSharp.Chunks.HashExceptionEntry>(),
+                },
+            },
+            PackedChunks = [0, 2, 5],
+            Seed = 11,
+        });
+
+        using var reader = RvzReader.Open(new MemoryStream(rvz));
+        Assert.Equal(iso, reader.ReadFully());
+    }
+
+    [Fact]
+    public void CorruptGroupData_Throws()
+    {
+        var (rvz, _) = TestRvzBuilder.BuildWithIso(new RvzSpec
+        {
+            Compression = CompressionType.Zstd,
+            ChunkSize = 0x200000,
+            RawSize = 0x18000,
+            Seed = 2,
+        });
+
+        // Corrupt a byte inside the first group's stored data.
+        var disc = RVZSharp.Format.WiaDisc.Parse(rvz.AsSpan(0x48, 0xDC));
+        var gs = rvz.AsSpan((int)disc.GroupEntriesOffset, (int)disc.GroupEntriesSize).ToArray();
+        byte[] table;
+        using (var ms = new MemoryStream(gs))
+        using (var d = RVZSharp.Compression.CompressionCodecFactory.Create(disc.Compression)
+            .CreateDecompressor(ms, disc.ComprData.AsSpan(0, disc.ComprDataLen), gs.Length, disc.NumGroups * 12))
+        {
+            table = new byte[disc.NumGroups * 12];
+            var t = 0;
+            while (t < table.Length)
+            {
+                var n = d.Read(table, t, table.Length - t);
+                if (n <= 0)
+                {
+                    break;
+                }
+
+                t += n;
+            }
+        }
+
+        var g0 = RVZSharp.Format.RvzGroupEntry.Parse(table.AsSpan(0, 12));
+        var corrupted = (byte[])rvz.Clone();
+        corrupted[(int)g0.FileOffset] ^= 0xFF; // break the zstd frame magic
+
+        using var reader = RvzReader.Open(new MemoryStream(corrupted));
+        Assert.ThrowsAny<RVZSharp.RvzException>(() => reader.ReadFully());
+    }
+}
+
+public class RealFileDecodeTests
+{
+    /// <summary>
+    /// Optional real-world validation: set RVZ_REAL_FILE to a real .rvz path (and optionally
+    /// RVZ_REAL_SHA1 to the expected SHA-1 of the decoded ISO) to run it.
+    /// </summary>
+    [Fact]
+    public void DecodeRealFile()
+    {
+        var path = Environment.GetEnvironmentVariable("RVZ_REAL_FILE");
+        if (string.IsNullOrEmpty(path))
+        {
+            return; // skipped unless explicitly requested
+        }
+
+        using var file = File.OpenRead(path);
+        using var reader = RvzReader.Open(file, leaveOpen: true);
+        using var sha1 = System.Security.Cryptography.SHA1.Create();
+
+        var buffer = new byte[1 << 20];
+        var position = 0L;
+        while (position < reader.Length)
+        {
+            var read = reader.ReadAt(position, buffer);
+            Assert.True(read > 0, $"Read stopped at 0x{position:X}");
+            sha1.TransformBlock(buffer, 0, read, null, 0);
+            position += read;
+        }
+
+        sha1.TransformFinalBlock([], 0, 0);
+        var actual = Convert.ToHexString(sha1.Hash!).ToLowerInvariant();
+        var expected = Environment.GetEnvironmentVariable("RVZ_REAL_SHA1");
+        if (!string.IsNullOrEmpty(expected))
+        {
+            Assert.Equal(expected.Trim().ToLowerInvariant(), actual);
+        }
+        else
+        {
+            Console.WriteLine($"decoded {path}: {reader.Length} bytes, sha1={actual}");
+        }
+    }
+}

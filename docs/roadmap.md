@@ -28,7 +28,7 @@
 | NFS key location | key must be discoverable (`code/htk.bin` next to `content/`) or supplied via `Blob.Open(stream, nfsKey, …)`. |
 | No WIA writer | the writer emits RVZ only (WIA writing is a possible future addition). |
 
-## Open questions (from PLAN.md §7)
+## Open questions
 
 1. **Real-file validation** — do you have real GCZ / CISO / WBFS / TGC / NFS / WIA / RVZ
    files? Byte-exact decode of real images is the highest-value remaining validation step

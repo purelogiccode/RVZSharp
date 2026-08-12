@@ -19,8 +19,7 @@ src/RVZSharp.Cli/           the info/decode/convert tool
 tests/RVZSharp.Tests/       unit + end-to-end tests (221)
 References/dolphin-master/  Dolphin source (C++) — format reference
 References/rvz-1.0.3/       Go RVZ reader — cross-check reference
-docs/                       this wiki
-PLAN.md                     milestone plan and format notes
+docs/                       the wiki (this documentation)
 ```
 
 ## Building

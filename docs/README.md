@@ -1,6 +1,7 @@
 # RVZSharp Documentation
 
-RVZSharp is a .NET 10 library and command-line tool for **GameCube and Wii disc images**.
+RVZSharp is a .NET 8 / 9 / 10 library and command-line tool for **GameCube and Wii disc
+images**.
 It reads the modern **RVZ** container (and its predecessor **WIA**), decodes the classic
 legacy formats (**GCZ, CISO/WBI, WBFS, TGC, NFS**) into a canonical ISO view, and **writes
 RVZ files** from any of them — mirroring the behaviour of the reference implementations in
@@ -9,9 +10,9 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 
 | | |
 |---|---|
-| Target framework | .NET 10 (`net10.0`) |
+| Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.slnx` (XML solution — do **not** rename to `.sln`) |
-| Tests | 221, all green (`dotnet test CSharp_RVZSharp.slnx -c Release`) |
+| Tests | 228, green on every framework (`dotnet test CSharp_RVZSharp.slnx -c Release`) |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
@@ -21,6 +22,7 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 | Page | What it covers |
 |---|---|
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
+| [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
 | [CLI reference](usage-cli.md) | `info`, `decode`, `convert` — options and examples |
 | [Library API](usage-library.md) | `Blob`, `RvzReader`, `RvzWriter`, codecs, packing API |
 | [Architecture](architecture.md) | Module map, read/write pipelines, design decisions |

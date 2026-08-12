@@ -2,8 +2,9 @@
 
 ## Prerequisites
 
-- [.NET SDK 10](https://dotnet.microsoft.com/download) (or newer; the projects target
-  `net10.0`).
+- [.NET SDK 10](https://dotnet.microsoft.com/download) (or newer). The library and the
+  test suite target **`net8.0`, `net9.0` and `net10.0`**; the CLI targets `net8.0` so the
+  built tool runs on all three runtimes.
 - A disc image to experiment with: a plain `.iso`, or a `.rvz`/`.wia`/`.gcz`/`.ciso`/
   `.wbfs`/`.tgc`/`.nfs` file.
 
@@ -16,7 +17,7 @@ CSharp_RVZSharp.slnx        XML solution file (do NOT rename to .sln)
 Directory.Build.props       net10.0, Nullable, ImplicitUsings, TreatWarningsAsErrors
 src/RVZSharp/               the library
 src/RVZSharp.Cli/           the info/decode/convert tool
-tests/RVZSharp.Tests/       unit + end-to-end tests (221)
+tests/RVZSharp.Tests/       unit + end-to-end tests (228, x3 frameworks)
 References/dolphin-master/  Dolphin source (C++) — format reference
 References/rvz-1.0.3/       Go RVZ reader — cross-check reference
 docs/                       the wiki (this documentation)
@@ -36,7 +37,8 @@ The build treats warnings as errors, so a clean build means zero warnings.
 dotnet test CSharp_RVZSharp.slnx -c Release
 ```
 
-Expected result: `Passed: 221, Failed: 0`.
+Expected result: `Passed: 228, Failed: 0` on **each** of `net8.0`, `net9.0` and `net10.0`
+(the suite runs once per target framework).
 
 To run a single test class:
 
@@ -46,29 +48,19 @@ dotnet test CSharp_RVZSharp.slnx -c Release --filter "FullyQualifiedName~RvzWrit
 
 ## First commands
 
-Inspect a disc image (format is auto-detected):
+The CLI speaks the same command surface as Dolphin's `dolphin-tool` (plus the legacy
+`info`/`decode` commands):
 
 ```bash
-dotnet run --project src/RVZSharp.Cli -c Release -- info game.iso
-dotnet run --project src/RVZSharp.Cli -c Release -- info game.rvz
+dotnet run --project src/RVZSharp.Cli -c Release -- header -i game.iso
+dotnet run --project src/RVZSharp.Cli -c Release -- header -i game.rvz
+dotnet run --project src/RVZSharp.Cli -c Release -- verify -i game.rvz -a sha1
+dotnet run --project src/RVZSharp.Cli -c Release -- convert -i game.wia -o game.rvz -f rvz -c zstd -l 5 -b 131072
+dotnet run --project src/RVZSharp.Cli -c Release -- convert -i game.rvz -o game.iso -f iso
 ```
 
-Decode any format to a plain ISO:
-
-```bash
-dotnet run --project src/RVZSharp.Cli -c Release -- decode game.gcz game.iso
-dotnet run --project src/RVZSharp.Cli -c Release -- decode game.rvz game.iso --sha1 <expected-sha1>
-```
-
-Convert any format to RVZ:
-
-```bash
-dotnet run --project src/RVZSharp.Cli -c Release -- convert game.iso game.rvz
-dotnet run --project src/RVZSharp.Cli -c Release -- convert game.wia game.rvz --compression zstd --level 5
-```
-
-`convert` is the flagship command: it accepts **any** supported input (plain ISO or any
-legacy format) and writes a fully self-contained RVZ file. See the
+`convert` accepts **any** supported input (plain ISO or any legacy format) and writes a
+fully self-contained RVZ file (`-f iso` decodes back to a plain ISO). See the
 [CLI reference](usage-cli.md) for all options.
 
 ## Notes for contributors

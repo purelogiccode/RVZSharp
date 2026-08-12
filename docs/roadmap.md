@@ -7,7 +7,8 @@
 | 1 — RVZ reader | container parsing, tables, codecs, packing, Wii partition rebuild, CLI `info`/`decode` | ✅ done |
 | 2 — Legacy decoders | blob abstraction + magic detection; WIA, GCZ, CISO/WBI, WBFS, TGC, NFS | ✅ done |
 | 3 — RVZ writer | `RvzWriter`, encoders, junk packing, CLI `convert` | ✅ done |
-| 4 — Real-world validation | test against real game images | ⏳ open |
+| 4 — Distribution | NuGet package (net8.0/9.0/10.0), multi-target tests, progress/cancellation API | ✅ done |
+| 5 — Real-world validation | test against real game images | ⏳ open |
 
 ## Supported
 
@@ -26,7 +27,9 @@
 | Chunk sizes above 2 MiB | not writable (Dolphin's converter doesn't expose them either); readable if present. |
 | Single-threaded | reading and writing are sequential; no multithreading yet. |
 | NFS key location | key must be discoverable (`code/htk.bin` next to `content/`) or supplied via `Blob.Open(stream, nfsKey, …)`. |
-| No WIA writer | the writer emits RVZ only (WIA writing is a possible future addition). |
+| No WIA/GCZ writer | `convert -f wia`/`-f gcz` fail with a clear error; only `iso` and `rvz` output exist. |
+| No `extract` command | DolphinTool's `extract` requires a disc filesystem (FST) implementation; the CLI validates the arguments and reports it as unsupported. |
+| Zstd "fast" levels | Dolphin's CLI accepts negative Zstd levels; RVZSharp accepts 1–22. |
 
 ## Open questions
 
@@ -41,6 +44,7 @@
 - Parallel compression in the writer (per-group worker pool, like Dolphin's
   `MultithreadedCompressor`).
 - `--verify` mode: convert and immediately decode-compare (or rely on `--sha1`).
-- WIA writer (shares ~90% of the RVZ writer; adds Purge support).
+- WIA writer (shares ~90% of the RVZ writer; adds Purge support) and GCZ writer.
+- `extract` command: FST parser + file/directory extraction, listing, and game-only mode.
 - Streaming progress reporting for long conversions.
 - Cross-checks against `wit`/`wwt` output for shared formats.

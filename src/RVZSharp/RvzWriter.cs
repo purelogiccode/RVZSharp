@@ -49,8 +49,62 @@ public static class RvzWriter
         public ulong Groups { get; set; }
     }
 
-    /// <summary>Writes <paramref name="input"/> as an RVZ file to <paramref name="output"/>.</summary>
-    public static void Write(IBlobReader input, Stream output, RvzWriteOptions? options = null)
+    /// <summary>
+    /// Decorates an <see cref="IBlobReader"/> with progress reporting and cancellation.
+    /// All input reads in <see cref="Write"/> flow through <see cref="ReadAt"/>, so wrapping
+    /// the input is enough to observe the whole conversion (the reported fraction is clamped
+    /// to 1.0; header and table re-reads can push the byte count past the image size).
+    /// </summary>
+    private sealed class ProgressReader : IBlobReader
+    {
+        private readonly IBlobReader _inner;
+        private readonly IProgress<double>? _progress;
+        private readonly CancellationToken _cancellationToken;
+        private long _bytesServed;
+
+        public ProgressReader(IBlobReader inner, IProgress<double>? progress,
+            CancellationToken cancellationToken)
+        {
+            _inner = inner;
+            _progress = progress;
+            _cancellationToken = cancellationToken;
+        }
+
+        public BlobType Type => _inner.Type;
+        public long Length => _inner.Length;
+        public int BlockSize => _inner.BlockSize;
+
+        public int ReadAt(long position, Span<byte> buffer)
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            var read = _inner.ReadAt(position, buffer);
+            if (read > 0)
+            {
+                _bytesServed += read;
+                _progress?.Report(Math.Min(1.0, (double)_bytesServed / Length));
+            }
+
+            return read;
+        }
+
+        public void Dispose() => _inner.Dispose();
+    }
+
+    /// <summary>
+    /// Writes <paramref name="input"/> as an RVZ file to <paramref name="output"/>.
+    /// </summary>
+    /// <param name="input">Any decoded disc image (plain ISO or a legacy container).</param>
+    /// <param name="output">Destination stream (not disposed by this method).</param>
+    /// <param name="options">Writer options; <see cref="RvzWriteOptions.Default"/> when null.</param>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the input bytes processed.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between group reads.</param>
+    /// <exception cref="ArgumentException">Invalid chunk size or input too small.</exception>
+    /// <exception cref="RvzUnsupportedException">PURGE compression requested (WIA-only method).</exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    public static void Write(IBlobReader input, Stream output, RvzWriteOptions? options = null,
+        IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         options ??= RvzWriteOptions.Default;
         if (options.ChunkSize < 0x8000 || options.ChunkSize > (int)WiaDisc.GroupSize ||
@@ -64,6 +118,11 @@ public static class RvzWriter
         {
             // PURGE is a WIA-only method; the RVZ format does not support it.
             throw new RvzUnsupportedException("PURGE compression is not supported for RVZ files.");
+        }
+
+        if (progress is not null || cancellationToken.CanBeCanceled)
+        {
+            input = new ProgressReader(input, progress, cancellationToken);
         }
 
         var (encoder, props) = CompressionEncoderFactory.Create(options.Compression, options.CompressionLevel);

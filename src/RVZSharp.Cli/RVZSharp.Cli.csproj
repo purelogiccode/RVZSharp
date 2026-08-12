@@ -6,9 +6,13 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- The CLI targets net8.0 only so the built tool runs on .NET 8, 9 and 10 runtimes
+         alike, and plain dotnet run on this project needs no target-framework flag.
+         (Explicitly overrides the multi-targeting in Directory.Build.props.) -->
+    <TargetFrameworks>net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
 </Project>

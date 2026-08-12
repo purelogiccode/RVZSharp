@@ -70,6 +70,36 @@ public static class Blob
     }
 
     /// <summary>
+    /// Opens a disc image file by path with automatic format detection. The returned reader
+    /// owns the file stream; disposing the reader closes it.
+    /// </summary>
+    /// <param name="path">Path of the disc image file (RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS or a plain ISO).</param>
+    /// <exception cref="IOException">The file cannot be opened.</exception>
+    /// <exception cref="RvzFormatException">The file is not a recognized disc image.</exception>
+    public static IBlobReader Open(string path)
+    {
+        var stream = File.OpenRead(path);
+        try
+        {
+            return Open(stream, path, leaveOpen: false);
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Opens a disc image file by path with automatic format detection, supplying the NFS
+    /// AES key explicitly (only used when the file is an NFS image; other formats ignore it).
+    /// </summary>
+    /// <param name="path">Path of the disc image file.</param>
+    /// <param name="nfsKey">The 16-byte AES key used to decrypt NFS images.</param>
+    public static IBlobReader Open(string path, ReadOnlySpan<byte> nfsKey) =>
+        Open(File.OpenRead(path), nfsKey, leaveOpen: false);
+
+    /// <summary>
     /// Opens an NFS file (magic "EGGS") with an explicit 16-byte AES key; all other formats
     /// ignore the key. Use <see cref="Open(Stream, string?, bool)"/> to load the key from
     /// <c>code/htk.bin</c> instead.

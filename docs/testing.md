@@ -1,10 +1,13 @@
 # Testing
 
-The suite has **221 tests** and runs in ~30 seconds:
+The suite has **228 tests** and runs on every target framework (`net8.0`, `net9.0`,
+`net10.0`) in ~50 seconds each:
 
 ```bash
 dotnet test CSharp_RVZSharp.slnx -c Release
 ```
+
+A single framework can be selected with `--framework net8.0` (etc.).
 
 ## Strategy
 

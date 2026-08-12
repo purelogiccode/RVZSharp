@@ -1,8 +1,14 @@
 # RVZSharp
 
-A pure C# (.NET 10) library and CLI for decoding **Dolphin RVZ** disc images (GameCube/Wii).
-RVZ is the successor of the WIA format; RVZSharp decodes RVZ files back to the original
-disc image (`.iso`) **byte-for-byte**, including:- all five compression methods: NONE, BZIP2, LZMA, LZMA2, Zstandard (100% managed codecs —
+A pure managed C# library and CLI (**.NET 8 / 9 / 10**) for decoding and encoding **Dolphin
+RVZ** disc images (GameCube/Wii). RVZ is the successor of the WIA format; RVZSharp decodes
+RVZ files back to the original disc image (`.iso`) **byte-for-byte**, including:
+
+```
+dotnet add package RVZSharp
+```
+
+- all five compression methods: NONE, BZIP2, LZMA, LZMA2, Zstandard (100% managed codecs —
   ZstdSharp.Port, SharpZipLib, and a vendored 7-Zip LZMA/LZMA2 decoder, see THIRD-PARTY-NOTICES.md);
 - the RVZ packing scheme (Lagged Fibonacci PRNG padding reconstruction);
 - Wii partition reconstruction: SHA-1 hash trees (h0/h1/h2), hash exceptions, and
@@ -33,16 +39,18 @@ decoded bytes at any offset; `ReadFully()` decodes the entire image.
 ### CLI
 
 ```
-dotnet run --project src/RVZSharp.Cli -- info <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
-dotnet run --project src/RVZSharp.Cli -- decode <file> out.iso [--sha1 <expected-hex>]
-dotnet run --project src/RVZSharp.Cli -- convert <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso> out.rvz \
-    [--compression none|zstd|bzip2|lzma|lzma2] [--level <1-9>] [--chunk-size <kib>] [--no-packing]
+dotnet run --project src/RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
+dotnet run --project src/RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1]
+dotnet run --project src/RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz \
+    [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
 ```
 
-`convert` accepts **any** readable blob (a plain ISO or one of the legacy formats) and
-writes an RVZ file, mirroring Dolphin's converter: Wii partitions are stored decrypted with
-hash exceptions, raw data as-is, PRNG junk is packed with a recovered seed (Lagged
-Fibonacci `GetSeed`), and the tables carry all SHA-1 checksums.
+The CLI accepts the same command arguments as Dolphin's `dolphin-tool` (`convert`,
+`verify`, `header`; `extract` is recognized but not implemented). `convert` accepts
+**any** readable blob (a plain ISO or one of the legacy formats) and writes an RVZ file,
+mirroring Dolphin's converter: Wii partitions are stored decrypted with hash exceptions,
+raw data as-is, PRNG junk is packed with a recovered seed (Lagged Fibonacci `GetSeed`),
+and the tables carry all SHA-1 checksums. `-f iso` decodes back to a plain ISO.
 
 ## Documentation
 
@@ -52,7 +60,8 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
 [compression & packing](docs/format/compression-packing.md),
 [Wii partitions](docs/format/wii-partitions.md), the
 [legacy formats](docs/format/legacy.md), [testing](docs/testing.md),
-[roadmap](docs/roadmap.md) and a [FAQ](docs/faq.md).
+[packaging & distribution](docs/packaging.md), [roadmap](docs/roadmap.md) and a
+[FAQ](docs/faq.md).
 
 ## Project layout
 
@@ -61,9 +70,10 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   exception lists), `Packing` (RVZ packing + PRNG, encoder and decoder), `Wii` (hash tree +
   region rebuild, partition extraction for the writer), `RvzReader`, `RvzWriter`.
 - `src/RVZSharp.Cli` — the `info`/`decode`/`convert` tool.
-- `tests/RVZSharp.Tests` — 221 tests: unit (headers, tables, codecs, PRNG, packing,
-  exceptions, region rebuild) and end-to-end round-trips of synthetic RVZ files built by
-  `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii, legacy → RVZ).
+- `tests/RVZSharp.Tests` — 228 tests (net8.0 + net9.0 + net10.0): unit (headers, tables, codecs,
+  PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of synthetic RVZ files
+  built by `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii,
+  legacy → RVZ) and package-facing API tests (path open, ReadFully, progress, cancellation).
 
 ## Real-world validation
 

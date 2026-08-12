@@ -1,16 +1,48 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- NuGet package metadata (dotnet pack). -->
+  <PropertyGroup>
+    <PackageId>RVZSharp</PackageId>
+    <Title>RVZSharp</Title>
+    <Description>
+      A pure managed .NET library for reading and writing Dolphin RVZ/WIA disc images and
+      decoding the legacy GameCube/Wii formats (GCZ, CISO/WBI, WBFS, TGC, NFS) to a canonical
+      ISO view. Licensed under GPL-2.0-or-later (format logic derived from Dolphin).
+    </Description>
+    <PackageTags>dolphin;rvz;wia;gcz;ciso;wbfs;tgc;nfs;gamecube;wii;iso;disc-image</PackageTags>
+    <PackageLicenseExpression>GPL-2.0-or-later</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReleaseNotes>Initial release: RVZ/WIA reader, legacy format decoders, RVZ writer with packing and hash exceptions.</PackageReleaseNotes>
+    <RepositoryUrl>https://github.com/drpetersonfernandes/RVZSharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- Validates that every target framework (net8.0/net9.0/net10.0) asset is compatible
+         with the package's supported frameworks. Add PackageValidationBaselineVersion when
+         the API stabilizes (see docs/packaging.md). -->
+    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="LZMA-SDK" Version="22.1.1" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

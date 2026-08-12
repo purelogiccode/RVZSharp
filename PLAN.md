@@ -1,10 +1,12 @@
-# RVZSharp — Implementation Plan (draft)
-
-> DRAFT COPY — move to `D:\Sincronizar\source\repos\CSharp_RVZSharp\PLAN.md` once the sandbox
-> `allow_write` entry for that folder is active. See the chat summary for the same content.
+# RVZSharp — Implementation Plan
 
 Pure C# library to **encode and decode** Dolphin RVZ disc images, built on **.NET 10** (`net10.0`).
-**Phase 1 (this plan): full decoding.** Encoding is designed for later (M8) but out of scope now.
+
+- **Phase 1 (DONE): full RVZ decoding** — Milestones M0–M8, 120 tests green.
+- **Phase 2 (this plan): decode legacy GameCube/Wii formats** (GCZ, WIA, CISO, WBFS, TGC, NFS) to a
+  canonical ISO view, so those files can later be re-encoded to RVZ.
+- **Phase 3 (planned): RVZ encoding** (`RvzWriter` + `rvzsharp convert`) — consumes any decoded
+  image (ISO or legacy format) and produces an RVZ file.
 
 ## 1. Goal & scope
 
@@ -16,9 +18,15 @@ Pure C# library to **encode and decode** Dolphin RVZ disc images, built on **.NE
 - Public API: streaming `Stream` (sequential) + random-access read (`Read`/`Seek`/`Length`) with chunk caching.
 - CLI tool: `rvzsharp info <file.rvz>` and `rvzsharp decode <file.rvz> <out.iso> [--sha1 <expected>]`.
 
-Out of scope for Phase 1 (designed for, not built):
-- Encoding/writing RVZ files (M8 placeholder).
-- WIA format (magic `WIA\x01`) — architecture leaves room for it (same codebase); Purge codec is WIA-only and skipped.
+Phase 2 scope (decode legacy formats → canonical ISO view, enabling later re-encoding to RVZ):
+- A generic blob abstraction (Dolphin `BlobReader` equivalent) with magic-based auto-detection.
+- Decoders: **WIA** (same core as RVZ), **GCZ**, **CISO**, **WBFS**, **TGC**, **NFS**, plus
+  (optional) Dolphin's split-file and directory blobs.
+- Each decoder reproduces the original disc image (ISO) bytes; Wii formats keep their encrypted
+  partition layout as-is (no hash/encryption work needed for legacy formats other than WIA).
+
+Out of scope for now:
+- Phase 3 RVZ encoding (planned, see §9) — not started until Phase 2 decoders are green.
 - "Decrypted read" API (Dolphin `ReadWiiDecrypted`) — not needed to reproduce an ISO.
 
 ## 2. Format & reference sources (already studied)
@@ -125,13 +133,80 @@ Fallbacks if a package's API doesn't fit (checked at M3): LZMA → `Faithlife.Lz
 ### M8 — Docs & packaging (small)
 16. README (API usage, CLI usage, format notes), XML doc comments, `dotnet pack` for `RVZSharp.nupkg`, encoding design notes for Phase 2.
 
+## 4b. Phase 2 — Decode legacy formats → canonical ISO (to enable re-encoding to RVZ)
+
+User request (2026-08): decode legacy GameCube/Wii formats — **GCZ, WIA, CISO/WBI, WBFS** (and the
+other Dolphin blob formats **TGC, NFS**) — so those files can later be re-encoded to RVZ.
+Format facts below were verified against `References/dolphin-master/Source/Core/DiscIO/`
+(Blob.cpp, CISOBlob.cpp, WbfsBlob.cpp, TGCBlob.cpp, NFSBlob.cpp, WIABlob.h) and
+wit.wiimm.de documentation (GCZ/CISO/WBFS layout specs).
+
+### M9 — Blob abstraction + auto-detection
+17. `IBlobReader` (Dolphin `BlobReader` equivalent): `Length`, `ReadAt(offset, span)`,
+    `BlockSize`, `BlobType` + factory `Blob.Open(stream)` sniffing magics
+    (`RVZ\x01`, `WIA\x01`, GCZ, CISO, WBFS, TGC, NFS, EGGS). `RvzReader` implements it;
+    CLI `info`/`decode` accept any blob type.
+    Tests: detection table (each magic incl. negative cases), RVZ passthrough unchanged.
+
+### M10 — WIA decoder (reuse the RVZ core)
+18. WIA = the same `WIARVZFileReader<false>` template in Dolphin — differences from RVZ:
+    magic `WIA\x01`; compression ∈ {NONE, Purge, BZIP2, LZMA, LZMA2} (no Zstandard);
+    group entry is 8 bytes (no MSB compression flag, no `rvz_packed_size`); chunk size must be a
+    multiple of 2 MiB (no small chunks); no RVZ packing. Add `WiaGroupEntry` (8 B), `PurgeCodec`
+    (u32 offset/size segment runs + SHA-1 trailer over lists+segments), version constants
+    (`WIA_VERSION_READ_COMPATIBLE = 0x00080000`), magic acceptance in `WiaFileHead`.
+    Tests: synthetic WIA builder (extend `TestRvzBuilder` with a WIA mode) round-trips per codec
+    incl. Purge; corrupted files; RVZ/WIA cross-rejection.
+
+### M11 — GCZ decoder
+19. GCZ (Dolphin `Blob.cpp`: `GCZ_MAGIC`, `ConvertToGCZ`; layout cross-checked with wit docs):
+    header (magic, version, block size, block count, per-block offset table), each block
+    (16 KiB) optionally zlib/Deflate-compressed; uncompressed blocks stored raw. Implement with
+    `System.IO.Compression.ZLibStream` (BCL — no new dependency).
+    Tests: synthetic GCZ builder round-trip (mixed raw/compressed blocks, odd last block).
+
+### M12 — CISO decoder
+20. CISO (`CISOBlob.cpp`): header (magic, block size, block count, block map), fixed blocks
+    (0x8000), map entry 1 = block present (sequential file offsets), 0 = absent → zero-filled.
+    Dolphin's reader does not decompress CISO blocks (plain copy).
+    Tests: synthetic CISO (present/absent blocks, partial last block) round-trip.
+
+### M13 — WBFS decoder
+21. WBFS (`WbfsBlob.cpp`): header (`WBFS` magic, sector size/count, disc table), 2 MiB cluster
+    allocation; unused sectors omitted → zero-filled on decode. Supports standalone `.wbfs`
+    files (and the on-disc WBFS partition layout if cheap).
+    Tests: synthetic WBFS (sparse disc: full, partial and empty clusters) round-trip.
+
+### M14 — TGC, NFS (+ optional split-file/directory blobs)
+22. TGC (`TGCBlob.cpp`): header at 0 (magic, `tgc_header_size`, DOL offsets), disc data follows
+    the header; DOL extraction uses the header's real offset. NFS (`NFSBlob.cpp`, magic
+    `EGGS`): multi-file container with a lower-bound data size. Optional: `SplitFileBlob`
+    (.dol/.d01) and `DirectoryBlob` (folder → virtual ISO).
+    Tests: synthetic TGC (with/without DOL relocation) and NFS round-trips; optional blobs if
+    implemented.
+
+## 4c. Phase 3 — RVZ encoding (planned; start after Phase 2 is green)
+
+### M15 — RvzWriter + `rvzsharp convert`
+23. Writer mirroring `TestRvzBuilder` (promoted into the library): chunking per Dolphin rules
+    (aligned raw entries, per-2 MiB partition regions), exception-list generation (diff of
+    recalculated vs original hashes), RVZ packing writer (junk detection via the Lagged
+    Fibonacci `GetSeed` reverse algorithm from Dolphin's `LaggedFibonacciGenerator.cpp`, seed
+    + segment writing), table/header assembly with all SHA-1s.
+24. Encoders behind `ICompressionEncoder`: zstd (`ZstdSharp.CompressionStream`), bzip2
+    (`BZip2OutputStream`), LZMA1/LZMA2 (`LZMA-SDK` becomes a runtime dependency, or vendor the
+    7-Zip encoder), NONE. `rvzsharp convert <legacy|iso> out.rvz [--compression zstd] [--chunk-size ...]`.
+    Tests: convert ISO → RVZ → decode → byte-identical (per codec, GC + Wii); convert every
+    Phase-2 legacy format to RVZ and back; real-file spot checks.
+
 ## 5. Verification commands (used at every step)
 
 ```
-dotnet build CSharp_RVZSharp.sln -c Release
-dotnet test  CSharp_RVZSharp.sln
-dotnet run --project src/RVZSharp.Cli -- info <file.rvz>
-dotnet run --project src/RVZSharp.Cli -- decode <file.rvz> out.iso --sha1 <expected>
+dotnet build CSharp_RVZSharp.slnx -c Release
+dotnet test  CSharp_RVZSharp.slnx
+dotnet run --project src/RVZSharp.Cli -- info <file.rvz|legacy>
+dotnet run --project src/RVZSharp.Cli -- decode <file.rvz|legacy> out.iso --sha1 <expected>   # Phase 2: any blob
+dotnet run --project src/RVZSharp.Cli -- convert <file.rvz|legacy|iso> out.rvz               # Phase 3
 ```
 
 ## 6. Risks & mitigations
@@ -143,8 +218,14 @@ dotnet run --project src/RVZSharp.Cli -- decode <file.rvz> out.iso --sha1 <expec
 | RVZ packing / exceptions are easy to get subtly wrong (byte order, skip offsets, padding) | Independent reference implementations in tests (mirroring Go/Dolphin code) + round-trip ISO equality |
 | Different validators disagree (Go is stricter than Dolphin: `disc_size == 0xDC`) | Follow Dolphin's rules (accepting superset), document divergences |
 | Performance (multi-GB discs) | Streaming decode, single-chunk cache, `ReadExactly`/span APIs; parallel decompression deferred as an optimization step |
+| Legacy format specs are thin (GCZ layout lives in Blob.cpp; wit docs are the cross-reference) | Read Dolphin's implementation as truth, wit.wiimm.de as cross-check; document every layout decision; synthetic builders + real-file SHA-1 checks |
+| WIA Purge codec is WIA-only and unused by RVZ | Implement + test it in M10; it is small (segment runs + SHA-1 trailer) |
+| Phase 3 LZMA encoding needs an encoder (LZMA-SDK is currently test-only) | Promote LZMA-SDK to a runtime dependency or vendor the 7-Zip encoder; both are pure managed |
+| Legacy→RVZ conversion doubles the test surface | Round-trip property: convert → decode → compare with the original ISO for every legacy format |
 
 ## 7. Open questions for the user
 
 1. Codec dependency strategy — resolved: managed NuGet packages (ZstdSharp.Port, SharpZipLib, LZMA-SDK). ✓
 2. Real-world validation files — does the user have `.rvz` files to test against (M7 step 15)?
+3. Legacy test files — does the user have real GCZ/CISO/WBFS/TGC/NFS/WIA files (M11–M14 real-file checks)?
+4. Phase 3 scope — start RVZ encoding (M15) right after Phase 2, or after the user reviews the Phase 2 results?

@@ -150,7 +150,8 @@ count × { u16 hash_offset, 20 bytes SHA-1 }
 
 ## Chunking and regions
 
-- The disc is divided into **chunks** of `chunk_size` bytes (power of two, 32 KiB–2 MiB).
+- The disc is divided into **chunks** of `chunk_size` bytes (power of two between 32 KiB
+  and 2 MiB, or a multiple of 2 MiB above that — Dolphin's rule).
 - Raw data: one chunk per group.
 - Partition data: regions of **64 sectors = 2 MiB**; a chunk maps to one region for 2 MiB
   chunks, or to a sub-region slice for smaller chunks.

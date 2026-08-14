@@ -43,7 +43,7 @@ or the library API to supply the key directly.
 
 **Which compression should I use?**
 `zstd` (default) for most cases; `lzma2` for the best ratio on compressible data; `none`
-for speed. Levels 1–9 (Zstd up to 22).
+for speed. Levels 1–9 (Zstd −131072..22, like Dolphin's CLI).
 
 ## Technical
 

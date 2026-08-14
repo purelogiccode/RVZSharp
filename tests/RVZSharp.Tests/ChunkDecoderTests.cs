@@ -20,6 +20,32 @@ public class ChunkDecoderTests
         return data;
     }
 
+    [Fact]
+    public void Chunk_WithExtraStoredBytes_Throws()
+    {
+        // A group whose stored bytes exceed the expected payload must be rejected
+        // (Dolphin: WIABlob.cpp:741-754) — the end-of-payload probe finds the excess.
+        var payload = Payload(0x100, seed: 4);
+        var (file, group) = GroupFile(payload.Concat(new byte[] { 0xAA }).ToArray(), compressed: false);
+
+        var ex = Assert.Throws<RvzFormatException>(() =>
+            Decode(file, MakeDisc(CompressionType.None), CompressionType.None, group,
+                isPartition: false, expectedSize: payload.Length, dataOffset: 0));
+        Assert.Contains("more than", ex.Message);
+    }
+
+    [Fact]
+    public void Chunk_CorruptBzip2_ThrowsFormatException()
+    {
+        // A corrupt bzip2 stream must surface as RvzFormatException, not leak a raw
+        // SharpZipBaseException.
+        var (file, group) = GroupFile(new byte[] { 0x42, 0x5A, 0x68, 0x00, 0x00, 0xFF, 0xFF }, compressed: true);
+
+        Assert.Throws<RvzFormatException>(() =>
+            Decode(file, MakeDisc(CompressionType.Bzip2), CompressionType.Bzip2, group,
+                isPartition: false, expectedSize: 0x100, dataOffset: 0));
+    }
+
     private static WiaDisc MakeDisc(CompressionType compression)
     {
         var builder = new TestDiscBuilder { ChunkSize = 0x8000 };

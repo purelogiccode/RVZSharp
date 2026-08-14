@@ -1,9 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/RVZSharp.Cli/RVZSharp.Cli.csproj" />
-    <Project Path="src/RVZSharp/RVZSharp.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/RVZSharp.Tests/RVZSharp.Tests.csproj" />
-  </Folder>
-</Solution>

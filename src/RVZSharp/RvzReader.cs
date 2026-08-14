@@ -139,8 +139,101 @@ public sealed class RvzReader : IBlobReader
         var partitions = TableParser.ParsePartitions(stream, disc);
         var rawData = TableParser.ParseRawDataEntries(stream, disc);
         var groups = TableParser.ParseGroupEntries(stream, disc, format);
+        ValidateDataLayout(partitions, rawData);
 
         return new RvzReader(stream, leaveOpen, format, fileHead, disc, partitions, rawData, groups);
+    }
+
+    /// <summary>
+    /// Rejects tables whose data areas overlap or are misordered, mirroring Dolphin's
+    /// partition-segment ordering check (WIABlob.cpp:204-208) and HasDataOverlap
+    /// (WIABlob.cpp:244-277): every non-empty data area must be covered by its own
+    /// end-keyed entry (first_sector × 0x8000 for partition data, raw offsets as-is).
+    /// </summary>
+    private static void ValidateDataLayout(WiaPartEntry[] partitions, WiaRawDataEntry[] rawData)
+    {
+        const long blockSize = WiaDisc.SectorSize; // 0x8000: the partition entry sector unit
+
+        // The two segments of a partition must be in order (segment 0 before segment 1).
+        foreach (var partition in partitions)
+        {
+            if (partition.Data[0].NumSectors != 0 && partition.Data[1].NumSectors != 0 &&
+                partition.Data[0].FirstSector > partition.Data[1].FirstSector)
+            {
+                throw new RvzFormatException(
+                    "The partition table contains a data entry whose segments are out of order.");
+            }
+        }
+
+        // End-keyed map of every non-empty data area (std::map::emplace: first wins).
+        var ends = new SortedDictionary<long, (bool IsPartition, int Index, int Segment)>();
+        void AddEnd(long end, bool isPartition, int index, int segment)
+        {
+            if (!ends.ContainsKey(end))
+            {
+                ends[end] = (isPartition, index, segment);
+            }
+        }
+
+        for (var i = 0; i < partitions.Length; i++)
+        {
+            for (var segment = 0; segment < 2; segment++)
+            {
+                var entry = partitions[i].Data[segment];
+                if (entry.NumSectors != 0)
+                {
+                    AddEnd(((long)entry.FirstSector + entry.NumSectors) * blockSize, true, i, segment);
+                }
+            }
+        }
+
+        for (var i = 0; i < rawData.Length; i++)
+        {
+            if (rawData[i].RawDataSize != 0)
+            {
+                AddEnd((long)(rawData[i].RawDataOffset + rawData[i].RawDataSize), false, i, 0);
+            }
+        }
+
+        // Each area's start must be covered by exactly its own end-keyed entry (Dolphin:
+        // upper_bound(start) must find the entry itself — anything else is an overlap or
+        // a gap/ordering error).
+        bool Covered(long start, bool isPartition, int index, int segment)
+        {
+            foreach (var pair in ends)
+            {
+                if (pair.Key > start)
+                {
+                    return pair.Value == (isPartition, index, segment);
+                }
+            }
+
+            return false;
+        }
+
+        for (var i = 0; i < partitions.Length; i++)
+        {
+            for (var segment = 0; segment < 2; segment++)
+            {
+                var entry = partitions[i].Data[segment];
+                if (entry.NumSectors != 0 &&
+                    !Covered((long)entry.FirstSector * blockSize, true, i, segment))
+                {
+                    throw new RvzFormatException(
+                        "The disc tables contain overlapping or misplaced partition data.");
+                }
+            }
+        }
+
+        for (var i = 0; i < rawData.Length; i++)
+        {
+            if (rawData[i].RawDataSize != 0 &&
+                !Covered((long)rawData[i].RawDataOffset, false, i, 0))
+            {
+                throw new RvzFormatException(
+                    "The disc tables contain overlapping or misplaced raw data.");
+            }
+        }
     }
 
     /// <summary>
@@ -379,10 +472,28 @@ public sealed class RvzReader : IBlobReader
                                      WiiHashCalculator.SectorDataSize * WiiHashCalculator.HashBlockSize);
 
         // Each entry names a sector (offset >> 10) and a position within its hash area.
-        return lists[listIndex]
-            .Where(e => ((e.Offset + additionalOffset) >> 10) == (int)(sector % 64))
-            .Select(e => new HashExceptionEntry((ushort)((e.Offset + additionalOffset) & 0x3FF), e.Hash))
-            .ToArray();
+        // Out-of-range entries are rejected, not silently dropped (Dolphin:
+        // ApplyHashExceptions, WIABlob.cpp:868-876).
+        var exceptions = new List<HashExceptionEntry>();
+        foreach (var entry in lists[listIndex])
+        {
+            var regionOffset = entry.Offset + additionalOffset;
+            var blockIndex = regionOffset >> 10;
+            var offsetInBlock = regionOffset & 0x3FF;
+            if (blockIndex >= 64 ||
+                offsetInBlock + WiiHashCalculator.HashSize > WiiHashCalculator.HashBlockSize)
+            {
+                throw new RvzFormatException(
+                    $"Hash exception at offset 0x{entry.Offset:X4} is outside the region's hash area.");
+            }
+
+            if (blockIndex == (int)(sector % 64))
+            {
+                exceptions.Add(new HashExceptionEntry((ushort)offsetInBlock, entry.Hash));
+            }
+        }
+
+        return exceptions.ToArray();
     }
 
     private int PartitionChunkPayloadSize =>

@@ -17,7 +17,7 @@ CSharp_RVZSharp.slnx        XML solution file (do NOT rename to .sln)
 Directory.Build.props       net10.0, Nullable, ImplicitUsings, TreatWarningsAsErrors
 src/RVZSharp/               the library
 src/RVZSharp.Cli/           the info/decode/convert tool
-tests/RVZSharp.Tests/       unit + end-to-end tests (228, x3 frameworks)
+tests/RVZSharp.Tests/       unit + end-to-end tests (255, x3 frameworks)
 References/dolphin-master/  Dolphin source (C++) — format reference
 References/rvz-1.0.3/       Go RVZ reader — cross-check reference
 docs/                       the wiki (this documentation)
@@ -37,7 +37,7 @@ The build treats warnings as errors, so a clean build means zero warnings.
 dotnet test CSharp_RVZSharp.slnx -c Release
 ```
 
-Expected result: `Passed: 228, Failed: 0` on **each** of `net8.0`, `net9.0` and `net10.0`
+Expected result: `Passed: 255, Failed: 0` on **each** of `net8.0`, `net9.0` and `net10.0`
 (the suite runs once per target framework).
 
 To run a single test class:

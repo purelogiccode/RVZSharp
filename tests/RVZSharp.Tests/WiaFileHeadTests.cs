@@ -111,7 +111,11 @@ public class WiaFileHeadTests
     [Fact]
     public void FormatVersion_MatchesDolphinStyle()
     {
-        Assert.Equal("1.00", WiaFileHead.FormatVersion(0x01000000));
-        Assert.Equal("0.03", WiaFileHead.FormatVersion(0x00030000));
+        // Dolphin's VersionToString (WIABlob.cpp:618-629): 3-4 components.
+        Assert.Equal("1.00.00", WiaFileHead.FormatVersion(0x01000000));
+        Assert.Equal("0.03.00", WiaFileHead.FormatVersion(0x00030000));
+        Assert.Equal("0.08.00", WiaFileHead.FormatVersion(0x00080000));
+        Assert.Equal("1.00.00.beta1", WiaFileHead.FormatVersion(0x01000001));
+        Assert.Equal("1.02.03", WiaFileHead.FormatVersion(0x010203ff)); // 0xff also means "no beta"
     }
 }

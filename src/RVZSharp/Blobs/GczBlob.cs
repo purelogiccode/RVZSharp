@@ -81,6 +81,13 @@ public sealed class GczBlob : IBlobReader
             throw new RvzFormatException("The GCZ block size is zero.");
         }
 
+        // Reject sizes that would overflow the int casts used for reads and allocations
+        // (hostile headers only; Dolphin's own converter writes 0x4000-byte blocks).
+        if (blockSize > int.MaxValue)
+        {
+            throw new RvzFormatException($"The GCZ block size {blockSize} is too large.");
+        }
+
         // Compare in ulong so a header with the top bit set cannot wrap past the bounds check.
         var headerSize = HeaderSize + (ulong)numBlocks * 12;
         if (headerSize > (ulong)stream.Length ||
@@ -161,6 +168,14 @@ public sealed class GczBlob : IBlobReader
         while (!buffer.IsEmpty && position < Length)
         {
             var blockIndex = (int)(position / _blockSize);
+            if (blockIndex >= _blockOffsets.Length)
+            {
+                // The header's disc_size exceeds the block table: reading past the last
+                // block is a format error (Dolphin fails the read, CompressedBlob.cpp:137-138).
+                throw new RvzFormatException(
+                    $"GCZ read at 0x{position:X} is past the last block (disc_size exceeds the block table).");
+            }
+
             var offsetInBlock = (int)(position % _blockSize);
             var take = (int)Math.Min(Math.Min(buffer.Length, _blockSize - offsetInBlock), Length - position);
 

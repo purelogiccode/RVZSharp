@@ -17,7 +17,9 @@ public sealed class ZstdEncoder : ICompressionEncoder
 {
     private readonly int _level;
 
-    public ZstdEncoder(int level) => _level = Math.Clamp(level, 1, 22);
+    // Dolphin's CLI accepts ZSTD_minCLevel()..ZSTD_maxCLevel(), i.e. -131072..22
+    // (negative levels select fast modes; 0 means the default level).
+    public ZstdEncoder(int level) => _level = Math.Clamp(level, -131072, 22);
 
     public byte[] Compress(ReadOnlySpan<byte> data)
     {

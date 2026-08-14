@@ -9,7 +9,7 @@ rvzsharp convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
                  [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
 rvzsharp header -i <FILE> [-j] [-b] [-c] [-l]
 rvzsharp verify -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
-rvzsharp extract -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l <path>] [-q] [-g]
+rvzsharp extract -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l] [-q] [-g]
 rvzsharp info <FILE>                              (legacy alias of header)
 rvzsharp decode <FILE> <OUT> [--sha1 <hex>]       (decode any blob to a plain ISO)
 ```
@@ -32,8 +32,11 @@ Every command opens its input through `Blob.Open`, which recognises formats by m
 | `01 C0 0B B1` | GCZ |
 | `57 42 46 53` (`WBFS`) | WBFS |
 | `45 47 47 53` (`EGGS`) | NFS |
-| `A2 38 0F AE` | TGC |
+| `AE 0F 38 A2` | TGC |
 | anything else | plain ISO |
+
+(`WBFS` inputs may be split across `game.wbfs` + `game.wbf1…` continuation files, like
+Dolphin; the parts are found from the file path.)
 
 ## `convert`
 
@@ -53,7 +56,7 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
 | `-b`, `--block_size` | block size in **bytes**. Required for GCZ/WIA/RVZ. |
 | `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd`, `bzip2`, `lzma`, `lzma2`. Required for WIA/RVZ. |
 | `-l`, `--compression_level` | compression level. Required unless `-c none`. |
-| `-s`, `--scrub` | scrub junk data — **not supported** by RVZSharp (errors out). |
+| `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso` a warning notes that scrubbing gains little. |
 
 Block-size validation follows Dolphin's `IsDiscImageBlockSizeValid`:
 
@@ -64,27 +67,27 @@ Block-size validation follows Dolphin's `IsDiscImageBlockSizeValid`:
 | `wia` | ≥ 2 MiB and a multiple of 2 MiB |
 | `rvz` | ≥ 32 KiB; below 2 MiB a power of two; above 2 MiB a multiple of 2 MiB |
 
-Compression levels: `bzip2`/`lzma`/`lzma2` accept 1–9; `zstd` accepts 1–22 (Dolphin's CLI
-also allows negative "fast" levels, which this implementation does not). A block size
-outside Dolphin's preferred range (32 KiB–2 MiB) prints a warning and continues.
+Compression levels: `bzip2`/`lzma`/`lzma2` accept 1–9; `zstd` accepts −131072..22
+(negative levels select Zstd's fast modes, 0 means the default — the same range as
+Dolphin's CLI). A block size outside Dolphin's preferred range (32 KiB–2 MiB) prints a
+warning and continues.
 
 Notes:
 
 - **`-f iso`** writes a plain, fully decoded ISO (the same operation as the legacy `decode`).
 - **`-f rvz`** uses the RVZ writer: Wii partitions stored decrypted with hash exceptions,
-  PRNG junk packing, fully checksummed tables. `-b` becomes the chunk size; `-b` values
-  above 2 MiB are rejected by this implementation (the writer supports powers of two from
-  32 KiB to 2 MiB).
+  PRNG junk packing, fully checksummed tables. `-b` becomes the chunk size; below 2 MiB it
+  must be a power of two, at/above 2 MiB a multiple of 2 MiB (Dolphin's rule).
 - **`-f gcz` / `-f wia`** are not implemented yet — the command fails with a clear error
   (only `iso` and `rvz` output exist).
-- `-s` (scrub) is not implemented — the command fails rather than silently producing
-  different output than Dolphin.
+- `-s` (scrub) requires a Wii disc with a game partition; other inputs fail with
+  Dolphin's "Unable to process disc image. Try again without --scrub."
 
 Legacy positional form (RVZSharp extension, still works):
 
 ```
 rvzsharp convert <input> <output.rvz> [--compression <method>] [--level <n>]
-                 [--chunk-size <kib>] [--no-packing]
+                 [--chunk-size <bytes>] [--no-packing]
 ```
 
 ## `header`
@@ -140,17 +143,18 @@ verify -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
 CRC32: ee01e1c6
 MD5: a5547d8fa856c04da2d0147d59176365
 SHA1: 2fe83205d928407f049be5d2181cfb6e5ca44465
-Problems Found: No
 ```
 
 - With `-a <algo>`, prints just that digest in lowercase hex — handy for scripting
   (`verify -i game.rvz -a sha1` matches the `--sha1` value of `decode`).
-- `rchash` is accepted by the parser but errors out (RetroAchievements hashes are not
-  implemented).
+- `rchash` is not offered (Dolphin only provides it when built with RetroAchievements
+  support); `-a rchash` is an invalid choice.
+- The input must be a GC/Wii disc image (checked by the disc magic); other files fail
+  with "The input file is not a GC/Wii disc.".
 - Hashing is done over the **decoded** image (RVZ/WIA groups are decompressed and Wii
   partition regions rebuilt), so the digests match the plain ISO.
-- `Problems Found` mirrors Dolphin's report header; RVZSharp reports `No` — container
-  integrity problems fail loudly at open time instead.
+- Unlike Dolphin's structural verifier, the digests verify decodability + content; exit
+  code 1 on any decode failure (Dolphin exits 0 after recording problems).
 
 ## `extract`
 

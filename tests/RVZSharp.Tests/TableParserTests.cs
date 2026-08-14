@@ -128,11 +128,31 @@ public class TableParserTests
     [Fact]
     public void ParsePartitions_NoPartitions_ReturnsEmpty()
     {
-        var disc = new TestDiscBuilder { NumPartitions = 0 };
+        // Dolphin verifies the partition-table hash even when the table is empty
+        // (WIABlob.cpp:165-175): it must be SHA-1 of the empty byte buffer.
+        var disc = new TestDiscBuilder
+        {
+            NumPartitions = 0,
+            PartitionEntriesHash = SHA1.HashData(ReadOnlySpan<byte>.Empty),
+        };
         var (file, discBytes) = BuildFile(disc, [], [], []);
         using (file)
         {
             Assert.Empty(TableParser.ParsePartitions(file, WiaDisc.Parse(discBytes)));
+        }
+    }
+
+    [Fact]
+    public void ParsePartitions_NoPartitions_BadHash_Throws()
+    {
+        // An empty partition table with a non-matching hash must be rejected (the default
+        // TestDiscBuilder hash is all zeroes).
+        var disc = new TestDiscBuilder { NumPartitions = 0 };
+        var (file, discBytes) = BuildFile(disc, [], [], []);
+        using (file)
+        {
+            Assert.Throws<RvzHashMismatchException>(() =>
+                TableParser.ParsePartitions(file, WiaDisc.Parse(discBytes)));
         }
     }
 
@@ -155,19 +175,31 @@ public class TableParserTests
     }
 
     [Fact]
-    public void ParsePartitions_EntrySizeTooSmall_Throws()
+    public void ParsePartitions_EntrySizeSmallerThan030_ZeroFills()
     {
+        // Dolphin accepts entries smaller than 0x30 and zero-fills the remainder
+        // (WIABlob.cpp:177-185: copy_length = min(entry_size, sizeof(PartitionEntry))).
+        var partTable = new byte[0x20];
+        // 16-byte key at 0..15, first data entry at 16 (the second entry is beyond the
+        // declared entry size and must be zero-filled).
+        WriteBeU32(0x1234).CopyTo(partTable, 0x10); // first_sector
+        WriteBeU32(0x20).CopyTo(partTable, 0x14);   // number_of_sectors
         var disc = new TestDiscBuilder
         {
             DiscType = DiscType.Wii,
             NumPartitions = 1,
-            PartitionEntrySize = 0x10,
+            PartitionEntrySize = 0x20,
+            PartitionEntriesHash = SHA1.HashData(partTable),
         };
-        var (file, discBytes) = BuildFile(disc, new byte[0x10], [], []);
+        var (file, discBytes) = BuildFile(disc, partTable, [], []);
         using (file)
         {
-            Assert.Throws<RvzFormatException>(() =>
-                TableParser.ParsePartitions(file, WiaDisc.Parse(discBytes)));
+            var entries = TableParser.ParsePartitions(file, WiaDisc.Parse(discBytes));
+            Assert.Single(entries);
+            Assert.Equal(0x1234u, entries[0].Data[0].FirstSector);
+            Assert.Equal(0x20u, entries[0].Data[0].NumSectors);
+            Assert.Equal(0u, entries[0].Data[1].FirstSector); // zero-filled tail
+            Assert.Equal(0u, entries[0].Data[1].NumSectors);
         }
     }
 

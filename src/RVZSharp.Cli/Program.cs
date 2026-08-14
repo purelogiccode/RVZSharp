@@ -18,10 +18,10 @@ internal static class Program
     {
         try
         {
-            if (args.Length == 0)
+            if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
             {
                 PrintUsage();
-                return 1;
+                return args.Length == 0 ? 1 : 0;
             }
 
             return args[0] switch
@@ -37,7 +37,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Console.Error.WriteLine($"error: {e.Message}");
+            Console.Error.WriteLine($"Error: {e.Message}");
             return 1;
         }
     }
@@ -105,12 +105,15 @@ internal static class Program
             {
                 var eq = arg.IndexOf('=');
                 var longName = eq >= 0 ? arg[..eq] : arg;
-                if (!spec.TryGetValue(longName, out var option))
+                // Spec keys are dash-less long names ("input"); also accept the "--input"
+                // form advertised in the usage text.
+                if (!spec.TryGetValue(longName, out var option) &&
+                    !spec.TryGetValue(longName[2..], out option))
                 {
                     throw new CliError($"no such option: {arg}");
                 }
 
-                name = longName;
+                name = longName[2..];
                 takesValue = option.TakesValue;
                 choices = option.Choices;
                 inlineValue = eq >= 0 ? arg[(eq + 1)..] : null;
@@ -186,7 +189,7 @@ internal static class Program
 
     private static int ConvertCommand(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || args[0] is "-h" or "--help")
+        if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
         {
             Console.Error.WriteLine(
                 "usage: convert [options]... [FILE]...\n"
@@ -198,7 +201,7 @@ internal static class Program
                 + "  -b, --block_size <int>     block size in bytes (required for GCZ/WIA/RVZ)\n"
                 + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
                 + "  -l, --compression_level    level of compression for the selected method");
-            return args.Count > 0 && args[0] == "-h" ? 0 : 1;
+            return args.Count == 0 ? 1 : 0;
         }
 
         // Legacy positional form: convert <input> <output> [options]
@@ -254,6 +257,7 @@ internal static class Program
 
         using (blob)
         {
+            var input = (IBlobReader)blob;
             if (format is "gcz" or "wia")
             {
                 return Fail(
@@ -262,14 +266,38 @@ internal static class Program
 
             if (options.HasFlag("scrub"))
             {
-                return Fail("Scrubbing is not supported by this implementation.");
+                // Dolphin scrubs the input before converting (ConvertCommand.cpp:170-197).
+                // Without a filesystem (FST) parser, scrubbing zeroes the data of non-game
+                // Wii partitions (update/channel) — the safe subset of DiscScrubber.
+                var scrubbed = ScrubbedBlob.Create(blob);
+                if (scrubbed == null)
+                {
+                    return Fail("Unable to process disc image. Try again without --scrub.");
+                }
+
+                input = scrubbed;
+                if (format == "rvz")
+                {
+                    Console.Error.WriteLine(
+                        "Warning: Scrubbing an RVZ container does not offer significant space "
+                        + "advantages. Continuing anyway.");
+                }
+                else if (format == "iso")
+                {
+                    Console.Error.WriteLine(
+                        "Warning: Scrubbing does not save space when converting to ISO unless "
+                        + "using external compression. Continuing anyway.");
+                }
             }
 
             // --block_size
             var blockSize = 0;
             if (format is "gcz" or "wia" or "rvz")
             {
-                if (!options.IsSet("block_size") || !int.TryParse(options.Get("block_size"), out blockSize))
+                var blockSizeArg = options.IsSet("block_size")
+                    ? options.Get("block_size")
+                    : options.Get("chunk-size"); // RVZSharp extension: alias for -b (bytes)
+                if (blockSizeArg == null || !int.TryParse(blockSizeArg, out blockSize))
                 {
                     return Fail("Block size must be set for GCZ/RVZ/WIA");
                 }
@@ -283,13 +311,6 @@ internal static class Program
                 {
                     Console.Error.WriteLine(
                         "Warning: Block size is not ideal for performance. Continuing anyway.");
-                }
-
-                if (format == "rvz" && (blockSize & (blockSize - 1)) != 0)
-                {
-                    return Fail(
-                        "Block size is not supported by this implementation "
-                        + "(supported: a power of two between 32 KiB and 2 MiB).");
                 }
             }
 
@@ -338,7 +359,7 @@ internal static class Program
 
             if (format == "iso")
             {
-                return DecodeBlob(blob, outputPath, expectedSha1: null);
+                return DecodeBlob(input, outputPath, expectedSha1: null);
             }
 
             var writeOptions = new RvzWriteOptions
@@ -350,9 +371,7 @@ internal static class Program
             };
 
             using var output = File.Create(outputPath);
-            RvzWriter.Write(blob, output, writeOptions);
-            Console.WriteLine($"converted {blob.Length} bytes ({Blob.GetName(blob.Type)}) to {outputPath} "
-                + $"({compression}, level {level}, chunk 0x{blockSize:X}, packing {(packing ? "on" : "off")})");
+            RvzWriter.Write(input, output, writeOptions);
             return 0;
         }
     }
@@ -360,19 +379,22 @@ internal static class Program
     /// <summary>Legacy positional convert: rvzsharp convert &lt;in&gt; &lt;out&gt; [options].</summary>
     private static int ConvertLegacy(string inputPath, string outputPath, IReadOnlyList<string> args)
     {
-        var options = new RvzWriteOptions();
-        for (var i = 0; i < args.Count - 1; i++)
+        // Dolphin-style suggested defaults (level 5, 131072-byte chunks); -b/-c/-l are not
+        // required in this legacy form, but provided values are validated like the flag form.
+        var options = new RvzWriteOptions { CompressionLevel = 5, ChunkSize = 131072 };
+        for (var i = 0; i < args.Count; i++)
         {
             switch (args[i])
             {
-                case "--compression":
-                    options = options with { Compression = ParseCompression(args[i + 1]) };
+                case "--compression" when i + 1 < args.Count:
+                    options = options with { Compression = ParseCompression(args[++i]) };
                     break;
-                case "--level":
-                    options = options with { CompressionLevel = int.Parse(args[i + 1]) };
+                case "--level" when i + 1 < args.Count:
+                    options = options with { CompressionLevel = int.Parse(args[++i]) };
                     break;
-                case "--chunk-size":
-                    options = options with { ChunkSize = int.Parse(args[i + 1]) * 1024 };
+                // Bytes, like -b (--chunk-size used to be KiB).
+                case "--chunk-size" when i + 1 < args.Count:
+                    options = options with { ChunkSize = int.Parse(args[++i]) };
                     break;
                 case "--no-packing":
                     options = options with { Packing = false };
@@ -380,14 +402,28 @@ internal static class Program
             }
         }
 
+        if (options.Compression == CompressionType.Purge)
+        {
+            return Fail("PURGE compression is not supported for RVZ files.");
+        }
+
+        var (min, max) = GetAllowedCompressionLevels(options.Compression);
+        if (options.CompressionLevel < min || options.CompressionLevel > max)
+        {
+            return Fail("Compression level not in acceptable range");
+        }
+
+        if (options.ChunkSize < 0x8000 ||
+            (options.ChunkSize < (int)WiaDisc.GroupSize && (options.ChunkSize & (options.ChunkSize - 1)) != 0) ||
+            (options.ChunkSize > (int)WiaDisc.GroupSize && options.ChunkSize % (int)WiaDisc.GroupSize != 0))
+        {
+            return Fail("Block size is not valid for this format");
+        }
+
         using var input = File.OpenRead(inputPath);
         using var blob = Blob.Open(input, filePath: inputPath, leaveOpen: true);
         using var output = File.Create(outputPath);
         RvzWriter.Write(blob, output, options);
-
-        Console.WriteLine($"converted {blob.Length} bytes ({Blob.GetName(blob.Type)}) to {outputPath} "
-            + $"({options.Compression}, level {options.CompressionLevel}, "
-            + $"chunk 0x{options.ChunkSize:X}, packing {(options.Packing ? "on" : "off")})");
         return 0;
     }
 
@@ -409,9 +445,9 @@ internal static class Program
         compression switch
         {
             CompressionType.Bzip2 or CompressionType.Lzma or CompressionType.Lzma2 => (1, 9),
-            // Dolphin's CLI allows ZSTD_minCLevel()..ZSTD_maxCLevel(); this implementation
-            // supports the practical 1..22 range.
-            CompressionType.Zstd => (1, 22),
+            // Dolphin's non-GUI CLI accepts ZSTD_minCLevel()..ZSTD_maxCLevel()
+            // (WIABlob.cpp:68-75): negative levels select fast modes, 0 is the default.
+            CompressionType.Zstd => (-131072, 22),
             _ => (0, -1),
         };
 
@@ -443,7 +479,7 @@ internal static class Program
 
     private static int HeaderCommand(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || args[0] is "-h" or "--help")
+        if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
         {
             Console.Error.WriteLine(
                 "usage: header [options]...\n"
@@ -452,7 +488,7 @@ internal static class Program
                 + "  -b, --block_size     print the block size of GCZ/WIA/RVZ formats\n"
                 + "  -c, --compression    print the compression method of GCZ/WIA/RVZ formats\n"
                 + "  -l, --compression_level  print the level of compression for WIA/RVZ formats");
-            return args.Count > 0 && args[0] == "-h" ? 0 : 1;
+            return args.Count == 0 ? 1 : 0;
         }
 
         ParsedArgs options;
@@ -619,19 +655,21 @@ internal static class Program
     {
         ["user"] = new("-u", true, null),
         ["input"] = new("-i", true, null),
-        ["algorithm"] = new("-a", true, ["crc32", "md5", "sha1", "rchash"]),
+        // Dolphin only offers rchash when built with RetroAchievements support
+        // (VerifyCommand.cpp:134-137); without it, -a rchash is an invalid choice.
+        ["algorithm"] = new("-a", true, ["crc32", "md5", "sha1"]),
     };
 
     private static int VerifyCommand(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || args[0] is "-h" or "--help")
+        if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
         {
             Console.Error.WriteLine(
                 "usage: verify [options]...\n"
                 + "  -u, --user <dir>           user folder path (accepted for compatibility)\n"
                 + "  -i, --input <FILE>         path to input file\n"
                 + "  -a, --algorithm <algo>     compute one digest: crc32, md5, sha1");
-            return args.Count > 0 && args[0] == "-h" ? 0 : 1;
+            return args.Count == 0 ? 1 : 0;
         }
 
         ParsedArgs options;
@@ -650,10 +688,6 @@ internal static class Program
         }
 
         var algorithm = options.Get("algorithm");
-        if (algorithm == "rchash")
-        {
-            return Fail("The rchash algorithm is not supported by this implementation.");
-        }
 
         var inputPath = options.Get("input")!;
         IBlobReader blob;
@@ -669,6 +703,24 @@ internal static class Program
 
         using (blob)
         {
+            // Dolphin's verify requires a GC/Wii volume (VerifyCommand.cpp:148-154): check
+            // the disc magic (GC DVD magic at 0x1C, Wii magic at 0x18) so non-disc blobs
+            // fail like Dolphin.
+            Span<byte> discHeader = stackalloc byte[0x80];
+            if (blob.ReadAt(0, discHeader) != discHeader.Length)
+            {
+                return Fail("The input file is not a GC/Wii disc.");
+            }
+
+            var wiiMagic = (uint)((discHeader[0x18] << 24) | (discHeader[0x19] << 16) |
+                                  (discHeader[0x1A] << 8) | discHeader[0x1B]);
+            var gcMagic = (uint)((discHeader[0x1C] << 24) | (discHeader[0x1D] << 16) |
+                                 (discHeader[0x1E] << 8) | discHeader[0x1F]);
+            if (wiiMagic != WiiVolume.WII_MAGIC && gcMagic != WiiVolume.GC_MAGIC)
+            {
+                return Fail("The input file is not a GC/Wii disc.");
+            }
+
             var wantCrc32 = algorithm is null || algorithm == "crc32";
             var wantMd5 = algorithm is null || algorithm == "md5";
             var wantSha1 = algorithm is null || algorithm == "sha1";
@@ -715,7 +767,6 @@ internal static class Program
             Console.WriteLine($"CRC32: {crc:x8}");
             Console.WriteLine($"MD5: {ToLowerHex(md5!.Hash!)}");
             Console.WriteLine($"SHA1: {ToLowerHex(sha1!.Hash!)}");
-            Console.WriteLine("Problems Found: No");
             return 0;
         }
     }
@@ -765,14 +816,14 @@ internal static class Program
         ["output"] = new("-o", true, null),
         ["partition"] = new("-p", true, null),
         ["single"] = new("-s", true, null),
-        ["list"] = new("-l", true, null),
+        ["list"] = new("-l", false, null),
         ["quiet"] = new("-q", false, null),
         ["gameonly"] = new("-g", false, null),
     };
 
     private static int ExtractCommand(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || args[0] is "-h" or "--help")
+        if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
         {
             Console.Error.WriteLine(
                 "usage: extract [options]...\n"
@@ -780,10 +831,10 @@ internal static class Program
                 + "  -o, --output <dir>     output directory\n"
                 + "  -p, --partition <name> extract only this partition\n"
                 + "  -s, --single <path>    extract a single file\n"
-                + "  -l, --list <path>      list the files under this path\n"
+                + "  -l, --list            list the files under this path\n"
                 + "  -q, --quiet            do not print progress\n"
                 + "  -g, --gameonly         only extract the main game partition");
-            return args.Count > 0 && args[0] == "-h" ? 0 : 1;
+            return args.Count == 0 ? 1 : 0;
         }
 
         ParsedArgs options;
@@ -835,30 +886,42 @@ internal static class Program
             var gameId = FilterGameId(header[..6]);
             var revision = header[7];
 
-            var internalName = DecodeInternalName(disc);
-            var titleId = isWii ? ReadTitleId(disc) : null;
             var region = ReadRegion(disc, isWii);
-            var country = CountryCodeToCountry(gameId.Length > 3 ? gameId[3] : (char)0, isWii, region, revision);
+            var internalName = DecodeInternalName(disc, region);
+            var titleId = isWii ? ReadTitleId(disc) : null;
+            var countryCode = gameId[3];
+            var country = CountryCodeToCountry(countryCode, isWii, region, revision);
+            // Dolphin falls back to the region's typical country when the country byte
+            // contradicts the region (VolumeDisc.cpp:93-99).
+            if (CountryCodeToRegion(countryCode, isWii, region, revision) != region)
+            {
+                country = TypicalCountryForRegion(region);
+            }
+
             return new DiscVolumeInfo(gameId, revision, internalName, titleId, region, country);
         }
 
-        /// <summary>6 bytes at offset 0; non-printable bytes become '_'.</summary>
+        /// <summary>
+        /// 6 bytes at offset 0; any non-alphanumeric byte becomes '-', including NUL and
+        /// the country byte (Dolphin: Volume.cpp:46-56).
+        /// </summary>
         private static string FilterGameId(ReadOnlySpan<byte> id)
         {
             var chars = new char[id.Length];
             for (var i = 0; i < id.Length; i++)
             {
                 var c = (char)id[i];
-                chars[i] = c is >= (char)0x20 and <= (char)0x7E ? c : '_';
+                chars[i] = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                    ? c
+                    : '-';
             }
 
-            var text = new string(chars);
-            var end = text.IndexOf('\0');
-            return end >= 0 ? text[..end] : text;
+            return new string(chars);
         }
 
-        /// <summary>0x60 bytes at 0x20, up to the first NUL; ASCII plus a Latin-1 fallback.</summary>
-        private static string DecodeInternalName(IBlobReader disc)
+        /// <summary>0x60 bytes at 0x20, up to the first NUL; CP1252, or Shift-JIS for NTSC-J
+        /// (Dolphin: Volume.cpp:39-44).</summary>
+        private static string DecodeInternalName(IBlobReader disc, string region)
         {
             var raw = new byte[0x60];
             if (disc.ReadAt(0x20, raw) != raw.Length)
@@ -872,14 +935,18 @@ internal static class Program
                 end = raw.Length;
             }
 
-            var builder = new StringBuilder(end);
-            for (var i = 0; i < end; i++)
-            {
-                var b = raw[i];
-                builder.Append(b is >= 0x20 and <= 0x7E ? (char)b : (char)(0x100 + b - 0x80));
-            }
+            return NameEncoding(region).GetString(raw, 0, end);
+        }
 
-            return builder.ToString();
+        private static Encoding NameEncoding(string region) => region == "NTSC-J" ? ShiftJis : Cp1252;
+
+        private static readonly Encoding Cp1252 = GetCodePageEncoding(1252);
+        private static readonly Encoding ShiftJis = GetCodePageEncoding(932);
+
+        private static Encoding GetCodePageEncoding(int codePage)
+        {
+            Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(codePage);
         }
 
         /// <summary>
@@ -937,6 +1004,67 @@ internal static class Program
                 _ => "Unknown",
             };
         }
+
+        /// <summary>Dolphin's CountryCodeToRegion (Enums.cpp:213-268).</summary>
+        private static string CountryCodeToRegion(char code, bool isWii, string region, byte revision)
+        {
+            var isGc = !isWii;
+            switch (code)
+            {
+                case '\x02':
+                    return region; // Wii Menu (same title ID for all regions)
+                case 'J':
+                    return "NTSC-J";
+                case 'W':
+                    // Only the Nordic version of Ratatouille (Wii) is PAL; otherwise Korean
+                    // GC games in English or Taiwanese Wii games.
+                    return region == "PAL" ? "PAL" : "NTSC-J";
+                case 'E':
+                    if (!isGc)
+                    {
+                        return "NTSC-U"; // the most common country code for NTSC-U
+                    }
+
+                    return revision >= 0x30 ? "NTSC-J" : "NTSC-U"; // Korean GC games in English
+                case 'B':
+                case 'N':
+                    return "NTSC-U";
+                case 'X':
+                case 'Y':
+                case 'Z':
+                    // Additional language versions, store-exclusive versions, special versions.
+                    return region == "NTSC-U" ? "NTSC-U" : "PAL";
+                case 'D':
+                case 'F':
+                case 'H':
+                case 'I':
+                case 'L':
+                case 'M':
+                case 'P':
+                case 'R':
+                case 'S':
+                case 'U':
+                case 'V':
+                    return "PAL";
+                case 'K':
+                case 'Q':
+                case 'T':
+                    // All Korean, but the NTSC-K region does not exist on GC.
+                    return isGc ? "NTSC-J" : "NTSC-K";
+                default:
+                    return "Unknown";
+            }
+        }
+
+        /// <summary>Dolphin's TypicalCountryForRegion (Enums.cpp:173-187).</summary>
+        private static string TypicalCountryForRegion(string region) => region switch
+        {
+            "NTSC-J" => "Japan",
+            "NTSC-U" => "USA",
+            "PAL" => "Europe",
+            "NTSC-K" => "Korea",
+            _ => "Unknown",
+        };
 
         /// <summary>Dolphin's CountryCodeToCountry (Enums.cpp).</summary>
         private static string CountryCodeToCountry(char code, bool isWii, string region, byte revision)
@@ -1090,7 +1218,6 @@ internal static class Program
 
         var buffer = new byte[1 << 20];
         var position = 0L;
-        var lastProgress = -1;
         while (position < reader.Length)
         {
             var read = reader.ReadAt(position, buffer);
@@ -1102,23 +1229,6 @@ internal static class Program
             output.Write(buffer, 0, read);
             sha1.TransformBlock(buffer, 0, read, null, 0);
             position += read;
-
-            if (Console.IsOutputRedirected)
-            {
-                continue;
-            }
-
-            var percent = (int)(position * 100 / reader.Length);
-            if (percent != lastProgress)
-            {
-                lastProgress = percent;
-                Console.Write($"\rdecoding... {percent,3}%");
-            }
-        }
-
-        if (!Console.IsOutputRedirected)
-        {
-            Console.WriteLine();
         }
 
         if (expectedSha1 != null)

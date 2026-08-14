@@ -57,6 +57,195 @@ public class RvzWriterTests
     }
 
     [Fact]
+    public void WiiIso_ModifiedHashPadding_RoundTrips()
+    {
+        // Flip bytes inside the hash-area padding fields of a sector: the writer must emit
+        // full 20-byte hash exceptions with Dolphin's overlapping windows (offsets +0 and
+        // +12 for the 32-byte paddings, WIABlob.cpp:1452-1455). A partial trailing hash
+        // would desync the fixed 22-byte exception entries.
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 130, TestWiiIsoBuilder.RandomData(130));
+        var dataStart = TestWiiIsoBuilder.PartitionOffset + TestWiiIsoBuilder.DataOffset;
+        foreach (var paddingOffset in new[] { 0x26C, 0x320, 0x3E0 }) // padding_0/1/2 of sector 5
+        {
+            var at = dataStart + 5 * 0x8000 + paddingOffset;
+            iso[at] ^= 0xFF;
+            iso[at + 0x10] ^= 0xFF;
+        }
+
+        var rvz = Convert(iso, CompressionType.Zstd, packing: true);
+        Assert.Equal(iso, Decode(rvz));
+    }
+
+    [Fact]
+    public void WiiIso_OverlappingUpdatePartition_IsSkipped_AndDataRetained()
+    {
+        // A second, overlapping partition (an update partition) whose offset lies inside the
+        // first partition's data. Dolphin skips it (WIABlob.cpp:967-971); the writer must not
+        // encode it as a partition and must not lose any disc data.
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 130, TestWiiIsoBuilder.RandomData(130));
+
+        // Replace the partition table with the real {count, table_offset<<2} layout: two
+        // entries — the game partition and an update partition at 0x200000 (inside the first
+        // partition's data, which spans [0x140000, 0x550000)).
+        WriteBe32(iso, 0x40000, 2);
+        WriteBe32(iso, 0x40004, 0x8000 >> 2);
+        WriteBe32(iso, 0x8000, 0x100000 >> 2);
+        WriteBe32(iso, 0x8004, 0);
+        WriteBe32(iso, 0x8008, 0x200000 >> 2);
+        WriteBe32(iso, 0x800C, 0);
+
+        // Stamp the update partition's ticket + data header (its bytes live inside partition
+        // 1's data region; they just need to look like a valid partition).
+        WriteBe32(iso, 0x200000, 0x10001u);
+        key.CopyTo(iso, 0x200000 + 0x1BF);
+        WriteBe32(iso, 0x200000 + 0x2B8, 0x40000 >> 2);
+        WriteBe32(iso, 0x200000 + 0x2BC, 0x100000 >> 2);
+
+        var rvz = Convert(iso, CompressionType.Zstd, packing: true);
+        Assert.Equal(iso, Decode(rvz));
+
+        using var ms = new MemoryStream(rvz);
+        using var reader = RvzReader.Open(ms, leaveOpen: true);
+        Assert.Single(reader.Partitions); // the update partition was not encoded separately
+    }
+
+    [Fact]
+    public void WiiIso_OddSizedPartitionData_TailBecomesRaw()
+    {
+        // Partition data whose size is not a multiple of 0x8000: Dolphin encodes the whole
+        // sectors and leaves the partial sector to be covered as raw data (WIABlob.cpp:
+        // 921-933, 1039-1042) — the partition must not be bailed out entirely.
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 130, TestWiiIsoBuilder.RandomData(130));
+        WriteBe32(iso, TestWiiIsoBuilder.PartitionOffset + 0x2BC, (uint)((130L * 0x8000 + 0x400) >> 2));
+
+        var rvz = Convert(iso, CompressionType.Zstd, packing: true);
+        Assert.Equal(iso, Decode(rvz));
+
+        using var ms = new MemoryStream(rvz);
+        using var reader = RvzReader.Open(ms, leaveOpen: true);
+        Assert.Single(reader.Partitions); // encoded as a partition, not raw
+    }
+
+    [Fact]
+    public void DiscType_UnhashedWiiDisc_IsStillWii()
+    {
+        // disc_type comes from the volume, not from how the data is encoded (Dolphin:
+        // WIABlob.cpp:1989-1996): a Wii disc without hashes/encryption is stored raw but is
+        // still disc_type 2.
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 130, TestWiiIsoBuilder.RandomData(130));
+        iso[0x60] = 1; // no hashes
+        iso[0x61] = 1; // not encrypted
+
+        var rvz = Convert(iso, CompressionType.Zstd, packing: true);
+        Assert.Equal(iso, Decode(rvz));
+        using var ms = new MemoryStream(rvz);
+        using var reader = RvzReader.Open(ms, leaveOpen: true);
+        Assert.Equal(DiscType.Wii, reader.Disc.DiscType);
+    }
+
+    [Fact]
+    public void DiscType_UnrecognizedDisc_IsUnknown()
+    {
+        // No GC or Wii magic: Dolphin writes disc_type 0, and the reader accepts it.
+        var iso = new byte[0x200000];
+        new Random(42).NextBytes(iso);
+
+        var rvz = Convert(iso, CompressionType.Zstd, packing: true);
+        Assert.Equal(iso, Decode(rvz));
+        using var ms = new MemoryStream(rvz);
+        using var reader = RvzReader.Open(ms, leaveOpen: true);
+        Assert.Equal(DiscType.Unknown, reader.Disc.DiscType);
+    }
+
+    [Fact]
+    public void WiiIso_Scrubbed_ZeroesNonGamePartitionData()
+    {
+        // --scrub (Dolphin: ConvertCommand.cpp:170-197): the data of non-game partitions
+        // (update/channel) is zeroed; the game partition and all raw areas stay intact.
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 130, TestWiiIsoBuilder.RandomData(130));
+
+        // Add an update partition (type 0x10) AFTER the game partition's data
+        // ([0x140000, 0x550000)): offset 0x600000, data at [0x640000, ...).
+        WriteBe32(iso, 0x40000, 2);
+        WriteBe32(iso, 0x40004, 0x8000 >> 2);
+        WriteBe32(iso, 0x8000, 0x100000 >> 2);
+        WriteBe32(iso, 0x8004, 0);          // game partition type
+        WriteBe32(iso, 0x8008, 0x600000 >> 2);
+        WriteBe32(iso, 0x800C, 0x10);       // update partition type
+        WriteBe32(iso, 0x600000, 0x10001u);
+        key.CopyTo(iso, 0x600000 + 0x1BF);
+        WriteBe32(iso, 0x600000 + 0x2B8, 0x40000 >> 2);
+        WriteBe32(iso, 0x600000 + 0x2BC, 0x100000 >> 2);
+
+        var updateDataStart = 0x600000 + 0x40000; // clamped to the disc end by the scrubber
+        using var blob = PlainBlob.Open(new MemoryStream(iso));
+        using var scrubbed = ScrubbedBlob.Create(blob);
+        Assert.NotNull(scrubbed);
+        var expected = new byte[iso.Length];
+        iso.AsSpan(0, updateDataStart).CopyTo(expected);
+        // [updateDataStart, iso.Length) is zeroed.
+        scrubbed.ReadAt(0, expected);
+
+        // The update partition's data reads as zeroes, the game partition's data is intact.
+        var probe = new byte[iso.Length];
+        scrubbed.ReadAt(0, probe);
+        Assert.Equal(expected, probe);
+        Assert.All(probe.AsSpan(updateDataStart).ToArray(), b => Assert.Equal(0, b));
+        Assert.Equal(iso.AsSpan(0x140000, 0x410000).ToArray(), probe.AsSpan(0x140000, 0x410000).ToArray());
+
+        // And the scrubbed image converts to RVZ and back byte-identically.
+        using var ms = new MemoryStream();
+        RvzWriter.Write(scrubbed, ms, new RvzWriteOptions
+        {
+            Compression = CompressionType.Zstd,
+            Packing = true,
+        });
+        Assert.Equal(expected, Decode(ms.ToArray()));
+    }
+
+    [Fact]
+    public void WiiIso_FirstRawEntry_StartsAt0x80()
+    {
+        // Dolphin's raw entries skip the first 0x80 bytes of the disc: they live in the
+        // disc struct's disc_header (WIABlob.cpp:902-906), and the reader serves them from
+        // the disc struct. Round-trip stays byte-identical.
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 130, TestWiiIsoBuilder.RandomData(130));
+        var rvz = Convert(iso, CompressionType.Zstd, packing: true);
+        Assert.Equal(iso, Decode(rvz));
+
+        // Check the stored raw table (the reader aligns entries down to 0x8000, so it
+        // cannot be used for this assertion).
+        var disc = WiaDisc.Parse(rvz.AsSpan(0x48, 0xDC));
+        using var section = new MemoryStream(
+            rvz.AsSpan((int)disc.RawDataEntriesOffset, (int)disc.RawDataEntriesSize).ToArray());
+        using var decompressor = RVZSharp.Compression.CompressionCodecFactory.Create(disc.Compression)
+            .CreateDecompressor(section, disc.ComprData.AsSpan(0, disc.ComprDataLen),
+                disc.RawDataEntriesSize, disc.NumRawDataEntries * 0x18);
+        var rawTable = new byte[disc.NumRawDataEntries * 0x18];
+        var total = 0;
+        while (total < rawTable.Length)
+        {
+            var read = decompressor.Read(rawTable, total, rawTable.Length - total);
+            Assert.True(read > 0);
+            total += read;
+        }
+
+        Assert.Equal(0x80ul, ReadBe64(rawTable, 0));
+    }
+
+    private static ulong ReadBe64(byte[] data, int offset) =>
+        ((ulong)ReadBe32(data, offset) << 32) | ReadBe32(data, offset + 4);
+
+    private static uint ReadBe32(byte[] data, int offset) =>
+        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+
+    [Fact]
     public void AllZeroIso_ProducesTinyFile()
     {
         var iso = new byte[0x200000 * 3];
@@ -125,6 +314,27 @@ public class RvzWriterTests
             {
                 ChunkSize = 0x30000, // not a power of two
             }));
+    }
+
+    [Fact]
+    public void ChunkSize_MultipleOf2MiB_RoundTrips()
+    {
+        // 6 MiB: a multiple of 2 MiB that is not a power of two — valid per Dolphin
+        // (DiscUtils.cpp:210-236), previously rejected by the writer and the CLI.
+        var iso = new byte[0x600000 * 3 + 0x1234];
+        new Random(9).NextBytes(iso);
+        iso[0x1C] = 0xC2; // GC DVD magic (0xC2339F3D)
+        iso[0x1D] = 0x33;
+        iso[0x1E] = 0x9F;
+        iso[0x1F] = 0x3D;
+
+        using var ms = new MemoryStream();
+        RvzWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
+        {
+            Compression = CompressionType.Zstd,
+            ChunkSize = 0x600000,
+        });
+        Assert.Equal(iso, Decode(ms.ToArray()));
     }
 
     [Fact]
@@ -201,6 +411,13 @@ public class RvzWriterTests
         var iso = BuildGcIso().Take(0x400000 + 0x40).ToArray(); // % chunkSize ∈ (0, 0x80]
         var rvz = Convert(iso, CompressionType.Zstd, packing: true);
         Assert.Equal(iso, Decode(rvz));
+
+        // Regression: the raw table's number_of_groups field must be written (not zero), so
+        // Dolphin's reader (which loops i < number_of_groups) serves the raw areas.
+        using var ms = new MemoryStream(rvz);
+        using var reader = RvzReader.Open(ms, leaveOpen: true);
+        Assert.NotEmpty(reader.RawDataEntries);
+        Assert.All(reader.RawDataEntries, entry => Assert.True(entry.NumGroups > 0));
     }
 
     [Fact]

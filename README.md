@@ -42,15 +42,17 @@ decoded bytes at any offset; `ReadFully()` decodes the entire image.
 dotnet run --project src/RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
 dotnet run --project src/RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1]
 dotnet run --project src/RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz \
-    [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
+    [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>] [-s]
 ```
 
 The CLI accepts the same command arguments as Dolphin's `dolphin-tool` (`convert`,
 `verify`, `header`; `extract` is recognized but not implemented). `convert` accepts
-**any** readable blob (a plain ISO or one of the legacy formats) and writes an RVZ file,
-mirroring Dolphin's converter: Wii partitions are stored decrypted with hash exceptions,
-raw data as-is, PRNG junk is packed with a recovered seed (Lagged Fibonacci `GetSeed`),
-and the tables carry all SHA-1 checksums. `-f iso` decodes back to a plain ISO.
+**any** readable blob (a plain ISO or one of the legacy formats, including **split WBFS**
+`.wbfs`+`.wbf1…` parts) and writes an RVZ file, mirroring Dolphin's converter: Wii
+partitions are stored decrypted with hash exceptions, raw data as-is, PRNG junk is packed
+with a recovered seed (Lagged Fibonacci `GetSeed`), and the tables carry all SHA-1
+checksums. `--scrub` zeroes the data of non-game Wii partitions (update/channel) before
+converting. `-f iso` decodes back to a plain ISO.
 
 ## Documentation
 
@@ -70,10 +72,11 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   exception lists), `Packing` (RVZ packing + PRNG, encoder and decoder), `Wii` (hash tree +
   region rebuild, partition extraction for the writer), `RvzReader`, `RvzWriter`.
 - `src/RVZSharp.Cli` — the `info`/`decode`/`convert` tool.
-- `tests/RVZSharp.Tests` — 228 tests (net8.0 + net9.0 + net10.0): unit (headers, tables, codecs,
+- `tests/RVZSharp.Tests` — 255 tests (net8.0 + net9.0 + net10.0): unit (headers, tables, codecs,
   PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of synthetic RVZ files
   built by `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii,
-  legacy → RVZ) and package-facing API tests (path open, ReadFully, progress, cancellation).
+  legacy → RVZ, split WBFS, scrubbing) and package-facing API tests (path open, ReadFully,
+  progress, cancellation).
 
 ## Real-world validation
 
@@ -86,9 +89,12 @@ RVZ_REAL_FILE=C:\path\to\game.rvz RVZ_REAL_SHA1=<expected> dotnet test tests/RVZ
 
 ## Status
 
-RVZ **and** the legacy disc formats (WIA, GCZ, CISO/WBI, WBFS, TGC, NFS) are decoded
-byte-for-byte and covered by tests; the CLI `info`/`decode` commands accept any of them
-(auto-detected by magic). The RVZ writer (`rvzsharp convert`) encodes any of them back to
-RVZ (Zstd/Bzip2/LZMA1/LZMA2/None, optional packing, 32 KiB–2 MiB chunks), with the same
-SHA-1s Dolphin produces. Remaining work: validation against real game images (see
-`docs/roadmap.md`).
+RVZ **and** the legacy disc formats (WIA, GCZ, CISO/WBI, WBFS incl. split files, TGC, NFS)
+are decoded byte-for-byte and covered by tests; the CLI `info`/`decode` commands accept any
+of them (auto-detected by magic). The RVZ writer (`rvzsharp convert`) encodes any of them
+back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules — including negative
+Zstd "fast" levels — optional packing, chunks of 32 KiB–2 MiB powers of two or multiples of
+2 MiB), with the same SHA-1s Dolphin produces. The codebase was audited against the
+reference implementations (Dolphin `WIABlob`/`WIACompression` and the Go `rvz-1.0.3` tool)
+and every finding was fixed or explicitly documented; see `TODO.md` for the record.
+Remaining work: validation against real game images (see `docs/roadmap.md`).

@@ -46,12 +46,16 @@ public sealed class LaggedFibonacciGenerator
     /// <summary>Advances the state by <paramref name="count"/> bytes of output.</summary>
     public void ForwardBytes(long count)
     {
-        _positionBytes += (int)count;
-        while (_positionBytes >= BufferWords * 4)
+        // count is long (callers pass up to 0x8000, but the signature must not overflow):
+        // accumulate in long and forward whole buffers.
+        var position = _positionBytes + count;
+        while (position >= BufferWords * 4)
         {
             Forward();
-            _positionBytes -= BufferWords * 4;
+            position -= BufferWords * 4;
         }
+
+        _positionBytes = (int)position;
     }
 
     /// <summary>Writes <paramref name="count"/> output bytes.</summary>

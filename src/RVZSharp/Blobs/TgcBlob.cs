@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using RVZSharp.IO;
 
 namespace RVZSharp.Blobs;
@@ -61,10 +62,13 @@ public sealed class TgcBlob : IBlobReader
             throw new RvzFormatException("The TGC header is truncated.");
         }
 
-        if (ReadBe32(header, 0) != MagicValue)
+        // The magic is the one little-endian field in the TGC header (Dolphin compares a
+        // native u32 read against TGC_MAGIC = 0xA2380FAE, TGCBlob.cpp:50); every other field
+        // is big-endian and stays on ReadBe32 below.
+        if (BinaryPrimitives.ReadUInt32LittleEndian(header) != MagicValue)
         {
             throw new RvzFormatException(
-                $"Bad TGC magic: expected 0x{MagicValue:X8}, got 0x{ReadBe32(header, 0):X8}.");
+                $"Bad TGC magic: expected 0x{MagicValue:X8}, got 0x{BinaryPrimitives.ReadUInt32LittleEndian(header):X8}.");
         }
 
         var tgcHeaderSize = ReadBe32(header, 8);
@@ -89,7 +93,9 @@ public sealed class TgcBlob : IBlobReader
         // Relocate every file entry's offset from file-relative to ISO-relative. The shift can
         // overflow u32; Dolphin relies on the wrap cancelling out, so use unchecked arithmetic.
         var fileAreaShift = unchecked(fileAreaRealOffset - fileAreaVirtualOffset - tgcHeaderSize);
-        var patchedFst = rawFst;
+        // C++: when the FST read fails, m_fst is cleared and nothing is substituted
+        // (TGCBlob.cpp:66-70) — the FST region keeps the file's raw bytes.
+        var patchedFst = haveFst ? rawFst : [];
         if (haveFst && fstSizeClamped >= FstEntrySize)
         {
             var claimedEntries = ReadBe32(rawFst, 8);

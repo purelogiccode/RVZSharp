@@ -68,7 +68,10 @@ public static class WiiVolume
 
         Span<byte> tableInfo = stackalloc byte[8];
         Span<byte> entry = stackalloc byte[8];
-        Span<byte> ticket = stackalloc byte[0x228];
+        // The full ticket (Dolphin: sizeof(IOS::ES::Ticket) = 0x2A4), so the validation
+        // covers the whole structure like TicketReader::IsValid (Formats.cpp:368-377):
+        // signature type + a complete ticket buffer (the key sits at 0x1BF).
+        Span<byte> ticket = stackalloc byte[0x2A4];
         for (var group = 0; group < 4; group++)
         {
             disc.ReadAt((long)(PartitionTableAddress + (ulong)group * 8), tableInfo);
@@ -89,8 +92,8 @@ public static class WiiVolume
                     continue;
                 }
 
-                // The partition header starts with the ticket; require a valid RSA2048 ticket
-                // so we can decrypt the partition data.
+                // The partition header starts with the ticket; require a valid RSA2048
+                // ticket so we can decrypt the partition data (Dolphin: TicketReader::IsValid).
                 if (!TryReadAt(disc, partitionOffset, ticket))
                 {
                     continue;

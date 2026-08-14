@@ -107,11 +107,17 @@ public static class RvzWriter
         IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         options ??= RvzWriteOptions.Default;
-        if (options.ChunkSize < 0x8000 || options.ChunkSize > (int)WiaDisc.GroupSize ||
-            (options.ChunkSize & (options.ChunkSize - 1)) != 0)
+        // Dolphin's rule (DiscUtils.cpp:210-236): at least 32 KiB; below 2 MiB the chunk
+        // size must be a power of two, at 2 MiB either rule applies, and above 2 MiB it
+        // must be a multiple of 2 MiB (e.g. 6 MiB is valid).
+        var chunkSize = options.ChunkSize;
+        if (chunkSize < 0x8000 ||
+            (chunkSize < (int)WiaDisc.GroupSize && (chunkSize & (chunkSize - 1)) != 0) ||
+            (chunkSize > (int)WiaDisc.GroupSize && chunkSize % (int)WiaDisc.GroupSize != 0))
         {
             throw new ArgumentException(
-                "Chunk size must be a power of two between 32 KiB and 2 MiB.", nameof(options));
+                "Chunk size must be at least 32 KiB: a power of two below 2 MiB, or a multiple of 2 MiB.",
+                nameof(options));
         }
 
         if (options.Compression == CompressionType.Purge)
@@ -139,6 +145,13 @@ public static class RvzWriter
         var isWii = WiiVolume.IsWiiDisc(input) && WiiVolume.HasWiiHashes(input) &&
                     WiiVolume.HasWiiEncryption(input);
 
+        // disc_type describes the volume, independent of how the data is encoded (Dolphin:
+        // WIABlob.cpp:1989-1996): an unhashed/unencrypted Wii disc is still a Wii disc (2),
+        // and unrecognized volumes get 0.
+        var discType = WiiVolume.IsWiiDisc(input)
+            ? (uint)DiscType.Wii
+            : ReadBe32(discHeader, 0x18) == WiiVolume.GC_MAGIC ? (uint)DiscType.GameCube : (uint)DiscType.Unknown;
+
         // Build the data areas in disc order (Dolphin: SetUpDataEntriesForWriting).
         var areas = new List<AreaEntry>();
         if (isWii)
@@ -146,14 +159,27 @@ public static class RvzWriter
             ulong lastRawOffset = 0;
             foreach (var partition in WiiVolume.GetPartitions(input))
             {
+                // Partitions overlapping the data already encoded (e.g. update partitions)
+                // are skipped, exactly like Dolphin (WIABlob.cpp:967-971). Skipping never
+                // advances lastRawOffset, so the skipped region stays covered as raw data.
+                if (partition.Offset < lastRawOffset)
+                {
+                    continue;
+                }
+
                 var dataStart = partition.Offset + partition.DataOffset;
+                // Clamp to the disc end like Dolphin (WIABlob.cpp:1006-1010); the clamped
+                // tail below the sector boundary is left to the raw path.
                 var dataEnd = Math.Min(dataStart + partition.DataSize, isoSize);
                 var size = dataEnd - dataStart;
 
-                // Invalid partitions are encoded as raw data (Dolphin's behaviour).
-                if (size < SectorSize || size % SectorSize != 0 || dataStart % SectorSize != 0)
+                // Genuinely unusable partitions are encoded as raw data (Dolphin's
+                // behaviour): continue leaves lastRawOffset unchanged, so the region is
+                // covered by a later raw entry. An odd size is NOT a skip reason — Dolphin
+                // encodes the whole 0x8000-sector units and leaves the partial sector to
+                // be covered as raw data.
+                if (size < SectorSize || dataStart % SectorSize != 0)
                 {
-                    lastRawOffset = Math.Max(lastRawOffset, partition.Offset + SectorSize);
                     continue;
                 }
 
@@ -169,7 +195,7 @@ public static class RvzWriter
                 var size1 = AlignDown(dataEnd - splitPoint, SectorSize);
                 if (size0 == 0 && size1 == 0)
                 {
-                    lastRawOffset = Math.Max(lastRawOffset, dataEnd);
+                    // Nothing to encode as partition data; the region stays raw.
                     continue;
                 }
 
@@ -183,7 +209,11 @@ public static class RvzWriter
                     areas.Add(new AreaEntry { Offset = splitPoint, Size = size1, IsPartition = true, Partition = partition });
                 }
 
-                lastRawOffset = Math.Max(lastRawOffset, dataEnd);
+                // The partition's unaligned tail (and any gap after segment 0) is covered
+                // as raw data by the next gap: lastRawOffset is the rounded covered end,
+                // not dataEnd (Dolphin derives last_partition_end_offset from the entry
+                // sizes, WIABlob.cpp:1039-1042).
+                lastRawOffset = Math.Max(lastRawOffset, splitPoint + size1);
             }
 
             AddRawArea(areas, lastRawOffset, isoSize - lastRawOffset);
@@ -230,13 +260,23 @@ public static class RvzWriter
         var partitionTable = BuildPartitionTable(areas);
         var rawTable = BuildRawTable(areas);
         var rawTableStored = CompressTable(encoder, rawTable);
+        // The group table's stored size determines the group data offsets, which the table
+        // itself encodes — a circular dependency (Dolphin avoids it by writing the tables
+        // after the group data; here the tables come first, so we iterate). Each pass builds
+        // the table from the previous stored size. A layout is valid as soon as the actual
+        // stored size fits in the space its offsets assumed (stored <= layout size; the
+        // difference becomes dead padding). Exact equality is not guaranteed — compressed
+        // sizes are not monotone in the content and can cycle (bzip2) — so keep the tightest
+        // valid layout seen and stop at the first perfect fit.
+        var tableBase = (ulong)(WiaFileHead.Size + WiaDisc.Size + partitionTable.Length +
+                                rawTableStored.Length);
         byte[] groupTableStored = [];
-        var converged = false;
-        for (var iteration = 0; iteration < 16; iteration++)
+        var bestLayoutSize = 0;
+        var bestPadding = long.MaxValue;
+        var layoutSize = 0;
+        for (var iteration = 0; iteration < 32; iteration++)
         {
-            var groupDataStart = (ulong)(WiaFileHead.Size + WiaDisc.Size + partitionTable.Length +
-                                         rawTableStored.Length + groupTableStored.Length);
-            var running = AlignUp(groupDataStart, 4);
+            var running = AlignUp(tableBase + (ulong)layoutSize, 4);
             for (var i = 0; i < groupEntries.Count; i++)
             {
                 var size = (ulong)groupEntries[i].StoredSize;
@@ -245,18 +285,27 @@ public static class RvzWriter
                 running += AlignUp(size, 4);
             }
 
-            var nextStored = CompressTable(encoder, BuildGroupTable(groupEntries));
-            if (nextStored.Length == groupTableStored.Length)
+            var stored = CompressTable(encoder, BuildGroupTable(groupEntries));
+            if (stored.Length <= layoutSize)
             {
-                groupTableStored = nextStored; // converged: keep the table for these offsets
-                converged = true;
-                break;
+                var padding = layoutSize - stored.Length;
+                if (padding < bestPadding)
+                {
+                    groupTableStored = stored;
+                    bestLayoutSize = layoutSize;
+                    bestPadding = padding;
+                }
+
+                if (padding == 0)
+                {
+                    break;
+                }
             }
 
-            groupTableStored = nextStored;
+            layoutSize = stored.Length;
         }
 
-        if (!converged)
+        if (bestPadding == long.MaxValue)
         {
             throw new RvzFormatException("The group table layout did not converge.");
         }
@@ -271,7 +320,7 @@ public static class RvzWriter
         var partitionCount = (uint)areas.Where(a => a.IsPartition)
             .Select(a => a.Partition.Offset).Distinct().Count();
 
-        var discStruct = BuildDiscStruct(isWii, options, props, discHeader,
+        var discStruct = BuildDiscStruct(discType, options, props, discHeader,
             partitionCount, rawCount, partOffset, rawOffset,
             rawTableStored.Length, groupOffset, groupTableStored.Length, groupEntries.Count);
         SHA1.HashData(partitionTable).CopyTo(discStruct, 0xA0);
@@ -283,9 +332,11 @@ public static class RvzWriter
         file.Write(rawTableStored);
         file.Write(groupTableStored);
 
-        // Pad to the aligned group-data start (the layout assumes 4-byte alignment).
+        // Pad to the aligned group-data start. The group offsets in the table were computed
+        // from bestLayoutSize (which may exceed the stored table size when the table had to
+        // fit with padding), so pad to that, not to groupTableStored.Length.
         var alignedStart = AlignUp((ulong)(WiaFileHead.Size + WiaDisc.Size + partitionTable.Length +
-                                           rawTableStored.Length + groupTableStored.Length), 4);
+                                           rawTableStored.Length) + (ulong)bestLayoutSize, 4);
         var pad = (int)(alignedStart - (ulong)file.Position);
         if (pad > 0)
         {
@@ -324,6 +375,15 @@ public static class RvzWriter
 
     private static void AddRawArea(List<AreaEntry> areas, ulong offset, ulong size)
     {
+        // Dolphin's AddRawDataEntry skips the first 0x80 bytes of the disc: they live in the
+        // disc struct's disc_header (WIABlob.cpp:902-906), and the reader serves them from
+        // there. Only the first Wii raw gap (which starts at 0) is affected; the reader's
+        // alignment growth (TableParser) maps the entry back to the same bytes.
+        const ulong SkipSize = WiiVolume.DiscHeaderSize; // 0x80
+        var skip = offset < SkipSize ? Math.Min(SkipSize - offset, size) : 0;
+        offset += skip;
+        size -= skip;
+
         if (size == 0)
         {
             return;
@@ -527,7 +587,10 @@ public static class RvzWriter
             WriteBe64(output, area.Offset);
             WriteBe64(output, area.Size);
             WriteBe32(output, (uint)area.GroupIndex);
-            WriteBe32(output, 0); // padding to a 24-byte entry
+            // number_of_groups: Dolphin's reader loops i < number_of_groups (WIABlob.cpp:508)
+            // and grows the area by offset % 0x8000, so the count must cover the groups this
+            // writer actually emitted for the area (area.Groups, the sector-aligned read size).
+            WriteBe32(output, (uint)area.Groups);
         }
 
         return output.ToArray();
@@ -556,14 +619,16 @@ public static class RvzWriter
         return encoder.Compress(table);
     }
 
-    private static byte[] BuildDiscStruct(bool isWii, RvzWriteOptions options, byte[] props,
+    private static byte[] BuildDiscStruct(uint discType, RvzWriteOptions options, byte[] props,
         byte[] discHeader, uint partitionCount, uint rawCount, ulong partOffset, ulong rawOffset,
         int rawTableSize, ulong groupOffset, int groupTableSize, int groupCount)
     {
         var disc = new byte[WiaDisc.Size];
-        WriteBe32(disc, 0x00, isWii ? (uint)DiscType.Wii : (uint)DiscType.GameCube);
+        WriteBe32(disc, 0x00, discType);
         WriteBe32(disc, 0x04, (uint)options.Compression);
-        WriteBe32(disc, 0x08, unchecked((uint)(sbyte)options.CompressionLevel));
+        // The level is an s32 in the format (informative only); write the full value so
+        // negative Zstd fast levels survive (Dolphin: swap32(compression_level)).
+        WriteBe32(disc, 0x08, unchecked((uint)options.CompressionLevel));
         WriteBe32(disc, 0x0C, (uint)options.ChunkSize);
         discHeader.CopyTo(disc, 0x10);
 
@@ -655,4 +720,7 @@ public static class RvzWriter
         WriteBe32(data, offset, (uint)(value >> 32));
         WriteBe32(data, offset + 4, (uint)value);
     }
+
+    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset) =>
+        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
 }

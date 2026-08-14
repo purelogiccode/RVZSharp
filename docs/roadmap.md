@@ -8,13 +8,16 @@
 | 2 — Legacy decoders | blob abstraction + magic detection; WIA, GCZ, CISO/WBI, WBFS, TGC, NFS | ✅ done |
 | 3 — RVZ writer | `RvzWriter`, encoders, junk packing, CLI `convert` | ✅ done |
 | 4 — Distribution | NuGet package (net8.0/9.0/10.0), multi-target tests, progress/cancellation API | ✅ done |
-| 5 — Real-world validation | test against real game images | ⏳ open |
+| 5 — Reference alignment | audit against dolphin-master + rvz-1.0.3; every finding fixed or documented (see TODO.md) | ✅ done |
+| 6 — Real-world validation | test against real game images | ⏳ open |
 
 ## Supported
 
 - Read: RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO — auto-detected, random-access.
-- Write: RVZ from any of the above (None/Zstd/Bzip2/LZMA1/LZMA2, levels 1–9, chunk sizes
-  32 KiB–2 MiB, optional packing, `--sha1`-verifiable output).
+- Write: RVZ from any of the above (None/Zstd/Bzip2/LZMA1/LZMA2 with Dolphin's level rules
+  incl. negative Zstd "fast" levels; chunk sizes 32 KiB–2 MiB powers of two or multiples of
+  2 MiB above that; optional packing; `--sha1`-verifiable output).
+- `--scrub`: zeroes the data of non-game Wii partitions (update/channel) before converting.
 - Wii partition optimization with hash exceptions, FST split, zero groups, PRNG-junk
   packing with seed recovery.
 
@@ -24,12 +27,10 @@
 |---|---|
 | WBFS conversion is slow | WBFS reports a fixed 9.4 GiB logical image; converting reads all of it (mostly zero clusters). `decode` + `convert` on the ISO is faster in practice. |
 | PURGE output | PURGE is WIA-only; `convert --compression purge` is rejected, and RVZ readers reject PURGE containers. |
-| Chunk sizes above 2 MiB | not writable (Dolphin's converter doesn't expose them either); readable if present. |
-| Single-threaded | reading and writing are sequential; no multithreading yet. |
-| NFS key location | key must be discoverable (`code/htk.bin` next to `content/`) or supplied via `Blob.Open(stream, nfsKey, …)`. |
-| No WIA/GCZ writer | `convert -f wia`/`-f gcz` fail with a clear error; only `iso` and `rvz` output exist. |
+| No WIA/GCZ writers | `convert -f wia` / `-f gcz` fail with a clear error (only `iso` and `rvz` output exist). |
 | No `extract` command | DolphinTool's `extract` requires a disc filesystem (FST) implementation; the CLI validates the arguments and reports it as unsupported. |
-| Zstd "fast" levels | Dolphin's CLI accepts negative Zstd levels; RVZSharp accepts 1–22. |
+| NFS key location | the AES key must come from `code/htk.bin` next to the `content/hif_000000.nfs` file (or be supplied via the library API). |
+| Single-threaded | reading and writing are sequential; no multithreading yet. |
 
 ## Open questions
 

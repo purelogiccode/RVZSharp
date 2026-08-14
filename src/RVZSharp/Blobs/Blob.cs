@@ -52,7 +52,7 @@ public static class Blob
 
         if (magic.SequenceEqual("WBFS"u8))
         {
-            return WbfsBlob.Open(stream, leaveOpen);
+            return WbfsBlob.Open(stream, filePath, leaveOpen);
         }
 
         if (magic.SequenceEqual("EGGS"u8))
@@ -60,8 +60,10 @@ public static class Blob
             return NfsBlob.Open(stream, filePath, leaveOpen);
         }
 
-        // TGC's magic (0xA2380FAE) is a big-endian u32.
-        if (magic.SequenceEqual(new byte[] { 0xA2, 0x38, 0x0F, 0xAE }))
+        // TGC's magic (0xA2380FAE) is the one little-endian field in the otherwise
+        // big-endian header, so the on-disk bytes are AE 0F 38 A2 (Dolphin compares a native
+        // u32 read against TGC_MAGIC: Blob.cpp:234, TGCBlob.cpp:50).
+        if (magic.SequenceEqual(new byte[] { 0xAE, 0x0F, 0x38, 0xA2 }))
         {
             return TgcBlob.Open(stream, leaveOpen);
         }

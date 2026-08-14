@@ -17,14 +17,15 @@ public static class TableParser
         var count = disc.NumPartitions;
         if (count == 0)
         {
-            return [];
-        }
+            // Dolphin verifies the partition-table hash even when the table is empty
+            // (WIABlob.cpp:165-175); the writers store SHA-1 of the empty byte buffer.
+            var emptyHash = SHA1.HashData(ReadOnlySpan<byte>.Empty);
+            if (!emptyHash.AsSpan().SequenceEqual(disc.PartitionEntriesHash))
+            {
+                throw new RvzHashMismatchException("The partition table SHA-1 does not match its contents.");
+            }
 
-        if (disc.PartitionEntrySize < WiaPartEntry.Size)
-        {
-            throw new RvzFormatException(
-                $"Partition entry size {disc.PartitionEntrySize} is smaller than the "
-                + $"required {WiaPartEntry.Size}.");
+            return [];
         }
 
         var tableSize = checked((long)count * disc.PartitionEntrySize);
@@ -38,10 +39,22 @@ public static class TableParser
             throw new RvzHashMismatchException("The partition table SHA-1 does not match its contents.");
         }
 
+        // Dolphin accepts entries smaller than 0x30 and zero-fills the remainder
+        // (WIABlob.cpp:177-185: copy_length = min(entry_size, sizeof(PartitionEntry)));
+        // entries larger than 0x30 are truncated (extra bytes ignored).
+        var copyLength = (int)Math.Min(disc.PartitionEntrySize, WiaPartEntry.Size);
         var entries = new WiaPartEntry[count];
         for (var i = 0; i < count; i++)
         {
-            entries[i] = WiaPartEntry.Parse(raw.AsSpan((int)(i * disc.PartitionEntrySize), WiaPartEntry.Size));
+            var entryBytes = raw.AsSpan((int)(i * disc.PartitionEntrySize), copyLength);
+            if (copyLength < WiaPartEntry.Size)
+            {
+                var padded = new byte[WiaPartEntry.Size];
+                entryBytes.CopyTo(padded);
+                entryBytes = padded;
+            }
+
+            entries[i] = WiaPartEntry.Parse(entryBytes);
         }
 
         return entries;
@@ -146,9 +159,19 @@ public static class TableParser
         {
             throw;
         }
-        catch (Exception e) when (e is IOException or InvalidDataException or ZstdSharp.ZstdException)
+        catch (Exception e) when (e is IOException or InvalidDataException or ZstdSharp.ZstdException
+                                 or ICSharpCode.SharpZipLib.SharpZipBaseException)
         {
             throw new RvzFormatException($"Failed to decompress the {name} table: {e.Message}", e);
+        }
+
+        // Dolphin rejects decompressed output larger than the declared size
+        // (WIABlob.cpp:741-754): the decompressor must be at end-of-stream right after the
+        // expected bytes. A stream that produced extra output fails this probe read.
+        if (decompressor.ReadByte() != -1)
+        {
+            throw new RvzFormatException(
+                $"The {name} table decompressed to more than {expectedSize} bytes.");
         }
 
         return output;

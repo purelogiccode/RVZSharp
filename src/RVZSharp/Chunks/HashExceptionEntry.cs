@@ -21,6 +21,14 @@ public readonly struct HashExceptionEntry
 
     public HashExceptionEntry(ushort offset, byte[] hash)
     {
+        // The on-disk entry is a fixed 22 bytes (2 + 20): a shorter hash would desync every
+        // exception list parser (ExceptionListParser walks fixed 22-byte entries).
+        if (hash.Length != 20)
+        {
+            throw new ArgumentException(
+                $"A hash exception must carry exactly 20 bytes, got {hash.Length}.", nameof(hash));
+        }
+
         Offset = offset;
         Hash = hash;
     }

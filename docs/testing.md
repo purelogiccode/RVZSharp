@@ -1,6 +1,6 @@
 # Testing
 
-The suite has **228 tests** and runs on every target framework (`net8.0`, `net9.0`,
+The suite has **255 tests** and runs on every target framework (`net8.0`, `net9.0`,
 `net10.0`) in ~50 seconds each:
 
 ```bash
@@ -21,6 +21,12 @@ implementations' semantics:
 3. **Format semantics** were validated against Dolphin's C++ (`References/dolphin-master`)
    and the Go reader (`References/rvz-1.0.3`) — including a Python prototype used during
    development to pin down the PRNG seed-recovery algorithm before the C# port.
+4. **Reference-alignment regressions** (2025 audit, see TODO.md): every finding from the
+   comparison against Dolphin/Go is pinned by a test — LZMA1 end markers, raw-table group
+   counts, TGC/WBFS magic offsets, >2 MiB chunk exception lists, zero-fill hash trees,
+   overlapping-window hash exceptions, overlap/ordering validation, empty-table hashes,
+   decompressed-size probes, split WBFS, scrubbing, truncated packing headers, and the CLI
+   option surface.
 
 ## Test files
 
@@ -36,7 +42,8 @@ implementations' semantics:
 | `BlobDetectionTests` | magic-byte auto-detection |
 | `GczBlobTests`, `CisoBlobTests`, `WbfsBlobTests`, `TgcBlobTests`, `NfsBlobTests` | legacy decoders |
 | `WiaReaderTests`, `RvzReaderTests`, `RvzReaderMatrixTests` | full-container decoding across codecs/chunk sizes |
-| `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, junk-only image |
+| `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, junk-only image, >2 MiB chunks, overlapping/odd partitions, scrubbing, raw-table group counts |
+| `SectionStreamTests` | section bounds under external seeks |
 
 ## Synthetic builders (`tests/RVZSharp.Tests/Helpers/`)
 
@@ -59,7 +66,7 @@ implementations' semantics:
 - **Discs**: GameCube (random + zero + junk regions), Wii with corrupted hash areas
   (forcing exceptions), Wii with an FST split, Wii with junk inside partition data,
   Wii with small chunk sizes (exception splitting), all-zero ISO.
-- **Chunk sizes**: 2 MiB default, 32 KiB / 64 KiB small chunks.
+- **Chunk sizes**: 2 MiB default, 32 KiB / 64 KiB small chunks, 6 MiB (multiple of 2 MiB).
 
 ## Gotchas encoded in tests
 

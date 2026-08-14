@@ -110,7 +110,10 @@ public sealed class WiiPartitionExtractor
 
     /// <summary>
     /// Compares the six hash-block fields (h0, padding, h1, padding, h2, padding) in 20-byte
-    /// strides with partial last strides, exactly like Dolphin's compare_hashes.
+    /// windows, exactly like Dolphin's compare_hashes (WIABlob.cpp:1452-1455): the window of
+    /// stride l starts at offset + min(l, size - 20), so fields not divisible by 20 (the
+    /// 32-byte paddings) get overlapping windows (+0 and +12) instead of a partial trailing
+    /// hash. Exceptions therefore always carry a full 20-byte hash.
     /// </summary>
     private static void CompareHashFields(byte[] desired, byte[] recalculated,
         int blockIndexInChunk, List<HashExceptionEntry> exceptions)
@@ -127,12 +130,11 @@ public sealed class WiiPartitionExtractor
 
         foreach (var (fieldOffset, fieldSize) in fields)
         {
-            for (var j = 0; j < fieldSize; j += 20)
+            for (var j = 0; j < fieldSize; j += WiiHashCalculator.HashSize)
             {
-                var length = Math.Min(20, fieldSize - j);
-                var offset = fieldOffset + j;
-                var desiredSpan = desired.AsSpan(offset, length);
-                if (!desiredSpan.SequenceEqual(recalculated.AsSpan(offset, length)))
+                var offset = fieldOffset + Math.Min(j, fieldSize - WiiHashCalculator.HashSize);
+                var desiredSpan = desired.AsSpan(offset, WiiHashCalculator.HashSize);
+                if (!desiredSpan.SequenceEqual(recalculated.AsSpan(offset, WiiHashCalculator.HashSize)))
                 {
                     exceptions.Add(new HashExceptionEntry(
                         (ushort)(blockIndexInChunk * WiiHashCalculator.HashBlockSize + offset),
@@ -171,7 +173,13 @@ public sealed class WiiPartitionExtractor
             for (var j = 0; j < 8; j++)
             {
                 var sector = group * 8 + j;
-                var h0 = h0Areas[sector].AsSpan(0, 0x26C);
+                // Missing sectors: their data is zero-filled and hashed normally (Dolphin:
+                // VolumeWii.cpp EncryptGroup; Go: part.go DevZero), so the h0 area is
+                // 31 × SHA1(0x400 zeros) and h1 = SHA1 of that area — not SHA1 of a raw
+                // zero buffer (that would miscompute the shared h1/h2 of the last region).
+                var h0 = sector < blocks
+                    ? h0Areas[sector].AsSpan(0, WiiHashCalculator.H0Size)
+                    : WiiHashCalculator.ZeroSectorH0Area;
                 SHA1.HashData(h0, h1.AsSpan(j * 20));
             }
 

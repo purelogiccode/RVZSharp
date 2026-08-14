@@ -88,14 +88,16 @@ public class WiaDiscTests
     }
 
     [Fact]
-    public void Validate_UnknownDiscType_ThrowsFormatException()
+    public void Validate_NonstandardDiscType_IsAccepted()
     {
+        // Dolphin never validates disc_type on read (WIABlob.cpp) — nonstandard values are
+        // accepted (0 is what Dolphin's converter writes for unrecognized volumes).
         var builder = new TestDiscBuilder { DiscType = (DiscType)99 };
         var bytes = builder.Build();
 
         var disc = WiaDisc.Parse(bytes);
-        Assert.Throws<RvzFormatException>(() =>
-            disc.Validate((uint)bytes.Length, bytes, builder.GetDiscHash()));
+        disc.Validate((uint)bytes.Length, bytes, builder.GetDiscHash());
+        Assert.Equal((DiscType)99, disc.DiscType);
     }
 
     [Fact]

@@ -147,7 +147,18 @@ public readonly struct WiaFileHead
         }
     }
 
-    /// <summary>Formats a version like Dolphin does: 0x01000000 → "1.00".</summary>
-    public static string FormatVersion(uint version) =>
-        $"{(version >> 24)}.{((version >> 16) & 0xff):x2}";
+    /// <summary>
+    /// Formats a version like Dolphin's VersionToString (WIABlob.cpp:618-629):
+    /// major.minor.revision, plus a .beta suffix when the fourth byte is neither 0 nor 0xff.
+    /// </summary>
+    public static string FormatVersion(uint version)
+    {
+        var a = version >> 24;
+        var b = (version >> 16) & 0xff;
+        var c = (version >> 8) & 0xff;
+        var d = version & 0xff;
+        return d is 0 or 0xff
+            ? $"{a}.{b:x2}.{c:x2}"
+            : $"{a}.{b:x2}.{c:x2}.beta{d}";
+    }
 }

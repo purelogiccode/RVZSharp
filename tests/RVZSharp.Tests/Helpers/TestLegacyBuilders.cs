@@ -218,7 +218,7 @@ public static class TestLegacyBuilders
         header[7] = (byte)hdSectorCount;
         header[8] = (byte)Math.Log2(hdSectorSize);
         header[9] = (byte)Math.Log2(clusterSize);
-        header[10] = 1; // disc_table[0]: a disc is present
+        header[12] = 1; // disc_table[0] (after the 2-byte padding at 10-11): a disc is present
         output.Write(header);
 
         output.Position = tableOffset;
@@ -295,7 +295,12 @@ public static class TestLegacyBuilders
         // rest of the file being the ISO data shifted by tgc_header_size.
         var tgcLength = (int)tgcHeaderSize + isoSize;
         var tgc = new byte[tgcLength];
-        WriteBe32(tgc, 0, 0xA2380FAE);
+        // The magic is the one little-endian field in the TGC header (Dolphin reads a native
+        // u32 and compares it to TGC_MAGIC = 0xA2380FAE, TGCBlob.cpp:50).
+        tgc[0] = 0xAE;
+        tgc[1] = 0x0F;
+        tgc[2] = 0x38;
+        tgc[3] = 0xA2;
         WriteBe32(tgc, 8, tgcHeaderSize);
         WriteBe32(tgc, 12, 0x80); // disc_header_area_size
         WriteBe32(tgc, 16, fstReal);

@@ -67,6 +67,52 @@ public class RvzPackingEncoderTests
         Assert.Equal(0x8000_0000u | 0x20000u, header);
     }
 
+    [Fact]
+    public void Pack_MultipartChunks_AlwaysWriteSizeHeaders()
+    {
+        // Dolphin disables the headerless fast path for multipart entries
+        // (first_loop_iteration = !multipart, WIABlob.cpp:1237): every chunk gets a
+        // segment stream, even without junk.
+        var payload = new byte[0x20000];
+        new Random(7).NextBytes(payload);
+
+        var mainData = new List<byte>();
+        uint packedSize = 0;
+        RvzPackingEncoder.Pack(payload, dataOffset: 0, bytesPerChunk: payload.Length / 2, chunks: 2,
+            allowJunkReuse: true, compression: true, mainData, ref packedSize);
+
+        // Two literal segments with 4-byte headers each.
+        Assert.Equal(2u * 4 + (uint)payload.Length, packedSize);
+        Assert.Equal(2 * 4 + payload.Length, mainData.Count);
+        var header0 = (uint)((mainData[0] << 24) | (mainData[1] << 16) | (mainData[2] << 8) | mainData[3]);
+        Assert.Equal((uint)(payload.Length / 2), header0);
+
+        // And the segment stream still decodes to the payload.
+        using var stream = new MemoryStream(mainData.ToArray(), writable: false);
+        using var decoder = new RvzPackingDecoder(stream, dataOffset: 0);
+        var decoded = new byte[payload.Length];
+        var read = 0;
+        while (read < decoded.Length)
+        {
+            var take = decoder.Read(decoded, read, decoded.Length - read);
+            Assert.True(take > 0, $"decoder stalled at {read}");
+            read += take;
+        }
+
+        Assert.Equal(payload, decoded);
+    }
+
+    [Fact]
+    public void TruncatedSizeHeader_Throws()
+    {
+        // A partial 1-3 byte segment header at EOF is corruption, not a clean end
+        // (Dolphin fails; Go returns ErrUnexpectedEOF).
+        using var input = new MemoryStream(new byte[] { 0x00, 0x01 });
+        using var decoder = new RvzPackingDecoder(input, dataOffset: 0);
+        var buffer = new byte[16];
+        Assert.Throws<RvzFormatException>(() => decoder.Read(buffer, 0, buffer.Length));
+    }
+
     private static void AssertRoundTrip(byte[] payload, long dataOffset)
     {
         var mainData = new List<byte>();

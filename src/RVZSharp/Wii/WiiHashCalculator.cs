@@ -17,14 +17,29 @@ public static class WiiHashCalculator
     public const int BlocksPerSector = 31;
     public const int SectorDataSize = BlocksPerSector * BlockDataSize; // 0x7C00
     public const int HashBlockSize = 0x400;
-
-    private const int HashSize = 20;
-    private const int H0Size = BlocksPerSector * HashSize;  // 0x26C
+    public const int HashSize = 20;
+    public const int H0Size = BlocksPerSector * HashSize; // 0x26C
     private const int H0Padding = 0x14;
     private const int H1Size = 8 * HashSize;                // 0xA0
     private const int H1Padding = 0x20;
     private const int H2Size = 8 * HashSize;                // 0xA0
     private const int H2Padding = 0x20;
+
+    /// <summary>
+    /// The h0 area (31 × SHA-1 of a 0x400 block) of a sector whose data is all zeroes — what
+    /// sectors beyond a partition's data end hash to. Dolphin zero-fills the sector data and
+    /// hashes it normally (VolumeWii.cpp EncryptGroup: unencrypted_data[block].fill(0)); Go's
+    /// reader does the same by reading zeros into the cluster (part.go readGroup). This is a
+    /// constant, so it is computed once.
+    /// </summary>
+    public static readonly byte[] ZeroSectorH0Area = ComputeZeroSectorH0Area();
+
+    private static byte[] ComputeZeroSectorH0Area()
+    {
+        var hashArea = new byte[HashBlockSize];
+        BuildHashArea(new byte[SectorDataSize], hashArea);
+        return hashArea[..H0Size].ToArray();
+    }
 
     /// <summary>
     /// Computes the 0x400-byte hash area for one sector (before applying hash exceptions).
@@ -78,10 +93,11 @@ public static class WiiHashCalculator
         foreach (var exception in exceptions)
         {
             var offset = chunkBaseOffset + exception.Offset;
-            var blockIndex = offset >> 10; // offset / 0x400
             var offsetInBlock = offset & 0x3FF;
 
-            if (blockIndex > BlocksPerSector || offsetInBlock + HashSize > HashBlockSize)
+            // A per-sector exception must fit inside this sector's 0x400 hash area; anything
+            // beyond it is malformed (Dolphin: ApplyHashExceptions, WIABlob.cpp:868-876).
+            if (offset >= HashBlockSize || offsetInBlock + HashSize > HashBlockSize)
             {
                 throw new RvzFormatException(
                     $"Hash exception at offset 0x{exception.Offset:X4} is outside the sector hash area.");

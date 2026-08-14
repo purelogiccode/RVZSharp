@@ -164,6 +164,52 @@ public class PartitionRegionBuilderTests
     }
 
     [Fact]
+    public void PartialRegion_ZeroSectorHashes_MatchFirstPrinciples()
+    {
+        // 60 real sectors: the h1 entries for sectors 60-63 (group 7) must hash the h0 area
+        // of an all-zero sector — zero data hashed normally (31 × SHA1(0x400 zeros)), not a
+        // raw zero buffer (Dolphin: VolumeWii.cpp EncryptGroup; Go: part.go DevZero).
+        var data = RegionData(60, seedBase: 5);
+        var key = new byte[16];
+        new Random(7).NextBytes(key);
+
+        var builder = new PartitionRegionBuilder(key);
+        for (var s = 0; s < 60; s++)
+        {
+            builder.AddSector(data.AsSpan(s * 0x7C00, 0x7C00), []);
+        }
+
+        var encrypted = builder.Finish();
+
+        // The h1 array is shared within each 8-sector group (Dolphin: "H1 copies"), so group
+        // 7's h1 lives in sectors 56-63 — decrypt sector 56's hash area (zero IV).
+        using var aes = System.Security.Cryptography.Aes.Create();
+        aes.Key = key;
+        aes.IV = new byte[16];
+        aes.Mode = System.Security.Cryptography.CipherMode.CBC;
+        aes.Padding = System.Security.Cryptography.PaddingMode.None;
+        using var decryptor = aes.CreateDecryptor();
+        var hashArea = decryptor.TransformFinalBlock(encrypted, 56 * 0x8000, 0x400);
+
+        var zeroBlockHash = System.Security.Cryptography.SHA1.HashData(new byte[0x400]);
+        var zeroSectorH0 = new byte[31 * 20];
+        for (var k = 0; k < 31; k++)
+        {
+            zeroBlockHash.CopyTo(zeroSectorH0, k * 20);
+        }
+
+        var expected = System.Security.Cryptography.SHA1.HashData(zeroSectorH0);
+        Assert.NotEqual(expected,
+            System.Security.Cryptography.SHA1.HashData(new byte[31 * 20])); // the old (wrong) convention
+        // Group 7's h1 entries for the first zero-filled sectors (60 and 63).
+        Assert.Equal(expected, hashArea.AsSpan(0x280 + (60 % 8) * 20, 20).ToArray());
+        Assert.Equal(expected, hashArea.AsSpan(0x280 + (63 % 8) * 20, 20).ToArray());
+        // The last group's h2 covers an h1 array that includes those entries.
+        Assert.Equal(System.Security.Cryptography.SHA1.HashData(hashArea.AsSpan(0x280, 0xA0)),
+            hashArea.AsSpan(0x340 + 7 * 20, 20).ToArray());
+    }
+
+    [Fact]
     public void Builder_TooManySectors_Throws()
     {
         var builder = new PartitionRegionBuilder(new byte[16]);

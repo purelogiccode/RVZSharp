@@ -12,7 +12,7 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.slnx` (XML solution — do **not** rename to `.sln`) |
-| Tests | 228, green on every framework (`dotnet test CSharp_RVZSharp.slnx -c Release`) |
+| Tests | 255, green on every framework (`dotnet test CSharp_RVZSharp.slnx -c Release`) |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |

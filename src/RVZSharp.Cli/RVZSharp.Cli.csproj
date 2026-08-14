@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RVZSharp\RVZSharp.csproj" />
+    <!-- CP1252 / Shift-JIS decoders for the disc internal name (Dolphin: Volume::DecodeString). -->
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -46,10 +46,14 @@ public class CompressionLzmaTests
     private static (byte[] Props, byte[] Data) EncodeLzma1(byte[] payload, bool endMarker)
     {
         var encoder = new SevenZip.Compression.LZMA.Encoder();
+        // LZMA-SDK ignores the outSize argument; the marker is controlled by CoderPropID.EndMarker.
         encoder.SetCoderProperties(
-            [SevenZip.CoderPropID.DictionarySize, SevenZip.CoderPropID.PosStateBits,
-             SevenZip.CoderPropID.LitContextBits, SevenZip.CoderPropID.LitPosBits],
-            [1 << 20, 2, 3, 0]);
+            [
+                SevenZip.CoderPropID.DictionarySize, SevenZip.CoderPropID.PosStateBits,
+                SevenZip.CoderPropID.LitContextBits, SevenZip.CoderPropID.LitPosBits,
+                SevenZip.CoderPropID.EndMarker,
+            ],
+            [1 << 20, 2, 3, 0, endMarker]);
 
         byte[] props;
         using (var ps = new MemoryStream())
@@ -89,6 +93,37 @@ public class CompressionLzmaTests
         var ex = Assert.ThrowsAny<RvzException>(() =>
             decoder.CreateDecompressor(new MemoryStream(), props, -1, -1));
         Assert.Contains(messagePart, ex.Message);
+    }
+
+    [Fact]
+    public void LzmaEncoder_Output_HasEndOfStreamMarker()
+    {
+        // Regression: the writer's LZMA1 encoder must emit the end-of-stream marker. Dolphin's
+        // decoder only accepts streams that end in LZMA_STREAM_END, and RVZSharp's chunk
+        // decoder opens LZMA1 with an unknown output size (-1), so it can only terminate at
+        // the marker. A size-terminated stream would decode garbage beyond the payload.
+        var payload = MakePayload(150_000, seed: 7);
+        var (encoder, props) = CompressionEncoderFactory.Create(CompressionType.Lzma, 3);
+        var compressed = encoder.Compress(payload);
+
+        using var input = new MemoryStream(compressed);
+        var decoder = CompressionCodecFactory.Create(CompressionType.Lzma);
+        using var stream = decoder.CreateDecompressor(input, props, compressed.Length, -1);
+
+        // Unknown output size: decoding must stop exactly at the payload end.
+        var buffer = new byte[payload.Length + 64];
+        var total = 0;
+        int read;
+        while (total < buffer.Length &&
+               (read = stream.Read(buffer, total, buffer.Length - total)) > 0)
+        {
+            total += read;
+        }
+
+        Assert.Equal(payload.Length, total);
+        Assert.Equal(payload, buffer.AsSpan(0, payload.Length).ToArray());
+        // The marker terminates the stream: no trailing garbage bytes.
+        Assert.Equal(0, stream.Read(buffer, 0, 1));
     }
 
     [Fact]

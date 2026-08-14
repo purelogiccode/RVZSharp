@@ -50,7 +50,7 @@ dotnet pack src/RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuil
    `PackageValidationBaselineVersion` to diff the public API against the previous release
    (API-compat analysis) — see the roadmap.
 3. **Tests on every framework** — `dotnet test CSharp_RVZSharp.slnx -c Release` runs the
-   full suite (228 tests) on `net8.0`, `net9.0` and `net10.0`.
+   full suite (255 tests) on `net8.0`, `net9.0` and `net10.0`.
 4. **Consumer smoke test** — before publishing, a fresh project consuming only the nupkg
    (from a local feed) must compile and run on .NET 8 and .NET 10, converting and decoding
    a disc image byte-exactly. This catches packaging mistakes (missing files, wrong

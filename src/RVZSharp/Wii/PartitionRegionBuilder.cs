@@ -87,19 +87,15 @@ public sealed class PartitionRegionBuilder
             for (var j = 0; j < 8; j++)
             {
                 var sector = group * 8 + j;
+                // A sector beyond the partition data end: its data is zero-filled and hashed
+                // normally (Dolphin: VolumeWii.cpp EncryptGroup; Go: part.go DevZero), so the
+                // h0 area is 31 × SHA1(0x400 zeros) and h1 = SHA1 of that area — not SHA1 of
+                // a raw zero buffer.
                 var h0 = sector < _h0Areas.Length && _h0Areas[sector] != null
-                    ? _h0Areas[sector].AsSpan(0, 0x26C)
-                    : ReadOnlySpan<byte>.Empty;
+                    ? _h0Areas[sector].AsSpan(0, WiiHashCalculator.H0Size)
+                    : WiiHashCalculator.ZeroSectorH0Area;
                 var hash = new byte[20];
-                if (h0.IsEmpty)
-                {
-                    SHA1.HashData(new byte[0x26C], hash); // zero-filled sector
-                }
-                else
-                {
-                    SHA1.HashData(h0, hash);
-                }
-
+                SHA1.HashData(h0, hash);
                 hash.CopyTo(h1, j * 20);
             }
 

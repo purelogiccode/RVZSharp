@@ -36,7 +36,7 @@
     <PackageReference Include="LZMA-SDK" Version="22.1.1" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.400" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

@@ -52,6 +52,7 @@ public static class ChunkDecoder
         Math.Max(1, partitionChunkSize / PartitionGroupDataSize);
 
     private const int PartitionGroupDataSize = 0x1F0000; // 0x7C00 * 64 (2 MiB minus hashes)
+    private const int GroupTotalSize = 0x200000; // one 2 MiB Wii group, incl. hashes
 
     public static ChunkDecodeResult DecodeChunk(Stream file, WiaDisc disc, ICompressionDecoder codec,
         ChunkDecodeRequest request)
@@ -73,7 +74,8 @@ public static class ChunkDecoder
         {
             throw;
         }
-        catch (Exception e) when (e is IOException or InvalidDataException or ZstdSharp.ZstdException)
+        catch (Exception e) when (e is IOException or InvalidDataException or ZstdSharp.ZstdException
+                                 or ICSharpCode.SharpZipLib.SharpZipBaseException)
         {
             throw new RvzFormatException($"Failed to decode a group chunk: {e.Message}", e);
         }
@@ -82,7 +84,14 @@ public static class ChunkDecoder
     private static ChunkDecodeResult DecodeChunkCore(Stream file, WiaDisc disc,
         ICompressionDecoder codec, ChunkDecodeRequest request, GroupEntry group, int expectedSize)
     {
-        var exceptionListCount = request.IsPartition ? ExceptionListCount(expectedSize) : 0;
+        // The exception-list count is fixed by the FULL chunk size: Dolphin's writer stores
+        // exception_lists_per_chunk = max(1, chunk_size / 2 MiB) lists for every partition
+        // chunk, including the final partial one (WIABlob.cpp:1386-1387). Deriving it from the
+        // truncated expectedSize of a partial chunk would parse too few lists and misread the
+        // trailing lists as payload (relevant for chunk sizes > 2 MiB).
+        var exceptionListCount = request.IsPartition
+            ? ExceptionListCount((int)((long)disc.ChunkSize * PartitionGroupDataSize / GroupTotalSize))
+            : 0;
 
         // PURGE is not a streaming codec: its data sits right after the exception lists in the
         // raw group bytes, so the whole group is read as one section and decoded in one go.
@@ -116,6 +125,15 @@ public static class ChunkDecoder
         else
         {
             payload = ReadExactly(input, expectedSize, "group payload");
+        }
+
+        // Dolphin rejects chunks whose decompressed output exceeds the expected size
+        // (WIABlob.cpp:741-754): the (decompressed) stream must be exhausted right after
+        // the payload. A stream that produced extra output fails this probe read.
+        if (!isPurge && input.ReadByte() != -1)
+        {
+            throw new RvzFormatException(
+                $"Group chunk decompressed to more than {expectedSize} bytes.");
         }
 
         return new ChunkDecodeResult { Payload = payload, ExceptionLists = exceptionLists };

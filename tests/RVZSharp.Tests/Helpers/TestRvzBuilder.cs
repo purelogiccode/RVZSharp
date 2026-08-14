@@ -297,7 +297,7 @@ public static class TestRvzBuilder
 
         if (isPartition)
         {
-            stored = PrependExceptionLists(stored, payload.Length, spec, partition!, partitionDataOffset);
+            stored = PrependExceptionLists(stored, spec, partition!, partitionDataOffset);
         }
 
         // For PURGE the exception lists stay uncompressed in front of the segment stream,
@@ -306,7 +306,7 @@ public static class TestRvzBuilder
         if (spec.Compression == CompressionType.Purge)
         {
             var listsBytes = isPartition
-                ? BuildExceptionListBytes(payload.Length, spec, partition!, partitionDataOffset)
+                ? BuildExceptionListBytes(spec, partition!, partitionDataOffset)
                 : [];
             compressed = listsBytes.Concat(TestCompressor.CompressPurge(payload, listsBytes)).ToArray();
         }
@@ -344,29 +344,40 @@ public static class TestRvzBuilder
         return (stored, (uint)stored.Length);
     }
 
-    private static byte[] BuildExceptionListBytes(int payloadLength, RvzSpec spec,
+    private static byte[] BuildExceptionListBytes(RvzSpec spec,
         PartitionSpec partition, long partitionDataOffset)
     {
-        // Every partition chunk starts with one exception list per 2 MiB region it covers
-        // (a chunk without exceptions carries an empty list). For chunks larger than 2 MiB
-        // there is one list per covered region, with region-relative offsets; the last
-        // partial chunk may cover fewer regions than a full chunk.
-        var regionsPerChunk = Math.Max(1, payloadLength / 0x1F0000);
+        // Every partition chunk starts with one exception list per 2 MiB region it covers,
+        // keyed to the FULL chunk size: Dolphin writes exception_lists_per_chunk =
+        // max(1, chunk_size / 2 MiB) lists even for the final partial chunk (regions beyond
+        // the chunk's data get an empty list; a chunk without exceptions carries one empty
+        // list per region). Chunks up to 2 MiB therefore carry exactly one list.
+        var regionsPerChunk = Math.Max(1, (int)((long)spec.ChunkSize / 0x200000));
         var regionBase = (int)(partitionDataOffset / 0x1F0000);
+        // The chunk's position within its 2 MiB region: which sectors it covers and how
+        // much the stored (chunk-relative) offsets are shifted from region-relative ones.
+        var chunkSectorStart = (int)((partitionDataOffset % 0x1F0000) / 0x7C00);
+        var sectorsPerChunk = (int)(spec.ChunkSize / 0x8000);
+        var shift = chunkSectorStart * 0x400;
         using var header = new MemoryStream();
         for (var r = 0; r < regionsPerChunk; r++)
         {
             var list = regionBase + r < partition.Exceptions.Length ? partition.Exceptions[regionBase + r] : [];
-            header.WriteByte((byte)(list.Length >> 8));
-            header.WriteByte((byte)list.Length);
-            for (var i = 0; i < list.Length; i++)
+            // Only the exceptions for sectors covered by this chunk belong in its list
+            // (Dolphin: per-chunk exception lists). Entries for other sectors would wrap
+            // around the u16 offset when shifted.
+            var chunkList = list
+                .Where(e => (e.Offset >> 10) >= chunkSectorStart &&
+                            (e.Offset >> 10) < chunkSectorStart + sectorsPerChunk)
+                .Select(e => new HashExceptionEntry((ushort)(e.Offset - shift), e.Hash))
+                .ToList();
+            header.WriteByte((byte)(chunkList.Count >> 8));
+            header.WriteByte((byte)chunkList.Count);
+            for (var i = 0; i < chunkList.Count; i++)
             {
-                var entry = list[i];
-                // Stored exception offsets are chunk-relative (the reader adds the chunk's
-                // position within its 2 MiB region); the spec's offsets are region-relative.
-                var offset = entry.Offset - (ushort)((partitionDataOffset % 0x1F0000) / 0x7C00 * 0x400);
-                header.WriteByte((byte)(offset >> 8));
-                header.WriteByte((byte)offset);
+                var entry = chunkList[i];
+                header.WriteByte((byte)(entry.Offset >> 8));
+                header.WriteByte((byte)entry.Offset);
                 header.Write(entry.Hash);
             }
         }
@@ -384,9 +395,9 @@ public static class TestRvzBuilder
         return headerBytes;
     }
 
-    private static byte[] PrependExceptionLists(byte[] stored, int payloadLength, RvzSpec spec,
+    private static byte[] PrependExceptionLists(byte[] stored, RvzSpec spec,
         PartitionSpec partition, long partitionDataOffset) =>
-        BuildExceptionListBytes(payloadLength, spec, partition, partitionDataOffset).Concat(stored).ToArray();
+        BuildExceptionListBytes(spec, partition, partitionDataOffset).Concat(stored).ToArray();
 
 
     private static byte[] BuildPartTable(RvzSpec spec, PartitionSpec? partition, int partitionChunkStart,
@@ -450,14 +461,17 @@ public static class TestRvzBuilder
             rawEntryChunkStart, compression);
 
         // The group entries' data_off4 depend on the group table's (compressed) length —
-        // iterate until the layout is stable.
+        // iterate until the layout is stable. A layout fits as soon as the stored size is
+        // <= the size its offsets assumed (the difference becomes dead padding); equality
+        // is not guaranteed for bzip2-style compressors, whose size can cycle.
         var groupEntrySize = spec.IsWia ? WiaGroupEntry.Size : RvzGroupEntry.Size;
         byte[] groupTableStored = [];
-        for (var iteration = 0; iteration < 10; iteration++)
+        var layoutSize = 0;
+        for (var iteration = 0; iteration < 32; iteration++)
         {
             var groupTable = new byte[groupEntries.Count * groupEntrySize];
             var groupDataStart = AlignUp(0x48L + WiaDisc.Size + partTable.Length +
-                rawTableStored.Length + groupTableStored.Length, 4);
+                rawTableStored.Length + layoutSize, 4);
             var running = groupDataStart;
             for (var i = 0; i < groupEntries.Count; i++)
             {
@@ -480,13 +494,13 @@ public static class TestRvzBuilder
             var next = compression == CompressionType.None
                 ? groupTable
                 : TestCompressor.Compress(compression, groupTable);
-            if (next.Length == groupTableStored.Length)
+            if (next.Length <= layoutSize)
             {
                 groupTableStored = next;
                 break;
             }
 
-            groupTableStored = next;
+            layoutSize = next.Length;
         }
 
         // Layout: file head | disc | part table | raw table | group table | group data
@@ -505,9 +519,13 @@ public static class TestRvzBuilder
         outStream.Write(partTable);
         outStream.Write(rawTableStored);
         outStream.Write(groupTableStored);
-        while (outStream.Position % 4 != 0)
+        // Pad to the aligned group-data start the table's offsets were computed from
+        // (layoutSize may exceed the stored size; the difference is dead padding).
+        var finalDataStart = AlignUp(0x48L + WiaDisc.Size + partTable.Length +
+            rawTableStored.Length + layoutSize, 4);
+        while (outStream.Position + 0x48 < finalDataStart)
         {
-            outStream.WriteByte(0); // pad to a 4-byte boundary before the group data
+            outStream.WriteByte(0);
         }
 
         foreach (var data in groupData)
@@ -557,13 +575,11 @@ public static class TestRvzBuilder
         WriteBe32(disc, 12, spec.ChunkSize);
         discHeader.CopyTo(disc, 16);
 
-        if (partition != null)
-        {
-            WriteBe32(disc, 0x90, 1); // n_part
-            WriteBe32(disc, 0x94, 0x30); // part_t_size
-            WriteBe64(disc, 0x98, (ulong)partOff);
-            SHA1.HashData(partTable).CopyTo(disc, 0xA0);
-        }
+        WriteBe32(disc, 0x90, (uint)(partition == null ? 0 : 1)); // n_part
+        WriteBe32(disc, 0x94, 0x30); // part_t_size
+        WriteBe64(disc, 0x98, (ulong)partOff);
+        // SHA-1 of the (possibly empty) partition table — the reader verifies it either way.
+        SHA1.HashData(partTable).CopyTo(disc, 0xA0);
 
         WriteBe32(disc, 0xB4, (uint)(partition == null ? 1 : 2)); // n_raw_data
         WriteBe64(disc, 0xB8, (ulong)rawOff);

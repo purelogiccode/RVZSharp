@@ -64,7 +64,7 @@ reader:
 | `01 C0 0B B1` | GCZ | `GczBlob` |
 | `57 42 46 53` (`WBFS`) | WBFS | `WbfsBlob` |
 | `45 47 47 53` (`EGGS`) | NFS | `NfsBlob` |
-| `A2 38 0F AE` | TGC | `TgcBlob` |
+| `AE 0F 38 A2` | TGC | `TgcBlob` |
 | anything else | plain ISO | `PlainBlob` |
 
 ### Overloads
@@ -85,9 +85,18 @@ using IBlobReader blob = Blob.Open(@"C:\content\hif_000000.nfs", key);
 Notes:
 
 - `Blob.Open(Stream, ...)` requires a **seekable** stream (`ArgumentException` otherwise).
-- The `filePath` argument is only consulted for NFS (locating `code/htk.bin` and the
-  `hif_00000X.nfs` continuation files). NFS files must live in a directory named `content`;
-  use the key overload to bypass the on-disk lookup.
+- The `filePath` argument is consulted for NFS (locating `code/htk.bin` and the
+  `hif_00000X.nfs` continuation files) and for **split WBFS** images (`game.wbfs` +
+  `game.wbf1…` parts are opened like Dolphin; the declared size is checked against the sum
+  of the parts). NFS files must be named `hif_000000.nfs` and live in a directory named
+  `content`; use the key overload to bypass the on-disk lookup.
+
+### Scrubbing
+
+`ScrubbedBlob.Create(blob)` wraps any disc image and zeroes the data of every non-game Wii
+partition (update/channel) — the safe subset of Dolphin's `DiscScrubber` that needs no
+filesystem (FST) parser. It returns `null` for discs that cannot be scrubbed (non-Wii, or
+no game partition). The CLI's `convert -s/--scrub` uses it.
 - `leaveOpen` controls whether disposing the reader also disposes the stream.
 - Any file that is not a recognized container is opened as a **plain ISO** — opening
   arbitrary files succeeds, reads just serve the file bytes.
@@ -209,8 +218,8 @@ The writer mirrors Dolphin's converter:
 | Member | Default | Notes |
 |---|---|---|
 | `Compression` | `Zstd` | `None`, `Bzip2`, `Lzma`, `Lzma2`, `Zstd`. `Purge` throws `RvzUnsupportedException` (WIA-only). |
-| `CompressionLevel` | `3` | `Bzip2`/`Lzma`/`Lzma2`: 1–9. `Zstd`: 1–22. |
-| `ChunkSize` | `0x200000` | Power of two between 0x8000 (32 KiB) and 0x200000 (2 MiB). |
+| `CompressionLevel` | `3` | `Bzip2`/`Lzma`/`Lzma2`: 1–9. `Zstd`: −131072..22 (negative levels = fast modes, 0 = default). |
+| `ChunkSize` | `0x200000` | Power of two between 0x8000 (32 KiB) and 0x200000 (2 MiB), or a multiple of 0x200000 above that (Dolphin's rule). |
 | `Packing` | `true` | Set `false` to store junk literally (larger file, no packing overhead). |
 
 ```csharp

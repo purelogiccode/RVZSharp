@@ -85,6 +85,22 @@ public class CompressionCodecTests
     }
 
     [Fact]
+    public void Zstd_NegativeFastLevel_RoundTrip()
+    {
+        // Dolphin's CLI accepts ZSTD_minCLevel()..ZSTD_maxCLevel() (WIABlob.cpp:68-75);
+        // negative levels select fast modes and must not be clamped to 1.
+        var payload = MakePayload(200_000);
+        var (encoder, props) = CompressionEncoderFactory.Create(CompressionType.Zstd, -5);
+        var compressed = encoder.Compress(payload);
+
+        using var input = new MemoryStream(compressed);
+        var decoder = CompressionCodecFactory.Create(CompressionType.Zstd);
+        using var stream = decoder.CreateDecompressor(input, props, compressed.Length, payload.Length);
+
+        Assert.Equal(payload, DecompressAll(stream, payload.Length));
+    }
+
+    [Fact]
     public void Zstd_WithProperties_Throws()
     {
         var decoder = CompressionCodecFactory.Create(CompressionType.Zstd);

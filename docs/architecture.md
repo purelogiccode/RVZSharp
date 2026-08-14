@@ -116,7 +116,7 @@ Key points:
 | LZMA-SDK for encoding | pure-managed public-domain encoder (runtime dependency, version 22.1.1) |
 | Writer stores partitions decrypted + exceptions | the defining RVZ space optimization; identical to Dolphin |
 | Junk packing is best-effort | `GetSeed` fails cleanly on non-PRNG data and the writer falls back to literal bytes — output stays valid |
-| Chunk sizes ≤ 2 MiB | Dolphin's converter does not expose larger chunks; larger sizes complicate exception lists |
+| Chunk sizes per Dolphin | powers of two from 32 KiB to 2 MiB, or multiples of 2 MiB above that |
 | PURGE rejected for RVZ output | PURGE is a WIA-only method; RVZ readers reject it |
 
 ## Format-version handling

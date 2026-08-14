@@ -106,11 +106,27 @@ public sealed class RvzPackingDecoder : Stream
             return false;
         }
 
+        // A partial header at EOF is corruption, not a clean end: only a true end-of-input
+        // at a segment boundary terminates the stream (Dolphin fails, Go returns
+        // ErrUnexpectedEOF).
         var sizeBytes = new byte[4];
-        if (!ReadExactly(_input, sizeBytes))
+        var read = 0;
+        while (read < sizeBytes.Length)
         {
-            _endReached = true;
-            return false;
+            var n = _input.Read(sizeBytes, read, sizeBytes.Length - read);
+            if (n <= 0)
+            {
+                if (read == 0)
+                {
+                    _endReached = true;
+                    return false;
+                }
+
+                throw new RvzFormatException(
+                    "Truncated RVZ packing: partial segment size header.");
+            }
+
+            read += n;
         }
 
         var size = (uint)((sizeBytes[0] << 24) | (sizeBytes[1] << 16) | (sizeBytes[2] << 8) | sizeBytes[3]);

@@ -71,10 +71,11 @@ The Wii Backup File System container (a FAT-like structure in the file). Header 
 "Tiny GameCube" images: the disc without its empty tail, plus a header. RVZSharp follows
 Dolphin: the virtual image is the **file minus the TGC header**
 (`Length = file.Length − tgc_header_size`), and reads are served with three on-the-fly
-patches. Header fields are u32 big-endian.
+patches. Header fields are u32 big-endian, except the magic — the one field Dolphin reads
+without byte-swapping (the on-disk bytes are the little-endian form of `0xA2380FAE`):
 
 ```
-0x000  magic                 A2 38 0F AE
+0x000  magic                 AE 0F 38 A2
 0x008  tgc_header_size       (removed from the front when decoding)
 0x010  fst_real_offset       offset of the FST within the file
 0x014  fst_size

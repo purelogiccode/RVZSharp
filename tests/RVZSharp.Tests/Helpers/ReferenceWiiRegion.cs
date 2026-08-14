@@ -38,10 +38,20 @@ internal static class ReferenceWiiRegion
             }
         }
 
+        // The h0 area of an all-zero sector, from first principles: the zero-filled sector
+        // data is hashed normally (Go readGroup reads DevZero; Dolphin zero-fills and hashes),
+        // so h0 = 31 × SHA1(0x400 zeros). Sectors beyond realSectors hash to this.
+        var zeroBlockHash = SHA1.HashData(new byte[0x400]);
+        var zeroSectorH0 = new byte[31 * 20];
+        for (var k = 0; k < 31; k++)
+        {
+            zeroBlockHash.CopyTo(zeroSectorH0, k * 20);
+        }
+
         // H1: h1[i] = SHA1(h0 of sector i), the whole 8-slot array is shared by the 8 sectors.
         for (var i = 0; i < clusters; i++)
         {
-            var hash = SHA1.HashData(h0[i].AsSpan(0, 31 * 20));
+            var hash = SHA1.HashData(i < realSectors ? h0[i].AsSpan(0, 31 * 20) : zeroSectorH0);
             for (var s = 0; s < 8; s++)
             {
                 hash.CopyTo(h0[(i / 8) * 8 + s], 0x280 + (i % 8) * 20);

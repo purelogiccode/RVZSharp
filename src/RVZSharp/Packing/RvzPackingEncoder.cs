@@ -78,7 +78,11 @@ public static class RvzPackingEncoder
         {
             var currentOffset = chunk * bytesPerChunk;
             var endOffset = Math.Min(currentOffset + bytesPerChunk, totalSize);
-            var firstLoopIteration = true;
+            // Dolphin disables the "no junk → store without size headers" shortcut for
+            // multipart data entries (first_loop_iteration = !multipart, WIABlob.cpp:1237):
+            // every chunk of a multi-chunk entry gets a proper segment stream, so the
+            // reader can always tell where one chunk's data ends.
+            var firstLoopIteration = chunks <= 1;
 
             while (currentOffset < endOffset)
             {

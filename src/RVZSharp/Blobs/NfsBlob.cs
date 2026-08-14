@@ -150,6 +150,16 @@ public sealed class NfsBlob : IBlobReader
                     $"Expected the NFS files to sum to at least {expectedRawSize} bytes, got {rawSize}.");
             }
         }
+        else
+        {
+            // Single-file mode: the stream itself must cover the expected raw size — Dolphin
+            // validates the sum in every mode (NFSBlob.cpp:96-103).
+            if (stream.Length < (long)expectedRawSize)
+            {
+                throw new RvzFormatException(
+                    $"Expected the NFS data to be at least {expectedRawSize} bytes, got {stream.Length}.");
+            }
+        }
 
         return new NfsBlob(files.ToArray(), leaveOpen, key.ToArray(), ranges,
             (long)greatestBlockIndex * BlockSizeValue);
@@ -198,15 +208,31 @@ public sealed class NfsBlob : IBlobReader
             if (blockInFile == BlocksPerFile - 1)
             {
                 // The last block of a full file: its final 0x200 bytes live at the start of
-                // the next file (that file's header region).
-                ReadExactlyAt(_files[fileIndex], offsetInFile,
-                    output.AsSpan(0, (int)(BlockSizeValue - HeaderSize)));
-                ReadExactlyAt(_files[fileIndex + 1], 0,
-                    output.AsSpan((int)(BlockSizeValue - HeaderSize), HeaderSize));
+                // the next file (that file's header region). Without a continuation file the
+                // block is unreadable — fail instead of indexing past the file list
+                // (Dolphin: NFSBlob.cpp:214-215 always has the full file set).
+                if (fileIndex + 1 >= _files.Length)
+                {
+                    throw new RvzFormatException(
+                        $"NFS block {logicalBlockIndex} needs a continuation file that is not available.");
+                }
+
+                if (!ReadExactlyAt(_files[fileIndex], offsetInFile,
+                        output.AsSpan(0, (int)(BlockSizeValue - HeaderSize))) ||
+                    !ReadExactlyAt(_files[fileIndex + 1], 0,
+                        output.AsSpan((int)(BlockSizeValue - HeaderSize), HeaderSize)))
+                {
+                    throw new RvzFormatException(
+                        $"NFS block {logicalBlockIndex} is truncated across its file boundary.");
+                }
             }
             else
             {
-                ReadExactlyAt(_files[fileIndex], offsetInFile, output);
+                if (!ReadExactlyAt(_files[fileIndex], offsetInFile, output))
+                {
+                    throw new RvzFormatException(
+                        $"NFS block {logicalBlockIndex} is truncated.");
+                }
             }
 
             var iv = new byte[16];
@@ -249,8 +275,14 @@ public sealed class NfsBlob : IBlobReader
             throw new RvzFormatException("Cannot resolve the NFS file's directory.");
         }
 
-        // The NFS file must live in a directory named "content"; the key is
-        // <parent>/code/htk.bin (Dolphin: ReadKey).
+        // The NFS file must be named hif_000000.nfs and live in a directory named "content"
+        // (Dolphin: NFSBlob.cpp:129-132 + ReadKey); the key is <parent>/code/htk.bin.
+        if (!string.Equals(Path.GetFileName(filePath), "hif_000000.nfs", StringComparison.Ordinal))
+        {
+            throw new RvzFormatException(
+                $"The NFS file must be named hif_000000.nfs: {filePath}");
+        }
+
         var contentDir = directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         if (!string.Equals(Path.GetFileName(contentDir), "content", StringComparison.Ordinal))
         {

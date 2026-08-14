@@ -157,11 +157,9 @@ public readonly struct WiaDisc
             throw new RvzHashMismatchException("The disc struct SHA-1 does not match its contents.");
         }
 
-        if (DiscType is not (DiscType.GameCube or DiscType.Wii))
-        {
-            throw new RvzFormatException($"Invalid disc type {(uint)DiscType} (expected 1 or 2).");
-        }
-
+        // Dolphin never validates disc_type on read (WIABlob.cpp): 0 is written by
+        // Dolphin's own converter for unrecognized volumes, and other nonstandard values
+        // are accepted too — the value is informative only.
         var isRvz = format == WiaRvzFormat.Rvz;
         var allowed = isRvz
             ? new[]

@@ -109,4 +109,18 @@ public class GczBlobTests
         "NOTG"u8.CopyTo(bytes);
         Assert.Throws<RvzFormatException>(() => GczBlob.Open(new MemoryStream(bytes)));
     }
+
+    [Fact]
+    public void ReadPastBlockTable_ThrowsFormatException()
+    {
+        // A disc_size exceeding the block table must fail the read, not crash with an
+        // IndexOutOfRangeException (Dolphin fails the read, CompressedBlob.cpp:137-138).
+        var gcz = TestLegacyBuilders.BuildGcz(MakeIso());
+        var numBlocks = BitConverter.ToUInt32(gcz, 28);
+        var blockSize = BitConverter.ToUInt32(gcz, 24);
+        BitConverter.GetBytes((ulong)numBlocks * blockSize + 0x8000).CopyTo(gcz, 16); // disc_size
+
+        using var reader = GczBlob.Open(new MemoryStream(gcz));
+        Assert.Throws<RvzFormatException>(() => reader.ReadAt(0, new byte[reader.Length]));
+    }
 }

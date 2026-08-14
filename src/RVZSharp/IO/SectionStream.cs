@@ -12,9 +12,12 @@ public sealed class SectionStream : Stream
 
     public SectionStream(Stream baseStream, long start, long length)
     {
+        // A section outside the stream means a truncated/corrupt container: report it as a
+        // format error (Dolphin's OffsetRead fails cleanly, WIABlob.cpp:168-171, 698) instead
+        // of leaking an ArgumentOutOfRangeException out of RvzReader.Open.
         if (start < 0 || length < 0 || start + length > baseStream.Length)
         {
-            throw new ArgumentOutOfRangeException(nameof(start),
+            throw new RvzFormatException(
                 $"Section [{start}, {start + length}) is outside the stream of length {baseStream.Length}.");
         }
 
@@ -33,7 +36,9 @@ public sealed class SectionStream : Stream
 
     public override long Position
     {
-        get => _base.Position - _start;
+        // The base stream may have been seeked externally; never report a position outside
+        // the section.
+        get => Math.Clamp(_base.Position - _start, 0, _length);
         set
         {
             if (value < 0 || value > _length)
@@ -47,24 +52,28 @@ public sealed class SectionStream : Stream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        var remaining = _length - Position;
-        if (remaining <= 0)
+        // The base stream may have been seeked externally: never read outside the section
+        // (return 0 instead of crossing the section bounds).
+        if (_base.Position < _start || _base.Position >= _start + _length)
         {
             return 0;
         }
 
+        var remaining = _start + _length - _base.Position;
         count = (int)Math.Min(count, remaining);
         return _base.Read(buffer, offset, count);
     }
 
     public override int Read(Span<byte> buffer)
     {
-        var remaining = _length - Position;
-        if (remaining <= 0)
+        // The base stream may have been seeked externally: never read outside the section
+        // (return 0 instead of crossing the section bounds).
+        if (_base.Position < _start || _base.Position >= _start + _length)
         {
             return 0;
         }
 
+        var remaining = _start + _length - _base.Position;
         buffer = buffer[..(int)Math.Min(buffer.Length, remaining)];
         return _base.Read(buffer);
     }

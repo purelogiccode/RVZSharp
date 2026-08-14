@@ -118,4 +118,39 @@ public class NfsBlobTests
         var bytes = new byte[0x200];
         Assert.Throws<RvzFormatException>(() => NfsBlob.Open(new MemoryStream(bytes), MakeKey()));
     }
+
+    [Fact]
+    public void SingleFileMode_TooSmall_Throws()
+    {
+        // Dolphin validates the raw size in every mode (NFSBlob.cpp:96-103): a stream that
+        // cannot cover the declared LBA ranges must be rejected, not read as garbage.
+        var key = MakeKey();
+        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 2, [(0, 2)]);
+        var trimmed = nfs.AsSpan(0, nfs.Length - 0x100).ToArray();
+
+        Assert.Throws<RvzFormatException>(() => NfsBlob.Open(new MemoryStream(trimmed), key));
+    }
+
+    [Fact]
+    public void WrongFileName_Throws()
+    {
+        // Dolphin requires the file to be named hif_000000.nfs (NFSBlob.cpp:129-132).
+        var key = MakeKey();
+        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 2, [(0, 2)]);
+        var root = Path.Combine(Path.GetTempPath(), "rvzsharp-test-nfs-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "content"));
+        Directory.CreateDirectory(Path.Combine(root, "code"));
+        var path = Path.Combine(root, "content", "wrong.nfs");
+        File.WriteAllBytes(path, nfs);
+        File.WriteAllBytes(Path.Combine(root, "code", "htk.bin"), key);
+        try
+        {
+            using var stream = File.OpenRead(path);
+            Assert.Throws<RvzFormatException>(() => NfsBlob.Open(stream, path));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

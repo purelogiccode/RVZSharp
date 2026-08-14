@@ -126,10 +126,14 @@ public static class TestCompressor
     public static (byte[] Props, byte[] Data) EncodeLzma1(byte[] payload, bool endMarker)
     {
         var encoder = new SevenZip.Compression.LZMA.Encoder();
+        // LZMA-SDK ignores the outSize argument; the marker is controlled by CoderPropID.EndMarker.
         encoder.SetCoderProperties(
-            [SevenZip.CoderPropID.DictionarySize, SevenZip.CoderPropID.PosStateBits,
-             SevenZip.CoderPropID.LitContextBits, SevenZip.CoderPropID.LitPosBits],
-            [1 << 20, 2, 3, 0]);
+            [
+                SevenZip.CoderPropID.DictionarySize, SevenZip.CoderPropID.PosStateBits,
+                SevenZip.CoderPropID.LitContextBits, SevenZip.CoderPropID.LitPosBits,
+                SevenZip.CoderPropID.EndMarker,
+            ],
+            [1 << 20, 2, 3, 0, endMarker]);
 
         byte[] props;
         using (var ps = new MemoryStream())

@@ -12,7 +12,7 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.slnx` (XML solution — do **not** rename to `.sln`) |
-| Tests | 255, green on every framework (`dotnet test CSharp_RVZSharp.slnx -c Release`) |
+| Tests | 350, green on every framework (`dotnet test CSharp_RVZSharp.slnx -c Release`) — incl. a 95-test real-file suite validated against official No-Intro SHA-1s |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
@@ -52,5 +52,6 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
   (the same space-saving trick Dolphin uses), detects and packs PRNG junk with a recovered
   seed, and emits fully checksummed tables (SHA-1 everywhere Dolphin puts them).
 - **Verifiable** — every conversion is byte-exact: the test suite round-trips synthetic
-  discs through every codec, packing setting and chunk size, and the CLI can verify decoded
-  output with `--sha1`.
+  discs through every codec, packing setting and chunk size, decodes **30 real GameCube/Wii
+  RVZ files** byte-for-byte against their official No-Intro SHA-1s, re-encodes real GC/Wii
+  images back to RVZ, and the CLI can verify decoded output with `--sha1`.

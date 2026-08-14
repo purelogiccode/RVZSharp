@@ -9,7 +9,7 @@
 | 3 — RVZ writer | `RvzWriter`, encoders, junk packing, CLI `convert` | ✅ done |
 | 4 — Distribution | NuGet package (net8.0/9.0/10.0), multi-target tests, progress/cancellation API | ✅ done |
 | 5 — Reference alignment | audit against dolphin-master + rvz-1.0.3; every finding fixed or documented (see TODO.md) | ✅ done |
-| 6 — Real-world validation | test against real game images | ⏳ open |
+| 6 — Real-world validation | 95 real-file tests against 30 GameCube/Wii RVZ games (No-Intro SHA-1) incl. writer round-trips — found & fixed the 2 MiB ticket-key writer bug | ✅ done |
 
 ## Supported
 
@@ -20,6 +20,9 @@
 - `--scrub`: zeroes the data of non-game Wii partitions (update/channel) before converting.
 - Wii partition optimization with hash exceptions, FST split, zero groups, PRNG-junk
   packing with seed recovery.
+- Real-world validation: 30 real GC/Wii RVZ images decode byte-for-byte to their official
+  No-Intro SHA-1s; real images re-encode to RVZ (default 2 MiB chunks) and decode back to
+  the same hash. See [testing.md](testing.md#real-file-suite) for the suite details.
 
 ## Known limitations
 
@@ -34,9 +37,10 @@
 
 ## Open questions
 
-1. **Real-file validation** — do you have real GCZ / CISO / WBFS / TGC / NFS / WIA / RVZ
-   files? Byte-exact decode of real images is the highest-value remaining validation step
-   (`decode --sha1` makes it trivial to check).
+1. **Real-file validation** — ✅ resolved for RVZ: 30 real GameCube/Wii games decode
+   byte-for-byte to their official No-Intro SHA-1s, and real images re-encode to RVZ and
+   decode back. Legacy-format real files (GCZ/CISO/WBFS/TGC/NFS/WIA) are still only
+   validated against synthetic images.
 2. **Performance targets** — if large collections must be converted, parallel group
    processing (Dolphin uses a thread pool for exactly this) would give near-linear speedup.
 

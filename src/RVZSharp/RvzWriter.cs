@@ -126,6 +126,10 @@ public static class RvzWriter
             throw new RvzUnsupportedException("PURGE compression is not supported for RVZ files.");
         }
 
+        // Capture the container reference BEFORE the ProgressReader wrap below: the wrap
+        // would hide the RvzReader type and lose the container-key preference for callers
+        // that pass progress or a cancellation token.
+        var containerRz = input as RvzReader;
         if (progress is not null || cancellationToken.CanBeCanceled)
         {
             input = new ProgressReader(input, progress, cancellationToken);
@@ -156,9 +160,46 @@ public static class RvzWriter
         var areas = new List<AreaEntry>();
         if (isWii)
         {
+            // The input container (RVZ/WIA) stores the authoritative partition keys in its own
+            // partition table (wia_part_t.part_key). The ticket on the decoded disc may carry a
+            // different key (e.g. re-signed tickets on some No-Intro dumps), so prefer the
+            // container keys whenever the input is an RVZ/WIA file, and fall back to the disc
+            // ticket key for plain ISO inputs (Dolphin: VolumeWii::GetPartitions ticket key).
+            var containerKeys = new Dictionary<long, byte[]>();
+            if (containerRz is not null)
+            {
+                // Register every non-empty segment start (segment 0, or segment 1 when
+                // segment 0 is empty): the lookup below uses the partition's data start,
+                // which is the first non-empty segment's start.
+                foreach (var p in containerRz.Partitions)
+                {
+                    foreach (var segment in p.Data)
+                    {
+                        if (segment.NumSectors != 0)
+                        {
+                            containerKeys[(long)segment.FirstSector * WiaDisc.SectorSize] = p.Key;
+                        }
+                    }
+                }
+            }
+
             ulong lastRawOffset = 0;
             foreach (var partition in WiiVolume.GetPartitions(input))
             {
+                // Prefer the container's partition-table key over the disc ticket key.
+                var key = containerKeys.TryGetValue(
+                    (long)(partition.Offset + partition.DataOffset), out var containerKey)
+                    ? containerKey
+                    : partition.Key;
+                var effective = new Partition
+                {
+                    Offset = partition.Offset,
+                    Type = partition.Type,
+                    DataOffset = partition.DataOffset,
+                    DataSize = partition.DataSize,
+                    Key = key,
+                };
+
                 // Partitions overlapping the data already encoded (e.g. update partitions)
                 // are skipped, exactly like Dolphin (WIABlob.cpp:967-971). Skipping never
                 // advances lastRawOffset, so the skipped region stays covered as raw data.
@@ -201,12 +242,12 @@ public static class RvzWriter
 
                 if (size0 > 0)
                 {
-                    areas.Add(new AreaEntry { Offset = dataStart, Size = size0, IsPartition = true, Partition = partition });
+                    areas.Add(new AreaEntry { Offset = dataStart, Size = size0, IsPartition = true, Partition = effective });
                 }
 
                 if (size1 > 0)
                 {
-                    areas.Add(new AreaEntry { Offset = splitPoint, Size = size1, IsPartition = true, Partition = partition });
+                    areas.Add(new AreaEntry { Offset = splitPoint, Size = size1, IsPartition = true, Partition = effective });
                 }
 
                 // The partition's unaligned tail (and any gap after segment 0) is covered

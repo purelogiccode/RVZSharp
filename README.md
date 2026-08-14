@@ -72,20 +72,32 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   exception lists), `Packing` (RVZ packing + PRNG, encoder and decoder), `Wii` (hash tree +
   region rebuild, partition extraction for the writer), `RvzReader`, `RvzWriter`.
 - `src/RVZSharp.Cli` — the `info`/`decode`/`convert` tool.
-- `tests/RVZSharp.Tests` — 255 tests (net8.0 + net9.0 + net10.0): unit (headers, tables, codecs,
+- `tests/RVZSharp.Tests` — 350 tests (net8.0 + net9.0 + net10.0): unit (headers, tables, codecs,
   PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of synthetic RVZ files
   built by `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii,
-  legacy → RVZ, split WBFS, scrubbing) and package-facing API tests (path open, ReadFully,
-  progress, cancellation).
+  legacy → RVZ, split WBFS, scrubbing), package-facing API tests (path open, ReadFully,
+  progress, cancellation), and a 95-test real-file suite (`RealRvzFileTests`) that decodes
+  real GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
 
 ## Real-world validation
 
-Point the optional test at a real `.rvz` file to verify against its known ISO SHA-1
-(e.g. from the No-Intro datfiles in `References/rvz-1.0.3/testdata/*.dat`):
+The suite includes a real-file test class (`tests/RVZSharp.Tests/RealRvzFileTests.cs`) that
+validates the decoder and writer against actual game images on a local drive
+(`F:\Nintendo GameCube` / `F:\Nintendo Wii`). It contains:
 
-```
-RVZ_REAL_FILE=C:\path\to\game.rvz RVZ_REAL_SHA1=<expected> dotnet test tests/RVZSharp.Tests
-```
+- **60 decode tests** — 30 full-decode SHA-1 checks (15 GameCube + 15 Wii) plus an
+  expected-ISO-size check per file, each compared byte-for-byte against its official
+  No-Intro DAT entry (the canonical hash of the original disc image, from
+  `References/rvz-1.0.3/testdata/*.dat`);
+- **30 structural tests** — RVZ magic/version, legal chunk size, compression method and
+  group-table sanity on every file;
+- **3 region/random-access tests** — full-read hashing, `ReadAt` vs `ReadFully` across chunk
+  boundaries, out-of-range clamping;
+- **2 writer round-trips** — a real GameCube and a real Wii RVZ are re-encoded to RVZ with
+  default options and decoded back to the same SHA-1.
+
+The tests no-op when the files are not mounted, so the suite stays green on machines without
+the games. The real Wii round-trip exposed and pinned a writer bug (see Status below).
 
 ## Status
 
@@ -96,5 +108,12 @@ back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules — includin
 Zstd "fast" levels — optional packing, chunks of 32 KiB–2 MiB powers of two or multiples of
 2 MiB), with the same SHA-1s Dolphin produces. The codebase was audited against the
 reference implementations (Dolphin `WIABlob`/`WIACompression` and the Go `rvz-1.0.3` tool)
-and every finding was fixed or explicitly documented; see `TODO.md` for the record.
-Remaining work: validation against real game images (see `docs/roadmap.md`).
+and every finding was fixed or explicitly documented.
+
+**Real-world validation is done**: 30 real GameCube/Wii RVZ files decode byte-for-byte to
+their official No-Intro SHA-1s, and real GC/Wii images re-encode to RVZ and decode back to
+the same hash. That work also found and fixed a production writer bug: when re-encoding a
+real Wii game with the default **2 MiB chunk size**, the writer used the ISO ticket key
+instead of the RVZ partition-table key (No-Intro dumps carry re-signed tickets whose key
+differs), producing files the reader rejected. `RvzWriter` now prefers the container's
+partition-table key and falls back to the ticket key for plain ISO inputs.

@@ -1,7 +1,8 @@
 # Testing
 
-The suite has **255 tests** and runs on every target framework (`net8.0`, `net9.0`,
-`net10.0`) in ~50 seconds each:
+The suite has **350 tests** and runs on every target framework (`net8.0`, `net9.0`,
+`net10.0`). The 255 synthetic tests complete in ~50 seconds per framework; the 95-test
+real-file suite adds several minutes per framework when the real game images are mounted:
 
 ```bash
 dotnet test CSharp_RVZSharp.slnx -c Release
@@ -11,9 +12,10 @@ A single framework can be selected with `--framework net8.0` (etc.).
 
 ## Strategy
 
-The project has no real game images (testdata files are Git-LFS pointers), so every test
-runs against **synthetic discs** built in memory, plus cross-checks against the reference
-implementations' semantics:
+The suite runs against **synthetic discs** built in memory (cross-checked against the
+reference implementations' semantics) **and**, when a local library of real game images is
+mounted (`F:\Nintendo GameCube`, `F:\Nintendo Wii`), against **real RVZ files** validated
+byte-for-byte against their official No-Intro SHA-1s:
 
 1. **Synthetic builders** generate byte-exact images (RVZ/WIA, all legacy formats, and
    realistic Wii ISOs with tickets, partition tables and encrypted data).
@@ -43,7 +45,30 @@ implementations' semantics:
 | `GczBlobTests`, `CisoBlobTests`, `WbfsBlobTests`, `TgcBlobTests`, `NfsBlobTests` | legacy decoders |
 | `WiaReaderTests`, `RvzReaderTests`, `RvzReaderMatrixTests` | full-container decoding across codecs/chunk sizes |
 | `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, junk-only image, >2 MiB chunks, overlapping/odd partitions, scrubbing, raw-table group counts |
+| `RealRvzFileTests` | 95 real-file tests: 30 full-decode SHA-1 (15 GameCube + 15 Wii vs No-Intro DAT), 30 structural, 3 region/random-access, 2 writer round-trips — self-skipping when the games aren't mounted |
 | `SectionStreamTests` | section bounds under external seeks |
+
+## Real-file suite
+
+`RealRvzFileTests.cs` validates the library against actual game images on a local drive
+(`F:\Nintendo GameCube` / `F:\Nintendo Wii`). The expected ISO SHA-1s come from the official
+No-Intro DAT files in `References/rvz-1.0.3/testdata/`, so a passing test proves the decoder
+reproduces the original disc image byte-for-byte:
+
+- **30 full-decode SHA-1 tests** — 15 GameCube + 15 Wii RVZ files, decoded entirely and
+  compared to their No-Intro DAT SHA-1, plus an expected-ISO-size check per file;
+- **30 structural tests** — RVZ magic, version, legal chunk size, compression method,
+  group-table sanity on every file;
+- **3 region/random-access tests** — full-read hashing, `ReadAt` vs `ReadFully` across chunk
+  boundaries, out-of-range clamping;
+- **2 writer round-trips** — a real GameCube and a real Wii RVZ are re-encoded to RVZ with
+  default options and decoded back to the same SHA-1.
+
+Every test no-ops (early-returns) when its file is absent, so the suite stays green on
+machines without the games. Running the real Wii round-trip against genuine images exposed
+and pinned a production writer bug (default 2 MiB chunks used the ISO ticket key instead of
+the RVZ partition-table key on re-signed No-Intro tickets); `RvzWriter` now prefers the
+container key and falls back to the ticket key for plain ISO inputs.
 
 ## Synthetic builders (`tests/RVZSharp.Tests/Helpers/`)
 

@@ -6,3 +6,9 @@ theme: jekyll-theme-cayman
 relative_links:
   enabled: true
   collections: false
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+      title: RVZSharp Documentation

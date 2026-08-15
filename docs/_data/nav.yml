@@ -1,0 +1,28 @@
+- title: Home
+  url: "/"
+- title: Getting started
+  url: "/getting-started.html"
+- title: Packaging & distribution
+  url: "/packaging.html"
+- title: CLI reference
+  url: "/usage-cli.html"
+- title: Library usage guide
+  url: "/usage-library.html"
+- title: Architecture
+  url: "/architecture.html"
+- title: RVZ container format
+  url: "/format/rvz.html"
+- title: Compression & packing
+  url: "/format/compression-packing.html"
+- title: Wii partitions
+  url: "/format/wii-partitions.html"
+- title: Legacy formats
+  url: "/format/legacy.html"
+- title: Testing
+  url: "/testing.html"
+- title: Release notes 1.0.0
+  url: "/release-notes-1.0.0.html"
+- title: Roadmap & status
+  url: "/roadmap.html"
+- title: FAQ
+  url: "/faq.html"

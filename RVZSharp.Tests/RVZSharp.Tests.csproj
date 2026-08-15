@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\RVZSharp\RVZSharp.csproj" />
+    <ProjectReference Include="..\RVZSharp\RVZSharp.csproj" />
   </ItemGroup>
 
 </Project>

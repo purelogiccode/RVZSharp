@@ -3,15 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp", "RVZSharp\RVZSharp.csproj", "{C2C26AA2-D64B-4505-80F5-B76C417E2E6A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp", "src\RVZSharp\RVZSharp.csproj", "{C2C26AA2-D64B-4505-80F5-B76C417E2E6A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp.Cli", "RVZSharp.Cli\RVZSharp.Cli.csproj", "{12813695-D5C7-4CE5-ACAF-D3C5CA0ADAA2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp.Cli", "src\RVZSharp.Cli\RVZSharp.Cli.csproj", "{12813695-D5C7-4CE5-ACAF-D3C5CA0ADAA2}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp.Tests", "tests\RVZSharp.Tests\RVZSharp.Tests.csproj", "{321B2334-F667-4114-944F-C8B00BF18771}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp.Tests", "RVZSharp.Tests\RVZSharp.Tests.csproj", "{321B2334-F667-4114-944F-C8B00BF18771}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -64,8 +60,5 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{C2C26AA2-D64B-4505-80F5-B76C417E2E6A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
-		{12813695-D5C7-4CE5-ACAF-D3C5CA0ADAA2} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
-		{321B2334-F667-4114-944F-C8B00BF18771} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

@@ -10,5 +10,5 @@ public enum CompressionType : uint
     Bzip2 = 2,
     Lzma = 3,
     Lzma2 = 4,
-    Zstd = 5,
+    Zstd = 5
 }

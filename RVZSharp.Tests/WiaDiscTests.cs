@@ -1,4 +1,3 @@
-using RVZSharp;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
@@ -27,7 +26,7 @@ public class WiaDiscTests
             NumGroups = 4,
             GroupEntriesOffset = 0x3000,
             GroupEntriesSize = 0x40,
-            ComprDataLen = 0,
+            ComprDataLen = 0
         };
         var bytes = builder.Build();
 

@@ -1,4 +1,3 @@
-using RVZSharp;
 using RVZSharp.Compression;
 using RVZSharp.Models;
 
@@ -51,7 +50,7 @@ public class CompressionLzmaTests
             [
                 SevenZip.CoderPropID.DictionarySize, SevenZip.CoderPropID.PosStateBits,
                 SevenZip.CoderPropID.LitContextBits, SevenZip.CoderPropID.LitPosBits,
-                SevenZip.CoderPropID.EndMarker,
+                SevenZip.CoderPropID.EndMarker
             ],
             [1 << 20, 2, 3, 0, endMarker]);
 
@@ -69,7 +68,7 @@ public class CompressionLzmaTests
     }
 
     [Theory]
-    [InlineData(true)]  // end-of-stream marker present (Dolphin style)
+    [InlineData(true)] // end-of-stream marker present (Dolphin style)
     [InlineData(false)] // size-terminated only
     public void Lzma1_RoundTrip(bool endMarker)
     {

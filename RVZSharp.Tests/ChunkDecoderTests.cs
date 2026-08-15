@@ -1,4 +1,3 @@
-using RVZSharp;
 using RVZSharp.Chunks;
 using RVZSharp.Compression;
 using RVZSharp.Models;
@@ -27,7 +26,7 @@ public class ChunkDecoderTests
         // A group whose stored bytes exceed the expected payload must be rejected
         // (Dolphin: WIABlob.cpp:741-754) — the end-of-payload probe finds the excess.
         var payload = Payload(0x100, seed: 4);
-        var (file, group) = GroupFile(payload.Concat(new byte[] { 0xAA }).ToArray(), compressed: false);
+        var (file, group) = GroupFile([.. payload, 0xAA], compressed: false);
 
         var ex = Assert.Throws<RvzFormatException>(() =>
             Decode(file, MakeDisc(CompressionType.None), CompressionType.None, group,
@@ -40,7 +39,7 @@ public class ChunkDecoderTests
     {
         // A corrupt bzip2 stream must surface as RvzFormatException, not leak a raw
         // SharpZipBaseException.
-        var (file, group) = GroupFile(new byte[] { 0x42, 0x5A, 0x68, 0x00, 0x00, 0xFF, 0xFF }, compressed: true);
+        var (file, group) = GroupFile([0x42, 0x5A, 0x68, 0x00, 0x00, 0xFF, 0xFF], compressed: true);
 
         Assert.Throws<RvzFormatException>(() =>
             Decode(file, MakeDisc(CompressionType.Bzip2), CompressionType.Bzip2, group,
@@ -76,22 +75,26 @@ public class ChunkDecoderTests
         file.Position = offset;
         file.Write(data);
         file.Position = 0;
-        return (file, new RvzGroupEntry((uint)(offset / 4), (uint)data.Length | (compressed ? 0x80000000u : 0), packedSize));
+        return (file, new RvzGroupEntry(offset / 4, (uint)data.Length | (compressed ? 0x80000000u : 0), packedSize));
     }
 
     private static ChunkDecodeResult Decode(Stream file, WiaDisc disc, CompressionType compression, RvzGroupEntry group,
-        bool isPartition, int expectedSize, long dataOffset) =>
-        ChunkDecoder.DecodeChunk(file, disc, CompressionCodecFactory.Create(compression),
+        bool isPartition, int expectedSize, long dataOffset)
+    {
+        return ChunkDecoder.DecodeChunk(file, disc, CompressionCodecFactory.Create(compression),
             new ChunkDecodeRequest
             {
                 Group = GroupEntry.FromRvz(group),
                 IsPartition = isPartition,
                 ExpectedSize = expectedSize,
-                DataOffset = dataOffset,
+                DataOffset = dataOffset
             });
+    }
 
-    private static byte[] Be32(uint value) =>
-        [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+    private static byte[] Be32(uint value)
+    {
+        return [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+    }
 
     private static byte[] Concat(params byte[][] arrays)
     {

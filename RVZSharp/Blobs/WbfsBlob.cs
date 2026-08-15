@@ -1,4 +1,3 @@
-using RVZSharp.IO;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
 
@@ -197,8 +196,10 @@ public sealed class WbfsBlob : IBlobReader
         return shift;
     }
 
-    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset)
+    {
+        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    }
 
     private static bool ReadExactlyAt(Stream stream, long position, Span<byte> buffer)
     {
@@ -312,16 +313,22 @@ public sealed class WbfsBlob : IBlobReader
             {
                 SeekOrigin.Begin => offset,
                 SeekOrigin.Current => _position + offset,
-                _ => Length + offset,
+                _ => Length + offset
             };
             return _position;
         }
 
         public override void Flush() { }
 
-        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
 
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
 
         protected override void Dispose(bool disposing)
         {

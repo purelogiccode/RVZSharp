@@ -25,5 +25,5 @@ public enum BlobType
     Rvz,
 
     /// <summary>Wii U eShop NFS (EGGS, AES-encrypted blocks).</summary>
-    Nfs,
+    Nfs
 }

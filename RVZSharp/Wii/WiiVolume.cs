@@ -118,7 +118,7 @@ public static class WiiVolume
                     Type = partitionType,
                     DataOffset = dataOffset.Value,
                     DataSize = dataSize.Value,
-                    Key = key,
+                    Key = key
                 });
             }
         }
@@ -140,16 +140,22 @@ public static class WiiVolume
     }
 
     /// <summary>The FST offset within the partition (partition header 0x424, shifted).</summary>
-    public static ulong? GetFstOffset(IBlobReader disc, Partition partition) =>
-        ReadSwappedAndShifted(disc, partition.Offset + 0x424);
+    public static ulong? GetFstOffset(IBlobReader disc, Partition partition)
+    {
+        return ReadSwappedAndShifted(disc, partition.Offset + 0x424);
+    }
 
     /// <summary>The FST size (partition header 0x428, shifted).</summary>
-    public static ulong? GetFstSize(IBlobReader disc, Partition partition) =>
-        ReadSwappedAndShifted(disc, partition.Offset + 0x428);
+    public static ulong? GetFstSize(IBlobReader disc, Partition partition)
+    {
+        return ReadSwappedAndShifted(disc, partition.Offset + 0x428);
+    }
 
     /// <summary>Maps a partition-data-relative offset to a disc-relative offset.</summary>
-    public static ulong PartitionOffsetToRawOffset(ulong offset, Partition partition) =>
-        partition.Offset + partition.DataOffset + offset;
+    public static ulong PartitionOffsetToRawOffset(ulong offset, Partition partition)
+    {
+        return partition.Offset + partition.DataOffset + offset;
+    }
 
     /// <summary>Reads a big-endian u32 at <paramref name="offset"/>.</summary>
     public static uint ReadSwapped(IBlobReader disc, ulong offset)
@@ -165,9 +171,13 @@ public static class WiiVolume
         return TryReadAt(disc, offset, bytes) ? (ulong)ReadBe32(bytes, 0) << 2 : null;
     }
 
-    private static bool TryReadAt(IBlobReader disc, ulong offset, Span<byte> buffer) =>
-        offset < (ulong)disc.Length && disc.ReadAt((long)offset, buffer) == buffer.Length;
+    private static bool TryReadAt(IBlobReader disc, ulong offset, Span<byte> buffer)
+    {
+        return offset < (ulong)disc.Length && disc.ReadAt((long)offset, buffer) == buffer.Length;
+    }
 
-    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset)
+    {
+        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    }
 }

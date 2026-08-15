@@ -1,11 +1,9 @@
 // Adapted from SharpCompress (https://github.com/adamhathcock/sharpcompress), MIT license.
 // Trimmed to the LZMA1/LZMA2 *decode* paths only; namespace renamed to RVZSharp.Compression.Lzma.
 // See THIRD-PARTY-NOTICES.md in the repository root for the full license text.
-using System;
+
 using System.Buffers.Binary;
-using System.IO;
 using RVZSharp.Compression.Lzma.LZ;
-using RVZSharp.Compression.Lzma.RangeCoder;
 
 namespace RVZSharp.Compression.Lzma;
 
@@ -95,7 +93,10 @@ public sealed class LzmaStream : Stream
         long outputSize = -1,
         Stream? presetDictionary = null,
         bool leaveOpen = false
-    ) => Create(properties, inputStream, inputSize, outputSize, presetDictionary, properties.Length < 5, leaveOpen);
+    )
+    {
+        return Create(properties, inputStream, inputSize, outputSize, presetDictionary, properties.Length < 5, leaveOpen);
+    }
 
     public static LzmaStream Create(
         byte[] properties,
@@ -357,7 +358,7 @@ public sealed class LzmaStream : Stream
             return;
         }
 
-        if (control >= 0xE0 || control == 0x01)
+        if (control is >= 0xE0 or 0x01)
         {
             _needProps = true;
             _needDictReset = false;
@@ -430,11 +431,20 @@ public sealed class LzmaStream : Stream
         }
     }
 
-    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotSupportedException();
+    }
 
-    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
 
-    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
 
     public byte[] Properties { get; } = new byte[5];
 

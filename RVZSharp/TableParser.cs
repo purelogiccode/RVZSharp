@@ -96,8 +96,10 @@ public static class TableParser
     }
 
     /// <summary>Reads the group table (compressed with the disc's method at group_off).</summary>
-    public static GroupEntry[] ParseGroupEntries(Stream file, WiaDisc disc) =>
-        ParseGroupEntries(file, disc, WiaRvzFormat.Rvz);
+    public static GroupEntry[] ParseGroupEntries(Stream file, WiaDisc disc)
+    {
+        return ParseGroupEntries(file, disc, WiaRvzFormat.Rvz);
+    }
 
     /// <summary>Reads the group table for WIA (8-byte entries) or RVZ (12-byte entries).</summary>
     public static GroupEntry[] ParseGroupEntries(Stream file, WiaDisc disc, WiaRvzFormat format)
@@ -109,7 +111,7 @@ public static class TableParser
         }
 
         var entrySize = format == WiaRvzFormat.Wia ? WiaGroupEntry.Size : RvzGroupEntry.Size;
-        var tableSize = checked((long)count * entrySize);
+        var tableSize = checked(count * entrySize);
         var bytes = ReadCompressedTable(file, disc, (long)disc.GroupEntriesOffset,
             disc.GroupEntriesSize, tableSize, "group");
 

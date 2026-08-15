@@ -22,17 +22,20 @@ public sealed class LzmaEncoder : ICompressionEncoder
         _dictionarySize = DictionarySizeForLevel(level);
     }
 
-    private static int DictionarySizeForLevel(int level) => level switch
+    private static int DictionarySizeForLevel(int level)
     {
-        <= 0 => 1 << 16,
-        1 => 1 << 20,
-        2 => 1 << 21,
-        3 or 4 => 1 << 22,
-        5 or 6 => 1 << 23,
-        7 => 1 << 24,
-        8 => 1 << 25,
-        _ => 1 << 26, // 9
-    };
+        return level switch
+        {
+            <= 0 => 1 << 16,
+            1 => 1 << 20,
+            2 => 1 << 21,
+            3 or 4 => 1 << 22,
+            5 or 6 => 1 << 23,
+            7 => 1 << 24,
+            8 => 1 << 25,
+            _ => 1 << 26 // 9
+        };
+    }
 
     /// <summary>The 7-Zip properties for compr_data (LZMA1: 5 bytes; LZMA2: 1 byte).</summary>
     public byte[] Properties
@@ -65,7 +68,10 @@ public sealed class LzmaEncoder : ICompressionEncoder
         }
     }
 
-    public byte[] Compress(ReadOnlySpan<byte> data) => _lzma2 ? EncodeLzma2(data) : EncodeLzma1(data);
+    public byte[] Compress(ReadOnlySpan<byte> data)
+    {
+        return _lzma2 ? EncodeLzma2(data) : EncodeLzma1(data);
+    }
 
     public void AddPrecedingData(ReadOnlySpan<byte> data) { }
 
@@ -84,7 +90,7 @@ public sealed class LzmaEncoder : ICompressionEncoder
         var propIds = new List<CoderPropID>
         {
             CoderPropID.DictionarySize, CoderPropID.PosStateBits,
-            CoderPropID.LitContextBits, CoderPropID.LitPosBits,
+            CoderPropID.LitContextBits, CoderPropID.LitPosBits
         };
         var propValues = new List<object> { _dictionarySize, 2, 3, 0 };
         if (withEndMarker)
@@ -129,7 +135,7 @@ public sealed class LzmaEncoder : ICompressionEncoder
                 (byte)((part.Length - 1) & 0xFF),
                 (byte)((lzma1.Length - 1) >> 8),
                 (byte)((lzma1.Length - 1) & 0xFF),
-                lzmaProps[0], // lc/lp/pb byte (0x5D for lc=3, lp=0, pb=2)
+                lzmaProps[0] // lc/lp/pb byte (0x5D for lc=3, lp=0, pb=2)
             };
             output.Write(header);
             output.Write(lzma1);

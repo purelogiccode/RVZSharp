@@ -5,7 +5,10 @@ public sealed class NonDisposingStream : Stream
 {
     private readonly Stream _inner;
 
-    public NonDisposingStream(Stream inner) => _inner = inner;
+    public NonDisposingStream(Stream inner)
+    {
+        _inner = inner;
+    }
 
     public override bool CanRead => _inner.CanRead;
     public override bool CanSeek => _inner.CanSeek;
@@ -17,10 +20,33 @@ public sealed class NonDisposingStream : Stream
         set => _inner.Position = value;
     }
 
-    public override void Flush() => _inner.Flush();
-    public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
-    public override int Read(Span<byte> buffer) => _inner.Read(buffer);
-    public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
-    public override void SetLength(long value) => throw new NotSupportedException();
-    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override void Flush()
+    {
+        _inner.Flush();
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        return _inner.Read(buffer, offset, count);
+    }
+
+    public override int Read(Span<byte> buffer)
+    {
+        return _inner.Read(buffer);
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        return _inner.Seek(offset, origin);
+    }
+
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
 }

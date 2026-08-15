@@ -1,4 +1,3 @@
-using RVZSharp.IO;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
 
@@ -117,8 +116,10 @@ public sealed class CisoBlob : IBlobReader
         return total;
     }
 
-    private static uint ReadLe32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
+    private static uint ReadLe32(ReadOnlySpan<byte> data, int offset)
+    {
+        return (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
+    }
 
     private static bool ReadExactlyAt(Stream stream, long position, Span<byte> buffer)
     {

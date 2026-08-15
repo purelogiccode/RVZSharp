@@ -1,4 +1,3 @@
-using RVZSharp;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
@@ -15,7 +14,7 @@ public class WiaFileHeadTests
             VersionCompatible = 0x00030000,
             DiscSize = 0xDC,
             IsoFileSize = 0x100000000,
-            RvzFileSize = 12345,
+            RvzFileSize = 12345
         };
         var bytes = builder.Build();
 

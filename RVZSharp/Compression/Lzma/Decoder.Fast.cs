@@ -1,7 +1,6 @@
 #nullable disable
 
 #if !LEGACY_DOTNET
-using System;
 using System.Runtime.CompilerServices;
 using RVZSharp.Compression.Lzma.LZ;
 
@@ -252,7 +251,7 @@ public partial class Decoder
                 InPos = rangeDecoder.FastBufferPos,
                 InLen = rangeDecoder.FastBufferLen,
                 Consumed = 0,
-                RangeDecoder = rangeDecoder,
+                RangeDecoder = rangeDecoder
             };
             var os = new FastOutState
             {
@@ -261,7 +260,7 @@ public partial class Decoder
                 Total = outWindow.FastTotal,
                 WindowSize = outWindow.FastWindowSize,
                 Limit = outWindow.FastLimit,
-                OutWindow = outWindow,
+                OutWindow = outWindow
             };
 
             result = false;
@@ -465,7 +464,7 @@ public partial class Decoder
         // logical-shift result from a target of 0, so both formulas collapse into one
         // branchless expression selected by the same mask used above.
         int target = (int)(
-            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | (uint)(KBitModelOffsetFast & mask)
+            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | KBitModelOffsetFast & mask
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
 
@@ -478,8 +477,10 @@ public partial class Decoder
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe uint DecodeBitFast(ref FastRangeState rs, ushort* probs, int index) =>
-        DecodeBitFastCore(ref rs, probs + index, probs[index], out _);
+    private static unsafe uint DecodeBitFast(ref FastRangeState rs, ushort* probs, int index)
+    {
+        return DecodeBitFastCore(ref rs, probs + index, probs[index], out _);
+    }
 
     // Split form of DecodeBitFastCore used only for the outer dispatch bit (IsMatch): mirrors
     // the ASM's IF_BIT_x_NOUP / UPDATE_0 / UPDATE_1 split, where the probability-model update is
@@ -507,7 +508,7 @@ public partial class Decoder
     private static unsafe void UpdateProbFast(ushort* probSlot, uint prob, uint mask)
     {
         int target = (int)(
-            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | (uint)(KBitModelOffsetFast & mask)
+            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | KBitModelOffsetFast & mask
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
     }
@@ -638,11 +639,13 @@ public partial class Decoder
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private uint GetFastLiteralBaseIndex(uint pos, byte prevByte) =>
-        (
+    private uint GetFastLiteralBaseIndex(uint pos, byte prevByte)
+    {
+        return (
             ((pos & _fLiteralPosMask) << _fLiteralNumPrevBits)
             + (uint)(prevByte >> (8 - _fLiteralNumPrevBits))
         ) * 0x300;
+    }
 
     // baseP/firstProb (root of the literal tree, index 1) are precomputed by the caller -
     // pos/prevByte are already known before the IsMatch decode resolves, so hoisting this load
@@ -764,7 +767,7 @@ public partial class Decoder
             matchByte <<= 1;
             var hasNext = i < 7;
 
-            var child0 = (uint)((1 + nextMatchBit) << 8) + (symbol << 1);
+            var child0 = ((1 + nextMatchBit) << 8) + (symbol << 1);
             uint probChild0 = 0,
                 probChild1 = 0;
             if (hasNext)

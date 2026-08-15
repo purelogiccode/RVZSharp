@@ -125,8 +125,10 @@ public readonly struct WiaDisc
     }
 
     /// <summary>Validates this disc struct as part of an RVZ file.</summary>
-    public void Validate(uint discSize, ReadOnlySpan<byte> rawDisc, ReadOnlySpan<byte> expectedDiscHash) =>
+    public void Validate(uint discSize, ReadOnlySpan<byte> rawDisc, ReadOnlySpan<byte> expectedDiscHash)
+    {
         Validate(discSize, rawDisc, expectedDiscHash, WiaRvzFormat.Rvz);
+    }
 
     /// <summary>
     /// Validates the disc struct: disc size, compressor data bounds, SHA-1 of the disc bytes,
@@ -165,12 +167,12 @@ public readonly struct WiaDisc
             ? new[]
             {
                 CompressionType.None, CompressionType.Bzip2, CompressionType.Lzma,
-                CompressionType.Lzma2, CompressionType.Zstd,
+                CompressionType.Lzma2, CompressionType.Zstd
             }
             : new[]
             {
                 CompressionType.None, CompressionType.Purge, CompressionType.Bzip2,
-                CompressionType.Lzma, CompressionType.Lzma2,
+                CompressionType.Lzma, CompressionType.Lzma2
             };
         if (!allowed.Contains(Compression))
         {

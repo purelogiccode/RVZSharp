@@ -1,4 +1,3 @@
-using RVZSharp;
 using RVZSharp.Packing;
 using RVZSharp.Tests.Helpers;
 
@@ -14,8 +13,10 @@ public class PackingTests
         return seed;
     }
 
-    private static byte[] GenerateJunk(byte[] seed, long offset, int count) =>
-        ReferencePrng.Generate(seed, offset, count);
+    private static byte[] GenerateJunk(byte[] seed, long offset, int count)
+    {
+        return ReferencePrng.Generate(seed, offset, count);
+    }
 
     [Theory]
     [InlineData(0)]
@@ -37,7 +38,7 @@ public class PackingTests
 
         var prng = new LaggedFibonacciPrng();
         prng.SetSeed(seed);
-        prng.Forward((int)(offset % 0x8000));
+        prng.Forward(offset % 0x8000);
         prng.GetBytes(actual, count);
 
         Assert.Equal(expected, actual);
@@ -159,8 +160,10 @@ public class PackingTests
         return output;
     }
 
-    private static byte[] Be32(uint value) =>
-        [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+    private static byte[] Be32(uint value)
+    {
+        return [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+    }
 
     private static byte[] Concat(params byte[][] arrays)
     {

@@ -77,7 +77,7 @@ internal static class ReferencePrng
                     0 => unchecked((byte)word),
                     1 => unchecked((byte)(word >> 8)),
                     2 => unchecked((byte)(word >> 16)),
-                    _ => unchecked((byte)(word >> 24)),
+                    _ => unchecked((byte)(word >> 24))
                 };
             }
 
@@ -101,6 +101,8 @@ internal static class ReferencePrng
         }
     }
 
-    private static uint Swap32(uint value) =>
-        ((value & 0xFF) << 24) | ((value & 0xFF00) << 8) | ((value >> 8) & 0xFF00) | ((value >> 24) & 0xFF);
+    private static uint Swap32(uint value)
+    {
+        return ((value & 0xFF) << 24) | ((value & 0xFF00) << 8) | ((value >> 8) & 0xFF00) | ((value >> 24) & 0xFF);
+    }
 }

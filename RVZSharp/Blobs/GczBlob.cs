@@ -243,11 +243,15 @@ public sealed class GczBlob : IBlobReader
         return output;
     }
 
-    private static uint ReadLe32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
+    private static uint ReadLe32(ReadOnlySpan<byte> data, int offset)
+    {
+        return (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
+    }
 
-    private static ulong ReadLe64(ReadOnlySpan<byte> data, int offset) =>
-        ReadLe32(data, offset) | ((ulong)ReadLe32(data, offset + 4) << 32);
+    private static ulong ReadLe64(ReadOnlySpan<byte> data, int offset)
+    {
+        return ReadLe32(data, offset) | ((ulong)ReadLe32(data, offset + 4) << 32);
+    }
 
     private static bool ReadExactlyAt(Stream stream, long position, Span<byte> buffer)
     {

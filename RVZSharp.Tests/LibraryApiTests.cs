@@ -1,4 +1,3 @@
-using RVZSharp;
 using RVZSharp.Blobs;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
@@ -21,9 +20,15 @@ public class LibraryApiTests
     {
         private readonly Action<T> _handler;
 
-        public SyncProgress(Action<T> handler) => _handler = handler;
+        public SyncProgress(Action<T> handler)
+        {
+            _handler = handler;
+        }
 
-        public void Report(T value) => _handler(value);
+        public void Report(T value)
+        {
+            _handler(value);
+        }
     }
     private static byte[] MakeGcIso(int size = 0x420000)
     {

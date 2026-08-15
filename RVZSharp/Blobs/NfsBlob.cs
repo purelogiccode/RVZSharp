@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using RVZSharp.IO;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
 
@@ -65,8 +64,10 @@ public sealed class NfsBlob : IBlobReader
     }
 
     /// <summary>Opens an NFS file with an explicit 16-byte AES key (single-file mode).</summary>
-    public static NfsBlob Open(Stream stream, ReadOnlySpan<byte> key, bool leaveOpen = false) =>
-        Open(stream, key, leaveOpen, filePath: null);
+    public static NfsBlob Open(Stream stream, ReadOnlySpan<byte> key, bool leaveOpen = false)
+    {
+        return Open(stream, key, leaveOpen, filePath: null);
+    }
 
     private static NfsBlob Open(Stream stream, ReadOnlySpan<byte> key, bool leaveOpen, string? filePath)
     {
@@ -92,7 +93,7 @@ public sealed class NfsBlob : IBlobReader
                 $"Bad NFS magic: expected \"EGGS\", got {System.Text.Encoding.ASCII.GetString(header, 0, 4)}.");
         }
 
-        var rangeCount = Math.Min(ReadBe32(header, 0x10), (uint)MaxLbaRanges);
+        var rangeCount = Math.Min(ReadBe32(header, 0x10), MaxLbaRanges);
         var ranges = new (uint Start, uint Num)[rangeCount];
         ulong totalBlocks = 0;
         uint greatestBlockIndex = 0;
@@ -112,7 +113,7 @@ public sealed class NfsBlob : IBlobReader
             greatestBlockIndex = Math.Max(greatestBlockIndex, start + num);
         }
 
-        var expectedRawSize = (ulong)HeaderSize + totalBlocks * (ulong)BlockSizeValue;
+        var expectedRawSize = HeaderSize + totalBlocks * BlockSizeValue;
 
         // Open continuation files (Dolphin: OpenFiles). The data stream is the concatenation
         // of the files, each 0xFA00000 bytes, with the last 0x200 bytes of every full file
@@ -126,7 +127,7 @@ public sealed class NfsBlob : IBlobReader
                 throw new RvzFormatException("Cannot resolve the NFS file's directory.");
             }
 
-            var fileCount = (int)((expectedRawSize + (ulong)MaxFileSize - 1) / (ulong)MaxFileSize);
+            var fileCount = (int)((expectedRawSize + MaxFileSize - 1) / MaxFileSize);
             var rawSize = stream.Length;
             for (var i = 1; i < fileCount; i++)
             {
@@ -164,7 +165,7 @@ public sealed class NfsBlob : IBlobReader
         }
 
         return new NfsBlob(files.ToArray(), leaveOpen, key.ToArray(), ranges,
-            (long)greatestBlockIndex * BlockSizeValue);
+            greatestBlockIndex * BlockSizeValue);
     }
 
     public int ReadAt(long position, Span<byte> buffer)
@@ -307,8 +308,10 @@ public sealed class NfsBlob : IBlobReader
         return key[..KeySize];
     }
 
-    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset)
+    {
+        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    }
 
     private static void WriteBe64(byte[] data, int offset, ulong value)
     {

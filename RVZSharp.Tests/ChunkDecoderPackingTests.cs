@@ -1,4 +1,3 @@
-using RVZSharp;
 using RVZSharp.Chunks;
 using RVZSharp.Compression;
 using RVZSharp.Models;
@@ -24,16 +23,17 @@ public partial class ChunkDecoderPackingTests
     private static WiaDisc MakeDisc(CompressionType compression)
     {
         var builder = new TestDiscBuilder { ChunkSize = 0x8000 };
-        if (compression == CompressionType.Lzma)
+        switch (compression)
         {
-            var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
-            props.CopyTo(builder.ComprData, 0);
-            builder.ComprDataLen = (byte)props.Length;
-        }
-        else if (compression == CompressionType.Lzma2)
-        {
-            builder.ComprData[0] = 21;
-            builder.ComprDataLen = 1;
+            case CompressionType.Lzma:
+                var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
+                props.CopyTo(builder.ComprData, 0);
+                builder.ComprDataLen = (byte)props.Length;
+                break;
+            case CompressionType.Lzma2:
+                builder.ComprData[0] = 21;
+                builder.ComprDataLen = 1;
+                break;
         }
 
         builder.Compression = compression;
@@ -47,19 +47,21 @@ public partial class ChunkDecoderPackingTests
         file.Position = offset;
         file.Write(data);
         file.Position = 0;
-        return (file, new RvzGroupEntry((uint)(offset / 4), (uint)data.Length | (compressed ? 0x80000000u : 0), packedSize));
+        return (file, new RvzGroupEntry(offset / 4, (uint)data.Length | (compressed ? 0x80000000u : 0), packedSize));
     }
 
     private static ChunkDecodeResult Decode(Stream file, WiaDisc disc, CompressionType compression, RvzGroupEntry group,
-        bool isPartition, int expectedSize, long dataOffset) =>
-        ChunkDecoder.DecodeChunk(file, disc, CompressionCodecFactory.Create(compression),
+        bool isPartition, int expectedSize, long dataOffset)
+    {
+        return ChunkDecoder.DecodeChunk(file, disc, CompressionCodecFactory.Create(compression),
             new ChunkDecodeRequest
             {
                 Group = GroupEntry.FromRvz(group),
                 IsPartition = isPartition,
                 ExpectedSize = expectedSize,
-                DataOffset = dataOffset,
+                DataOffset = dataOffset
             });
+    }
 
     private static byte[] Concat(params byte[][] arrays)
     {
@@ -74,8 +76,10 @@ public partial class ChunkDecoderPackingTests
         return result;
     }
 
-    private static byte[] Be32(uint value) =>
-        [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+    private static byte[] Be32(uint value)
+    {
+        return [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+    }
 
     private static byte[] WithExceptionList(byte[] payload, bool alignTo4)
     {

@@ -88,7 +88,7 @@ public class RvzPackingEncoderTests
         Assert.Equal((uint)(payload.Length / 2), header0);
 
         // And the segment stream still decodes to the payload.
-        using var stream = new MemoryStream(mainData.ToArray(), writable: false);
+        using var stream = new MemoryStream([.. mainData], writable: false);
         using var decoder = new RvzPackingDecoder(stream, dataOffset: 0);
         var decoded = new byte[payload.Length];
         var read = 0;
@@ -107,7 +107,7 @@ public class RvzPackingEncoderTests
     {
         // A partial 1-3 byte segment header at EOF is corruption, not a clean end
         // (Dolphin fails; Go returns ErrUnexpectedEOF).
-        using var input = new MemoryStream(new byte[] { 0x00, 0x01 });
+        using var input = new MemoryStream([0x00, 0x01]);
         using var decoder = new RvzPackingDecoder(input, dataOffset: 0);
         var buffer = new byte[16];
         Assert.Throws<RvzFormatException>(() => decoder.Read(buffer, 0, buffer.Length));
@@ -121,7 +121,7 @@ public class RvzPackingEncoderTests
             allowJunkReuse: true, compression: true, mainData, ref packedSize);
         Assert.True(packedSize > 0);
 
-        using var stream = new MemoryStream(mainData.ToArray(), writable: false);
+        using var stream = new MemoryStream([.. mainData], writable: false);
         using var decoder = new RvzPackingDecoder(stream, dataOffset);
         var decoded = new byte[payload.Length];
         var read = 0;

@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
-using RVZSharp;
 using RVZSharp.Blobs;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
@@ -36,7 +35,7 @@ internal static class Program
                 "extract" => ExtractCommand(args[1..]),
                 "info" when args.Length >= 2 => Info(args[1]),
                 "decode" when args.Length >= 3 => Decode(args[1], args[2], args[3..]),
-                _ => PrintUsageAndFail(),
+                _ => PrintUsageAndFail()
             };
         }
         catch (Exception e)
@@ -90,13 +89,24 @@ internal static class Program
 
     private sealed class ParsedArgs
     {
-        internal readonly Dictionary<string, string> _values = new();
-        internal readonly HashSet<string> _flags = new();
+        internal readonly Dictionary<string, string> Values = new();
+        internal readonly HashSet<string> Flags = new();
         public List<string> Positionals { get; } = new();
 
-        public bool IsSet(string longName) => _values.ContainsKey(longName) || _flags.Contains(longName);
-        public bool HasFlag(string longName) => _flags.Contains(longName);
-        public string? Get(string longName) => _values.GetValueOrDefault(longName);
+        public bool IsSet(string longName)
+        {
+            return Values.ContainsKey(longName) || Flags.Contains(longName);
+        }
+
+        public bool HasFlag(string longName)
+        {
+            return Flags.Contains(longName);
+        }
+
+        public string? Get(string longName)
+        {
+            return Values.GetValueOrDefault(longName);
+        }
     }
 
     private static ParsedArgs ParseArgs(IReadOnlyList<string> args,
@@ -131,12 +141,8 @@ internal static class Program
             else if (arg.Length > 1 && arg[0] == '-')
             {
                 var match = spec.FirstOrDefault(pair => pair.Value.Short == arg);
-                if (match.Key == null)
-                {
-                    throw new CliError($"no such option: {arg}");
-                }
 
-                name = match.Key;
+                name = match.Key ?? throw new CliError($"no such option: {arg}");
                 takesValue = match.Value.TakesValue;
                 choices = match.Value.Choices;
             }
@@ -148,7 +154,7 @@ internal static class Program
 
             if (!takesValue)
             {
-                result._flags.Add(name);
+                result.Flags.Add(name);
                 continue;
             }
 
@@ -164,7 +170,7 @@ internal static class Program
                     $"option {arg}: invalid choice: '{value}' (choose from {string.Join(", ", choices)})");
             }
 
-            result._values[name] = value;
+            result.Values[name] = value;
         }
 
         return result;
@@ -184,17 +190,17 @@ internal static class Program
 
     private static readonly Dictionary<string, OptionSpec> ConvertSpec = new()
     {
-        ["user"] = new("-u", true, null),
-        ["input"] = new("-i", true, null),
-        ["output"] = new("-o", true, null),
-        ["format"] = new("-f", true, ["iso", "gcz", "wia", "rvz"]),
-        ["scrub"] = new("-s", false, null),
-        ["block_size"] = new("-b", true, null),
-        ["compression"] = new("-c", true, ["none", "zstd", "bzip2", "lzma", "lzma2"]),
-        ["compression_level"] = new("-l", true, null),
+        ["user"] = new OptionSpec("-u", true, null),
+        ["input"] = new OptionSpec("-i", true, null),
+        ["output"] = new OptionSpec("-o", true, null),
+        ["format"] = new OptionSpec("-f", true, ["iso", "gcz", "wia", "rvz"]),
+        ["scrub"] = new OptionSpec("-s", false, null),
+        ["block_size"] = new OptionSpec("-b", true, null),
+        ["compression"] = new OptionSpec("-c", true, ["none", "zstd", "bzip2", "lzma", "lzma2"]),
+        ["compression_level"] = new OptionSpec("-l", true, null),
         // RVZSharp extensions (accepted in flag mode too)
-        ["chunk-size"] = new("--chunk-size", true, null),
-        ["no-packing"] = new("--no-packing", false, null),
+        ["chunk-size"] = new OptionSpec("--chunk-size", true, null),
+        ["no-packing"] = new OptionSpec("--no-packing", false, null)
     };
 
     private static int ConvertCommand(IReadOnlyList<string> args)
@@ -271,7 +277,7 @@ internal static class Program
 
             using (blob)
             {
-                var input = (IBlobReader)blob;
+                var input = blob;
                 if (format is "gcz" or "wia")
                 {
                     return Fail(
@@ -287,17 +293,18 @@ internal static class Program
                     }
 
                     input = scrubbed;
-                    if (format == "rvz")
+                    switch (format)
                     {
-                        Console.Error.WriteLine(
-                            "Warning: Scrubbing an RVZ container does not offer significant space "
-                            + "advantages. Continuing anyway.");
-                    }
-                    else if (format == "iso")
-                    {
-                        Console.Error.WriteLine(
-                            "Warning: Scrubbing does not save space when converting to ISO unless "
-                            + "using external compression. Continuing anyway.");
+                        case "rvz":
+                            Console.Error.WriteLine(
+                                "Warning: Scrubbing an RVZ container does not offer significant space "
+                                + "advantages. Continuing anyway.");
+                            break;
+                        case "iso":
+                            Console.Error.WriteLine(
+                                "Warning: Scrubbing does not save space when converting to ISO unless "
+                                + "using external compression. Continuing anyway.");
+                            break;
                     }
                 }
 
@@ -317,7 +324,7 @@ internal static class Program
                         return Fail("Block size is not valid for this format");
                     }
 
-                    if (blockSize < 0x8000 || blockSize > 0x200000)
+                    if (blockSize is < 0x8000 or > 0x200000)
                     {
                         Console.Error.WriteLine(
                             "Warning: Block size is not ideal for performance. Continuing anyway.");
@@ -327,48 +334,51 @@ internal static class Program
                 var compression = CompressionType.Zstd;
                 var level = 0;
                 var packing = true;
-                if (format == "rvz")
+                switch (format)
                 {
-                    var compressionName = options.Get("compression");
-                    if (compressionName is null)
+                    case "rvz":
                     {
-                        return Fail("Compression method must be set for WIA or RVZ");
-                    }
-
-                    compression = ParseCompression(compressionName);
-                    if (compression == CompressionType.Purge)
-                    {
-                        return Fail("Compression type is not supported for the container format");
-                    }
-
-                    if (compression == CompressionType.None)
-                    {
-                        level = 0;
-                    }
-                    else
-                    {
-                        if (!options.IsSet("compression_level") ||
-                            !int.TryParse(options.Get("compression_level"), out level))
+                        var compressionName = options.Get("compression");
+                        if (compressionName is null)
                         {
-                            return Fail("Compression level must be set when compression type is not 'none'");
+                            return Fail("Compression method must be set for WIA or RVZ");
                         }
 
-                        var (min, max) = GetAllowedCompressionLevels(compression);
-                        if (level < min || level > max)
+                        compression = ParseCompression(compressionName);
+                        switch (compression)
                         {
-                            return Fail("Compression level not in acceptable range");
+                            case CompressionType.Purge:
+                                return Fail("Compression type is not supported for the container format");
+                            case CompressionType.None:
+                                level = 0;
+                                break;
+                            default:
+                            {
+                                if (!options.IsSet("compression_level") ||
+                                    !int.TryParse(options.Get("compression_level"), out level))
+                                {
+                                    return Fail("Compression level must be set when compression type is not 'none'");
+                                }
+
+                                var (min, max) = GetAllowedCompressionLevels(compression);
+                                if (level < min || level > max)
+                                {
+                                    return Fail("Compression level not in acceptable range");
+                                }
+
+                                break;
+                            }
                         }
-                    }
 
-                    if (options.IsSet("no-packing"))
-                    {
-                        packing = false;
-                    }
-                }
+                        if (options.IsSet("no-packing"))
+                        {
+                            packing = false;
+                        }
 
-                if (format == "iso")
-                {
-                    return DecodeBlob(input, outputPath, expectedSha1: null);
+                        break;
+                    }
+                    case "iso":
+                        return DecodeBlob(input, outputPath, expectedSha1: null);
                 }
 
                 var writeOptions = new RvzWriteOptions
@@ -376,7 +386,7 @@ internal static class Program
                     Compression = compression,
                     CompressionLevel = level,
                     ChunkSize = blockSize,
-                    Packing = packing,
+                    Packing = packing
                 };
 
                 using var output = File.Create(outputPath);
@@ -447,32 +457,39 @@ internal static class Program
         }
     }
 
-    private static bool IsDiscImageBlockSizeValid(int blockSize, string format) => format switch
+    private static bool IsDiscImageBlockSizeValid(int blockSize, string format)
     {
-        // GCZ: block size "must" be a power of 2
-        "gcz" => blockSize > 0 && (blockSize & (blockSize - 1)) == 0,
-        // WIA: not less than the minimum (2 MiB), and a multiple of it
-        "wia" => blockSize >= 0x200000 && blockSize % 0x200000 == 0,
-        // RVZ: not smaller than 32 KiB; below 2 MiB must be a power of 2;
-        // above 2 MiB must be a multiple of 2 MiB
-        "rvz" => blockSize >= 0x8000 &&
-                 (blockSize < 0x200000 ? (blockSize & (blockSize - 1)) == 0
-                                       : blockSize % 0x200000 == 0),
-        _ => false,
-    };
+        return format switch
+        {
+            // GCZ: block size "must" be a power of 2
+            "gcz" => blockSize > 0 && (blockSize & (blockSize - 1)) == 0,
+            // WIA: not less than the minimum (2 MiB), and a multiple of it
+            "wia" => blockSize >= 0x200000 && blockSize % 0x200000 == 0,
+            // RVZ: not smaller than 32 KiB; below 2 MiB must be a power of 2;
+            // above 2 MiB must be a multiple of 2 MiB
+            "rvz" => blockSize >= 0x8000 &&
+                     (blockSize < 0x200000
+                         ? (blockSize & (blockSize - 1)) == 0
+                         : blockSize % 0x200000 == 0),
+            _ => false
+        };
+    }
 
-    private static (int Min, int Max) GetAllowedCompressionLevels(CompressionType compression) =>
-        compression switch
+    private static (int Min, int Max) GetAllowedCompressionLevels(CompressionType compression)
+    {
+        return compression switch
         {
             CompressionType.Bzip2 or CompressionType.Lzma or CompressionType.Lzma2 => (1, 9),
             // Dolphin's non-GUI CLI accepts ZSTD_minCLevel()..ZSTD_maxCLevel()
             // (WIABlob.cpp:68-75): negative levels select fast modes, 0 is the default.
             CompressionType.Zstd => (-131072, 22),
-            _ => (0, -1),
+            _ => (0, -1)
         };
+    }
 
-    private static CompressionType ParseCompression(string name) =>
-        name.ToLowerInvariant() switch
+    private static CompressionType ParseCompression(string name)
+    {
+        return name.ToLowerInvariant() switch
         {
             "none" => CompressionType.None,
             "purge" => CompressionType.Purge,
@@ -481,8 +498,9 @@ internal static class Program
             "lzma2" => CompressionType.Lzma2,
             "zstd" or "zstandard" => CompressionType.Zstd,
             _ => throw new CliError(
-                $"unknown compression method '{name}' (expected none, zstd, bzip2, lzma or lzma2)"),
+                $"unknown compression method '{name}' (expected none, zstd, bzip2, lzma or lzma2)")
         };
+    }
 
     // ------------------------------------------------------------------
     // header — DolphinTool-compatible.
@@ -490,11 +508,11 @@ internal static class Program
 
     private static readonly Dictionary<string, OptionSpec> HeaderSpec = new()
     {
-        ["input"] = new("-i", true, null),
-        ["json"] = new("-j", false, null),
-        ["block_size"] = new("-b", false, null),
-        ["compression"] = new("-c", false, null),
-        ["compression_level"] = new("-l", false, null),
+        ["input"] = new OptionSpec("-i", true, null),
+        ["json"] = new OptionSpec("-j", false, null),
+        ["block_size"] = new OptionSpec("-b", false, null),
+        ["compression"] = new OptionSpec("-c", false, null),
+        ["compression_level"] = new OptionSpec("-l", false, null)
     };
 
     private static int HeaderCommand(IReadOnlyList<string> args)
@@ -654,27 +672,33 @@ internal static class Program
         }
     }
 
-    private static string GetCompressionMethod(IBlobReader blob) => blob switch
+    private static string GetCompressionMethod(IBlobReader blob)
     {
-        RvzReader rvz => rvz.Disc.Compression switch
+        return blob switch
         {
-            CompressionType.None => "",
-            CompressionType.Purge => "Purge",
-            CompressionType.Bzip2 => "bzip2",
-            CompressionType.Lzma => "LZMA",
-            CompressionType.Lzma2 => "LZMA2",
-            CompressionType.Zstd => "Zstandard",
-            _ => "",
-        },
-        GczBlob => "Deflate",
-        _ => "",
-    };
+            RvzReader rvz => rvz.Disc.Compression switch
+            {
+                CompressionType.None => "",
+                CompressionType.Purge => "Purge",
+                CompressionType.Bzip2 => "bzip2",
+                CompressionType.Lzma => "LZMA",
+                CompressionType.Lzma2 => "LZMA2",
+                CompressionType.Zstd => "Zstandard",
+                _ => ""
+            },
+            GczBlob => "Deflate",
+            _ => ""
+        };
+    }
 
-    private static int? GetCompressionLevel(IBlobReader blob) => blob switch
+    private static int? GetCompressionLevel(IBlobReader blob)
     {
-        RvzReader rvz => rvz.Disc.ComprLevel,
-        _ => null,
-    };
+        return blob switch
+        {
+            RvzReader rvz => rvz.Disc.ComprLevel,
+            _ => null
+        };
+    }
 
     // ------------------------------------------------------------------
     // verify — DolphinTool-compatible.
@@ -682,11 +706,11 @@ internal static class Program
 
     private static readonly Dictionary<string, OptionSpec> VerifySpec = new()
     {
-        ["user"] = new("-u", true, null),
-        ["input"] = new("-i", true, null),
+        ["user"] = new OptionSpec("-u", true, null),
+        ["input"] = new OptionSpec("-i", true, null),
         // Dolphin only offers rchash when built with RetroAchievements support
         // (VerifyCommand.cpp:134-137); without it, -a rchash is an invalid choice.
-        ["algorithm"] = new("-a", true, ["crc32", "md5", "sha1"]),
+        ["algorithm"] = new OptionSpec("-a", true, ["crc32", "md5", "sha1"])
     };
 
     private static int VerifyCommand(IReadOnlyList<string> args)
@@ -751,9 +775,9 @@ internal static class Program
                     return Fail("The input file is not a GC/Wii disc.");
                 }
 
-                var wantCrc32 = algorithm is null || algorithm == "crc32";
-                var wantMd5 = algorithm is null || algorithm == "md5";
-                var wantSha1 = algorithm is null || algorithm == "sha1";
+                var wantCrc32 = algorithm is null or "crc32";
+                var wantMd5 = algorithm is null or "md5";
+                var wantSha1 = algorithm is null or "sha1";
 
                 uint crc = 0xFFFFFFFF;
                 var md5 = wantMd5 ? MD5.Create() : null;
@@ -789,7 +813,7 @@ internal static class Program
                     {
                         "crc32" => crc.ToString("x8"),
                         "md5" => ToLowerHex(md5!.Hash!),
-                        _ => ToLowerHex(sha1!.Hash!),
+                        _ => ToLowerHex(sha1!.Hash!)
                     });
                     return 0;
                 }
@@ -807,7 +831,10 @@ internal static class Program
         }
     }
 
-    private static string ToLowerHex(byte[] bytes) => Convert.ToHexString(bytes).ToLowerInvariant();
+    private static string ToLowerHex(byte[] bytes)
+    {
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
 
     /// <summary>IEEE CRC-32 (as used by zlib / Dolphin's CRC32 hashes).</summary>
     private static class Crc32
@@ -848,13 +875,13 @@ internal static class Program
 
     private static readonly Dictionary<string, OptionSpec> ExtractSpec = new()
     {
-        ["input"] = new("-i", true, null),
-        ["output"] = new("-o", true, null),
-        ["partition"] = new("-p", true, null),
-        ["single"] = new("-s", true, null),
-        ["list"] = new("-l", false, null),
-        ["quiet"] = new("-q", false, null),
-        ["gameonly"] = new("-g", false, null),
+        ["input"] = new OptionSpec("-i", true, null),
+        ["output"] = new OptionSpec("-o", true, null),
+        ["partition"] = new OptionSpec("-p", true, null),
+        ["single"] = new OptionSpec("-s", true, null),
+        ["list"] = new OptionSpec("-l", false, null),
+        ["quiet"] = new OptionSpec("-q", false, null),
+        ["gameonly"] = new OptionSpec("-g", false, null)
     };
 
     private static int ExtractCommand(IReadOnlyList<string> args)
@@ -906,7 +933,12 @@ internal static class Program
     // ------------------------------------------------------------------
 
     private sealed record DiscVolumeInfo(
-        string GameId, byte? Revision, string InternalName, ulong? TitleId, string Region, string Country)
+        string GameId,
+        byte? Revision,
+        string InternalName,
+        ulong? TitleId,
+        string Region,
+        string Country)
     {
         public static DiscVolumeInfo? TryRead(IBlobReader disc)
         {
@@ -956,7 +988,7 @@ internal static class Program
             for (var i = 0; i < id.Length; i++)
             {
                 var c = (char)id[i];
-                chars[i] = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                chars[i] = c is >= '0' and <= '9' or >= 'A' and <= 'Z' or >= 'a' and <= 'z'
                     ? c
                     : '-';
             }
@@ -983,14 +1015,17 @@ internal static class Program
             return NameEncoding(region).GetString(raw, 0, end);
         }
 
-        private static Encoding NameEncoding(string region) => region == "NTSC-J" ? ShiftJis : Cp1252;
+        private static Encoding NameEncoding(string region)
+        {
+            return region == "NTSC-J" ? ShiftJis : Cp1252;
+        }
 
         private static readonly Encoding Cp1252 = GetCodePageEncoding(1252);
         private static readonly Encoding ShiftJis = GetCodePageEncoding(932);
 
         private static Encoding GetCodePageEncoding(int codePage)
         {
-            Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             return Encoding.GetEncoding(codePage);
         }
 
@@ -1046,7 +1081,7 @@ internal static class Program
                 1 => "NTSC-U",
                 2 => "PAL",
                 4 => "NTSC-K",
-                _ => "Unknown",
+                _ => "Unknown"
             };
         }
 
@@ -1102,14 +1137,17 @@ internal static class Program
         }
 
         /// <summary>Dolphin's TypicalCountryForRegion (Enums.cpp:173-187).</summary>
-        private static string TypicalCountryForRegion(string region) => region switch
+        private static string TypicalCountryForRegion(string region)
         {
-            "NTSC-J" => "Japan",
-            "NTSC-U" => "USA",
-            "PAL" => "Europe",
-            "NTSC-K" => "Korea",
-            _ => "Unknown",
-        };
+            return region switch
+            {
+                "NTSC-J" => "Japan",
+                "NTSC-U" => "USA",
+                "PAL" => "Europe",
+                "NTSC-K" => "Korea",
+                _ => "Unknown"
+            };
+        }
 
         /// <summary>Dolphin's CountryCodeToCountry (Enums.cpp).</summary>
         private static string CountryCodeToCountry(char code, bool isWii, string region, byte revision)
@@ -1176,11 +1214,15 @@ internal static class Program
         }
     }
 
-    private static uint Be32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    private static uint Be32(ReadOnlySpan<byte> data, int offset)
+    {
+        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    }
 
-    private static ulong Be64(ReadOnlySpan<byte> data, int offset) =>
-        ((ulong)Be32(data, offset) << 32) | Be32(data, offset + 4);
+    private static ulong Be64(ReadOnlySpan<byte> data, int offset)
+    {
+        return ((ulong)Be32(data, offset) << 32) | Be32(data, offset + 4);
+    }
 
     // ------------------------------------------------------------------
     // Legacy commands: info / decode.
@@ -1197,46 +1239,55 @@ internal static class Program
             Console.WriteLine($"format:          {Blob.GetName(reader.Type)}");
             Console.WriteLine($"iso size:        {reader.Length} bytes (0x{reader.Length:X})");
 
-            if (reader is RvzReader rvz)
+            switch (reader)
             {
-                Console.WriteLine($"version:         {WiaFileHead.FormatVersion(rvz.FileHead.Version)}");
-                Console.WriteLine($"disc type:       {rvz.Disc.DiscType} ({(uint)rvz.Disc.DiscType})");
-                Console.WriteLine($"compression:     {rvz.Disc.Compression} (level {rvz.Disc.ComprLevel})");
-                Console.WriteLine($"chunk size:      0x{rvz.Disc.ChunkSize:X}");
-                Console.WriteLine($"partitions:      {rvz.Partitions.Length}");
-                Console.WriteLine($"raw data areas:  {rvz.RawDataEntries.Length}");
-                Console.WriteLine($"groups:          {rvz.GroupEntries.Length}");
-
-                foreach (var part in rvz.Partitions)
+                case RvzReader rvz:
                 {
-                    for (var s = 0; s < 2; s++)
+                    Console.WriteLine($"version:         {WiaFileHead.FormatVersion(rvz.FileHead.Version)}");
+                    Console.WriteLine($"disc type:       {rvz.Disc.DiscType} ({(uint)rvz.Disc.DiscType})");
+                    Console.WriteLine($"compression:     {rvz.Disc.Compression} (level {rvz.Disc.ComprLevel})");
+                    Console.WriteLine($"chunk size:      0x{rvz.Disc.ChunkSize:X}");
+                    Console.WriteLine($"partitions:      {rvz.Partitions.Length}");
+                    Console.WriteLine($"raw data areas:  {rvz.RawDataEntries.Length}");
+                    Console.WriteLine($"groups:          {rvz.GroupEntries.Length}");
+
+                    foreach (var part in rvz.Partitions)
                     {
-                        var pd = part.Data[s];
-                        if (pd.NumSectors == 0)
+                        for (var s = 0; s < 2; s++)
                         {
-                            continue;
+                            var pd = part.Data[s];
+                            if (pd.NumSectors == 0)
+                            {
+                                continue;
+                            }
+
+                            Console.WriteLine($"  partition @ sector {pd.FirstSector}: {pd.NumSectors} sectors, "
+                                              + $"{pd.NumGroups} groups (key {Convert.ToHexString(part.Key)})");
                         }
-
-                        Console.WriteLine($"  partition @ sector {pd.FirstSector}: {pd.NumSectors} sectors, "
-                            + $"{pd.NumGroups} groups (key {Convert.ToHexString(part.Key)})");
                     }
-                }
 
-                foreach (var raw in rvz.RawDataEntries)
-                {
-                    Console.WriteLine($"  raw data @ 0x{raw.RawDataOffset:X}: 0x{raw.RawDataSize:X} bytes, "
-                        + $"{raw.NumGroups} groups");
+                    foreach (var raw in rvz.RawDataEntries)
+                    {
+                        Console.WriteLine($"  raw data @ 0x{raw.RawDataOffset:X}: 0x{raw.RawDataSize:X} bytes, "
+                                          + $"{raw.NumGroups} groups");
+                    }
+
+                    break;
                 }
-            }
-            else if (reader is GczBlob gcz)
-            {
-                Console.WriteLine($"block size:      0x{gcz.BlockSize:X}");
-                Console.WriteLine($"blocks:          {gcz.NumBlocks}");
-                Console.WriteLine($"compression:     Deflate");
-            }
-            else if (reader.BlockSize != 0)
-            {
-                Console.WriteLine($"block size:      0x{reader.BlockSize:X}");
+                case GczBlob gcz:
+                    Console.WriteLine($"block size:      0x{gcz.BlockSize:X}");
+                    Console.WriteLine($"blocks:          {gcz.NumBlocks}");
+                    Console.WriteLine("compression:     Deflate");
+                    break;
+                default:
+                {
+                    if (reader.BlockSize != 0)
+                    {
+                        Console.WriteLine($"block size:      0x{reader.BlockSize:X}");
+                    }
+
+                    break;
+                }
             }
 
             return 0;
@@ -1245,7 +1296,7 @@ internal static class Program
         {
             Log.Error(e, "Info command failed for path '{Path}'", path);
             Console.Error.WriteLine($"Error: {e.Message}");
-            return 1 ;
+            return 1;
         }
     }
 
@@ -1270,7 +1321,7 @@ internal static class Program
         {
             Log.Error(e, "Decode command failed");
             Console.Error.WriteLine($"Error: {e.Message}");
-            return 1 ;
+            return 1;
         }
     }
 
@@ -1315,7 +1366,7 @@ internal static class Program
         {
             Log.Error(e, "DecodeBlob failed");
             Console.Error.WriteLine($"Error: {e.Message}");
-            return 1 ;
+            return 1;
         }
     }
 }

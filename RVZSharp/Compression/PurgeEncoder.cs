@@ -15,7 +15,10 @@ public sealed class PurgeEncoder : ICompressionEncoder
 
     private readonly List<byte[]> _preceding = [];
 
-    public void AddPrecedingData(ReadOnlySpan<byte> data) => _preceding.Add(data.ToArray());
+    public void AddPrecedingData(ReadOnlySpan<byte> data)
+    {
+        _preceding.Add(data.ToArray());
+    }
 
     public byte[] Compress(ReadOnlySpan<byte> data)
     {

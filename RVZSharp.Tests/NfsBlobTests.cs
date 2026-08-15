@@ -1,6 +1,4 @@
-using RVZSharp;
 using RVZSharp.Blobs;
-using RVZSharp.Interfaces;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
@@ -8,7 +6,10 @@ namespace RVZSharp.Tests;
 
 public class NfsBlobTests
 {
-    private static byte[] MakeKey() => Enumerable.Range(0, 16).Select(i => (byte)(0x10 + i)).ToArray();
+    private static byte[] MakeKey()
+    {
+        return Enumerable.Range(0, 16).Select(i => (byte)(0x10 + i)).ToArray();
+    }
 
     [Fact]
     public void RoundTrip_WithMissingBlock()

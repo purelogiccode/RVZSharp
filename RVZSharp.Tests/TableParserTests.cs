@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using RVZSharp;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
@@ -27,8 +26,10 @@ public class TableParserTests
         return (ms, discBytes);
     }
 
-    private static byte[] WriteBeU32(uint value) =>
-        [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+    private static byte[] WriteBeU32(uint value)
+    {
+        return [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+    }
 
     private static byte[] WriteBeU64(ulong value)
     {
@@ -67,11 +68,15 @@ public class TableParserTests
         return b;
     }
 
-    private static byte[] MakeRawEntry(ulong offset, ulong size, uint groupIndex, uint numGroups) =>
-        Concat(WriteBeU64(offset), WriteBeU64(size), WriteBeU32(groupIndex), WriteBeU32(numGroups));
+    private static byte[] MakeRawEntry(ulong offset, ulong size, uint groupIndex, uint numGroups)
+    {
+        return Concat(WriteBeU64(offset), WriteBeU64(size), WriteBeU32(groupIndex), WriteBeU32(numGroups));
+    }
 
-    private static byte[] MakeGroupEntry(uint dataOff4, uint dataSize, uint packedSize) =>
-        Concat(WriteBeU32(dataOff4), WriteBeU32(dataSize), WriteBeU32(packedSize));
+    private static byte[] MakeGroupEntry(uint dataOff4, uint dataSize, uint packedSize)
+    {
+        return Concat(WriteBeU32(dataOff4), WriteBeU32(dataSize), WriteBeU32(packedSize));
+    }
 
     /// <summary>Configures a disc builder for the given compression method (props included).</summary>
     private static void ConfigureCompression(TestDiscBuilder disc, CompressionType compression)
@@ -85,12 +90,12 @@ public class TableParserTests
                 disc.ComprDataLen = 0;
                 break;
             case CompressionType.Lzma:
-            {
-                var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
-                props.CopyTo(disc.ComprData, 0);
-                disc.ComprDataLen = (byte)props.Length;
-                break;
-            }
+                {
+                    var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
+                    props.CopyTo(disc.ComprData, 0);
+                    disc.ComprDataLen = (byte)props.Length;
+                    break;
+                }
             case CompressionType.Lzma2:
                 disc.ComprData[0] = 21;
                 disc.ComprDataLen = 1;
@@ -108,7 +113,7 @@ public class TableParserTests
         {
             DiscType = DiscType.Wii,
             NumPartitions = 2,
-            PartitionEntriesHash = SHA1.HashData(partTable),
+            PartitionEntriesHash = SHA1.HashData(partTable)
         };
         var (file, discBytes) = BuildFile(disc, partTable, [], []);
         using (file)
@@ -133,7 +138,7 @@ public class TableParserTests
         var disc = new TestDiscBuilder
         {
             NumPartitions = 0,
-            PartitionEntriesHash = SHA1.HashData(ReadOnlySpan<byte>.Empty),
+            PartitionEntriesHash = SHA1.HashData(ReadOnlySpan<byte>.Empty)
         };
         var (file, discBytes) = BuildFile(disc, [], [], []);
         using (file)
@@ -164,7 +169,7 @@ public class TableParserTests
         {
             DiscType = DiscType.Wii,
             NumPartitions = 1,
-            PartitionEntriesHash = new byte[WiaDisc.HashSize],
+            PartitionEntriesHash = new byte[WiaDisc.HashSize]
         };
         var (file, discBytes) = BuildFile(disc, partTable, [], []);
         using (file)
@@ -189,7 +194,7 @@ public class TableParserTests
             DiscType = DiscType.Wii,
             NumPartitions = 1,
             PartitionEntrySize = 0x20,
-            PartitionEntriesHash = SHA1.HashData(partTable),
+            PartitionEntriesHash = SHA1.HashData(partTable)
         };
         var (file, discBytes) = BuildFile(disc, partTable, [], []);
         using (file)
@@ -212,7 +217,7 @@ public class TableParserTests
             DiscType = DiscType.Wii,
             NumPartitions = 1,
             PartitionEntrySize = 0x38,
-            PartitionEntriesHash = SHA1.HashData(partTable),
+            PartitionEntriesHash = SHA1.HashData(partTable)
         };
         var (file, discBytes) = BuildFile(disc, partTable, [], []);
         using (file)

@@ -1,6 +1,4 @@
 using System.Security.Cryptography;
-using RVZSharp.Chunks;
-using RVZSharp.Interfaces;
 using RVZSharp.Models;
 
 namespace RVZSharp.Wii;
@@ -127,7 +125,7 @@ public sealed class WiiPartitionExtractor
             (0x280, 0xA0),  // h1
             (0x320, 0x20),  // padding_1
             (0x340, 0xA0),  // h2
-            (0x3E0, 0x20),  // padding_2
+            (0x3E0, 0x20) // padding_2
         };
 
         foreach (var (fieldOffset, fieldSize) in fields)

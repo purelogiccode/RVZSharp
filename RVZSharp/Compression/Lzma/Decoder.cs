@@ -1,9 +1,6 @@
 #nullable disable
 
-using System;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Threading.Tasks;
 using RVZSharp.Compression.Lzma.LZ;
 using RVZSharp.Compression.Lzma.RangeCoder;
 using RVZSharp.Interfaces;
@@ -159,18 +156,25 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
             }
         }
 
-        private uint GetState(uint pos, byte prevByte) =>
-            ((pos & _posMask) << _numPrevBits) + (uint)(prevByte >> (8 - _numPrevBits));
+        private uint GetState(uint pos, byte prevByte)
+        {
+            return ((pos & _posMask) << _numPrevBits) + (uint)(prevByte >> (8 - _numPrevBits));
+        }
 
-        public byte DecodeNormal(RangeCoder.Decoder rangeDecoder, uint pos, byte prevByte) =>
-            _coders[GetState(pos, prevByte)].DecodeNormal(rangeDecoder);
+        public byte DecodeNormal(RangeCoder.Decoder rangeDecoder, uint pos, byte prevByte)
+        {
+            return _coders[GetState(pos, prevByte)].DecodeNormal(rangeDecoder);
+        }
 
         public byte DecodeWithMatchByte(
             RangeCoder.Decoder rangeDecoder,
             uint pos,
             byte prevByte,
             byte matchByte
-        ) => _coders[GetState(pos, prevByte)].DecodeWithMatchByte(rangeDecoder, matchByte);
+        )
+        {
+            return _coders[GetState(pos, prevByte)].DecodeWithMatchByte(rangeDecoder, matchByte);
+        }
     }
 
     private OutWindow _outWindow;
@@ -335,8 +339,10 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
 #if !LEGACY_DOTNET
     // On modern .NET targets, the hot decode loop uses the unsafe flat-array fast path
     // (see LzmaDecoder.Fast.cs) instead of the per-array, method-call based loop below.
-    internal bool Code(int dictionarySize, OutWindow outWindow, RangeCoder.Decoder rangeDecoder) =>
-        CodeFast(dictionarySize, outWindow, rangeDecoder);
+    internal bool Code(int dictionarySize, OutWindow outWindow, RangeCoder.Decoder rangeDecoder)
+    {
+        return CodeFast(dictionarySize, outWindow, rangeDecoder);
+    }
 #else
     internal bool Code(int dictionarySize, OutWindow outWindow, RangeCoder.Decoder rangeDecoder)
     {
@@ -465,8 +471,10 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
     }
 #endif
 
-    public void SetDecoderProperties(byte[] properties) =>
+    public void SetDecoderProperties(byte[] properties)
+    {
         SetDecoderProperties(properties.AsSpan());
+    }
 
     internal void SetDecoderProperties(ReadOnlySpan<byte> properties)
     {

@@ -109,7 +109,10 @@ public sealed class LaggedFibonacciGenerator
         }
     }
 
-    private void Backward() => Backward(0, BufferWords);
+    private void Backward()
+    {
+        Backward(0, BufferWords);
+    }
 
     private bool Initialize(bool check)
     {
@@ -257,6 +260,8 @@ public sealed class LaggedFibonacciGenerator
         return (seed, bytesReconstructed);
     }
 
-    private static uint Swap32(uint value) =>
-        ((value & 0xFF) << 24) | ((value & 0xFF00) << 8) | ((value >> 8) & 0xFF00) | ((value >> 24) & 0xFF);
+    private static uint Swap32(uint value)
+    {
+        return ((value & 0xFF) << 24) | ((value & 0xFF00) << 8) | ((value >> 8) & 0xFF00) | ((value >> 24) & 0xFF);
+    }
 }

@@ -55,7 +55,10 @@ public sealed class TestDiscBuilder
 
     private byte[]? _discHashOverride;
 
-    public byte[] GetDiscHash() => _discHashOverride ?? SHA1.HashData(Build());
+    public byte[] GetDiscHash()
+    {
+        return _discHashOverride ?? SHA1.HashData(Build());
+    }
 
     private static void WriteBe(byte[] b, int offset, uint value)
     {

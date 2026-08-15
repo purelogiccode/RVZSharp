@@ -1,5 +1,4 @@
 using RVZSharp.Blobs;
-using RVZSharp.Interfaces;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
@@ -20,7 +19,7 @@ public class RvzWriterTests
         { CompressionType.Zstd, true },
         { CompressionType.Bzip2, true },
         { CompressionType.Lzma, true },
-        { CompressionType.Lzma2, true },
+        { CompressionType.Lzma2, true }
     };
 
     [Theory]
@@ -204,7 +203,7 @@ public class RvzWriterTests
         RvzWriter.Write(scrubbed, ms, new RvzWriteOptions
         {
             Compression = CompressionType.Zstd,
-            Packing = true,
+            Packing = true
         });
         Assert.Equal(expected, Decode(ms.ToArray()));
     }
@@ -225,7 +224,7 @@ public class RvzWriterTests
         var disc = WiaDisc.Parse(rvz.AsSpan(0x48, 0xDC));
         using var section = new MemoryStream(
             rvz.AsSpan((int)disc.RawDataEntriesOffset, (int)disc.RawDataEntriesSize).ToArray());
-        using var decompressor = RVZSharp.Compression.CompressionCodecFactory.Create(disc.Compression)
+        using var decompressor = Compression.CompressionCodecFactory.Create(disc.Compression)
             .CreateDecompressor(section, disc.ComprData.AsSpan(0, disc.ComprDataLen),
                 disc.RawDataEntriesSize, disc.NumRawDataEntries * 0x18);
         var rawTable = new byte[disc.NumRawDataEntries * 0x18];
@@ -240,11 +239,15 @@ public class RvzWriterTests
         Assert.Equal(0x80ul, ReadBe64(rawTable, 0));
     }
 
-    private static ulong ReadBe64(byte[] data, int offset) =>
-        ((ulong)ReadBe32(data, offset) << 32) | ReadBe32(data, offset + 4);
+    private static ulong ReadBe64(byte[] data, int offset)
+    {
+        return ((ulong)ReadBe32(data, offset) << 32) | ReadBe32(data, offset + 4);
+    }
 
-    private static uint ReadBe32(byte[] data, int offset) =>
-        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    private static uint ReadBe32(byte[] data, int offset)
+    {
+        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    }
 
     [Fact]
     public void AllZeroIso_ProducesTinyFile()
@@ -284,7 +287,7 @@ public class RvzWriterTests
         RvzWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
         {
             Compression = CompressionType.Zstd,
-            ChunkSize = 0x8000,
+            ChunkSize = 0x8000
         });
         Assert.Equal(iso, Decode(ms.ToArray()));
     }
@@ -301,7 +304,7 @@ public class RvzWriterTests
         RvzWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
         {
             Compression = CompressionType.Zstd,
-            ChunkSize = 0x10000,
+            ChunkSize = 0x10000
         });
         Assert.Equal(iso, Decode(ms.ToArray()));
     }
@@ -313,7 +316,7 @@ public class RvzWriterTests
         Assert.Throws<ArgumentException>(() => RvzWriter.Write(
             PlainBlob.Open(new MemoryStream(new byte[0x10000])), ms, new RvzWriteOptions
             {
-                ChunkSize = 0x30000, // not a power of two
+                ChunkSize = 0x30000 // not a power of two
             }));
     }
 
@@ -333,7 +336,7 @@ public class RvzWriterTests
         RvzWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
         {
             Compression = CompressionType.Zstd,
-            ChunkSize = 0x600000,
+            ChunkSize = 0x600000
         });
         Assert.Equal(iso, Decode(ms.ToArray()));
     }
@@ -360,7 +363,7 @@ public class RvzWriterTests
             ChunkSize = WiaDisc.GroupSize,
             RawSize = 3 * 0x8000 + 0x1234,
             RawTailSize = 0x9000,
-            Seed = 4,
+            Seed = 4
         };
         var wia = TestRvzBuilder.Build(spec);
         var wiaIso = TestRvzBuilder.BuildWithIso(spec).Iso;
@@ -458,7 +461,7 @@ public class RvzWriterTests
         RvzWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
         {
             Compression = compression,
-            Packing = packing,
+            Packing = packing
         });
         return ms.ToArray();
     }

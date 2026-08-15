@@ -93,7 +93,7 @@ internal sealed class LaggedFibonacciPrng
             0 => (byte)(word >> 24),
             1 => (byte)(word >> 18), // NB: 18, not 16
             2 => (byte)(word >> 8),
-            _ => (byte)word,
+            _ => (byte)word
         };
     }
 

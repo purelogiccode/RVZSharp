@@ -85,13 +85,20 @@ public sealed class SectionStream : Stream
             SeekOrigin.Begin => offset,
             SeekOrigin.Current => Position + offset,
             SeekOrigin.End => _length + offset,
-            _ => throw new ArgumentOutOfRangeException(nameof(origin)),
+            _ => throw new ArgumentOutOfRangeException(nameof(origin))
         };
         Position = newPosition;
         return newPosition;
     }
 
     public override void Flush() { }
-    public override void SetLength(long value) => throw new NotSupportedException();
-    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
 }

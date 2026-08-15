@@ -57,7 +57,7 @@ public static class PurgeDecoder
             var size = ReadBe32(stream, inputPos + 4);
             inputPos += SegmentSize;
 
-            if ((long)offset > outputSize || (long)offset + size > outputSize)
+            if (offset > outputSize || (long)offset + size > outputSize)
             {
                 throw new RvzFormatException(
                     $"PURGE segment [{offset}, {offset + size}) exceeds the expected size {outputSize}.");
@@ -82,6 +82,8 @@ public static class PurgeDecoder
         return output;
     }
 
-    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset)
+    {
+        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    }
 }

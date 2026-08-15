@@ -93,8 +93,10 @@ public readonly struct WiaFileHead
     }
 
     /// <summary>Validates this header as an RVZ file head.</summary>
-    public void Validate(ReadOnlySpan<byte> rawHeader, long actualFileSize) =>
+    public void Validate(ReadOnlySpan<byte> rawHeader, long actualFileSize)
+    {
         Validate(rawHeader, actualFileSize, WiaRvzFormat.Rvz);
+    }
 
     /// <summary>
     /// Validates magic, version compatibility, declared file size and the file-head SHA-1.

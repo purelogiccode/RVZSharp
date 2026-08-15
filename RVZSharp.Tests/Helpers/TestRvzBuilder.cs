@@ -1,4 +1,3 @@
-using System;
 using System.Security.Cryptography;
 using RVZSharp.Models;
 using RVZSharp.Wii;
@@ -35,7 +34,7 @@ public sealed class PartitionSpec
 {
     public int SectorCount { get; set; } = 70;
 
-    public byte[] Key { get; set; } = Enumerable.Range(0, 16).Select(i => (byte)(0x40 + i)).ToArray();
+    public byte[] Key { get; set; } = [.. Enumerable.Range(0, 16).Select(i => (byte)(0x40 + i))];
 
     /// <summary>Hash exceptions per 2 MiB region (region-relative offsets).</summary>
     public HashExceptionEntry[][] Exceptions { get; set; } = [];
@@ -48,7 +47,10 @@ public sealed class PartitionSpec
 /// </summary>
 public static class TestRvzBuilder
 {
-    public static byte[] Build(RvzSpec spec) => BuildWithIso(spec).Rvz;
+    public static byte[] Build(RvzSpec spec)
+    {
+        return BuildWithIso(spec).Rvz;
+    }
 
     public static (byte[] Rvz, byte[] Iso) BuildWithIso(RvzSpec spec)
     {
@@ -69,9 +71,9 @@ public static class TestRvzBuilder
         {
             partitionOffset = AlignUp(0x80L + spec.RawSize, 0x8000);
             var totalSectors = (long)partition.SectorCount * 0x7C00;
-            for (var c = 0; (long)c * partitionPayloadPerChunk < totalSectors; c++)
+            for (var c = 0; c * partitionPayloadPerChunk < totalSectors; c++)
             {
-                var size = (int)Math.Min(partitionPayloadPerChunk, totalSectors - (long)c * partitionPayloadPerChunk);
+                var size = (int)Math.Min(partitionPayloadPerChunk, totalSectors - c * partitionPayloadPerChunk);
                 partitionPayloads.Add(new byte[size]);
             }
             // (the actual data is filled below, chunk by chunk, so packed chunks get junk)
@@ -91,54 +93,6 @@ public static class TestRvzBuilder
         var payloads = new List<byte[]>();
         var rawEntryChunkCounts = new List<(int EntryIndex, int ChunkCount)>();
         var globalChunk = 0;
-
-        byte[] MakePayload(long chunkDiscOffset, int size)
-        {
-            var packed = spec.PackedChunks.Contains(globalChunk);
-            var payload = new byte[size];
-            if (packed)
-            {
-                var split = size / 2;
-                var seedBytes = MakeSeed(spec.Seed ^ (int)chunkDiscOffset);
-                var junk = ReferencePrng.Generate(seedBytes, chunkDiscOffset + split, size - split);
-                for (var i = 0; i < split; i++)
-                {
-                    payload[i] = chunkDiscOffset + i < 0x80 && chunkDiscOffset == 0
-                        ? discHeader[(int)(chunkDiscOffset + i)]
-                        : RandomByte(rng, chunkDiscOffset + i, spec.Seed);
-                }
-
-                junk.CopyTo(payload, split);
-            }
-            else
-            {
-                for (var i = 0; i < size; i++)
-                {
-                    var discOffset = chunkDiscOffset + i;
-                    payload[i] = discOffset < 0x80 && chunkDiscOffset == 0
-                        ? discHeader[discOffset]
-                        : RandomByte(rng, discOffset, spec.Seed);
-                }
-            }
-
-            return payload;
-        }
-
-        void AddRawEntry(long start, long size, int entryIndex)
-        {
-            var alignedStart = start - start % 0x8000;
-            var alignedSize = size + start % 0x8000;
-            var count = 0;
-            for (var offset = 0L; offset < alignedSize; offset += chunkSize)
-            {
-                var chunkSizeHere = (int)Math.Min(chunkSize, alignedSize - offset);
-                payloads.Add(MakePayload(alignedStart + offset, chunkSizeHere));
-                count++;
-                globalChunk++;
-            }
-
-            rawEntryChunkCounts.Add((entryIndex, count));
-        }
 
         AddRawEntry(0x80, rawEntry1Size, 0);
         if (partition != null)
@@ -216,6 +170,54 @@ public static class TestRvzBuilder
 
         var rvz = BuildFile(spec, discHeader, iso, payloads, rawEntryChunkCounts, partition, partitionOffset);
         return (rvz, iso);
+
+        byte[] MakePayload(long chunkDiscOffset, int size)
+        {
+            var packed = spec.PackedChunks.Contains(globalChunk);
+            var payload = new byte[size];
+            if (packed)
+            {
+                var split = size / 2;
+                var seedBytes = MakeSeed(spec.Seed ^ (int)chunkDiscOffset);
+                var junk = ReferencePrng.Generate(seedBytes, chunkDiscOffset + split, size - split);
+                for (var i = 0; i < split; i++)
+                {
+                    payload[i] = chunkDiscOffset + i < 0x80 && chunkDiscOffset == 0
+                        ? discHeader[(int)(chunkDiscOffset + i)]
+                        : RandomByte(rng, chunkDiscOffset + i, spec.Seed);
+                }
+
+                junk.CopyTo(payload, split);
+            }
+            else
+            {
+                for (var i = 0; i < size; i++)
+                {
+                    var discOffset = chunkDiscOffset + i;
+                    payload[i] = discOffset < 0x80 && chunkDiscOffset == 0
+                        ? discHeader[discOffset]
+                        : RandomByte(rng, discOffset, spec.Seed);
+                }
+            }
+
+            return payload;
+        }
+
+        void AddRawEntry(long start, long size, int entryIndex)
+        {
+            var alignedStart = start - start % 0x8000;
+            var alignedSize = size + start % 0x8000;
+            var count = 0;
+            for (var offset = 0L; offset < alignedSize; offset += chunkSize)
+            {
+                var chunkSizeHere = (int)Math.Min(chunkSize, alignedSize - offset);
+                payloads.Add(MakePayload(alignedStart + offset, chunkSizeHere));
+                count++;
+                globalChunk++;
+            }
+
+            rawEntryChunkCounts.Add((entryIndex, count));
+        }
     }
 
     private static byte[] BuildFile(RvzSpec spec, byte[] discHeader, byte[] iso,
@@ -307,7 +309,7 @@ public static class TestRvzBuilder
             var listsBytes = isPartition
                 ? BuildExceptionListBytes(spec, partition!, partitionDataOffset)
                 : [];
-            compressed = listsBytes.Concat(TestCompressor.CompressPurge(payload, listsBytes)).ToArray();
+            compressed = [.. listsBytes, .. TestCompressor.CompressPurge(payload, listsBytes)];
         }
         else
         {
@@ -387,7 +389,7 @@ public static class TestRvzBuilder
             var padding = (4 - (headerBytes.Length % 4)) % 4;
             if (padding > 0)
             {
-                headerBytes = headerBytes.Concat(new byte[padding]).ToArray();
+                headerBytes = [.. headerBytes, .. new byte[padding]];
             }
         }
 
@@ -395,8 +397,10 @@ public static class TestRvzBuilder
     }
 
     private static byte[] PrependExceptionLists(byte[] stored, RvzSpec spec,
-        PartitionSpec partition, long partitionDataOffset) =>
-        BuildExceptionListBytes(spec, partition, partitionDataOffset).Concat(stored).ToArray();
+        PartitionSpec partition, long partitionDataOffset)
+    {
+        return [.. BuildExceptionListBytes(spec, partition, partitionDataOffset), .. stored];
+    }
 
 
     private static byte[] BuildPartTable(RvzSpec spec, PartitionSpec? partition, int partitionChunkStart,
@@ -470,7 +474,7 @@ public static class TestRvzBuilder
         {
             var groupTable = new byte[groupEntries.Count * groupEntrySize];
             var groupDataStart = AlignUp(0x48L + WiaDisc.Size + partTable.Length +
-                rawTableStored.Length + layoutSize, 4);
+                                         rawTableStored.Length + layoutSize, 4);
             var running = groupDataStart;
             for (var i = 0; i < groupEntries.Count; i++)
             {
@@ -603,12 +607,12 @@ public static class TestRvzBuilder
             case CompressionType.Zstd:
                 return (0, new byte[7]);
             case CompressionType.Lzma:
-            {
-                var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
-                var data = new byte[7];
-                props.CopyTo(data, 0);
-                return ((byte)props.Length, data);
-            }
+                {
+                    var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
+                    var data = new byte[7];
+                    props.CopyTo(data, 0);
+                    return ((byte)props.Length, data);
+                }
             case CompressionType.Lzma2:
                 return (1, [21, 0, 0, 0, 0, 0, 0]);
             case CompressionType.Purge:
@@ -666,8 +670,10 @@ public static class TestRvzBuilder
         }
     }
 
-    private static long AlignUp(long value, long alignment) =>
-        (value + alignment - 1) / alignment * alignment;
+    private static long AlignUp(long value, long alignment)
+    {
+        return (value + alignment - 1) / alignment * alignment;
+    }
 
     private static void WriteBe32(byte[] b, int offset, uint value)
     {

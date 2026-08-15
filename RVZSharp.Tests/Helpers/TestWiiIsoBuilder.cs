@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using RVZSharp.Wii;
 
 namespace RVZSharp.Tests.Helpers;

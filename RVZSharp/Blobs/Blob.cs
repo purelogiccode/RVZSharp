@@ -101,8 +101,10 @@ public static class Blob
     /// </summary>
     /// <param name="path">Path of the disc image file.</param>
     /// <param name="nfsKey">The 16-byte AES key used to decrypt NFS images.</param>
-    public static IBlobReader Open(string path, ReadOnlySpan<byte> nfsKey) =>
-        Open(File.OpenRead(path), nfsKey, leaveOpen: false);
+    public static IBlobReader Open(string path, ReadOnlySpan<byte> nfsKey)
+    {
+        return Open(File.OpenRead(path), nfsKey, leaveOpen: false);
+    }
 
     /// <summary>
     /// Opens an NFS file (magic "EGGS") with an explicit 16-byte AES key; all other formats
@@ -131,18 +133,21 @@ public static class Blob
     }
 
     /// <summary>Human-readable name of a blob type (Dolphin: GetName).</summary>
-    public static string GetName(BlobType type) => type switch
+    public static string GetName(BlobType type)
     {
-        BlobType.Plain => "ISO",
-        BlobType.Gcz => "GCZ",
-        BlobType.Ciso => "CISO",
-        BlobType.Wbfs => "WBFS",
-        BlobType.Tgc => "TGC",
-        BlobType.Wia => "WIA",
-        BlobType.Rvz => "RVZ",
-        BlobType.Nfs => "NFS",
-        _ => "",
-    };
+        return type switch
+        {
+            BlobType.Plain => "ISO",
+            BlobType.Gcz => "GCZ",
+            BlobType.Ciso => "CISO",
+            BlobType.Wbfs => "WBFS",
+            BlobType.Tgc => "TGC",
+            BlobType.Wia => "WIA",
+            BlobType.Rvz => "RVZ",
+            BlobType.Nfs => "NFS",
+            _ => ""
+        };
+    }
 
     private static bool ReadExactlyAt(Stream stream, long position, Span<byte> buffer)
     {

@@ -7,5 +7,5 @@ public enum WiaRvzFormat
     Wia,
 
     /// <summary>Dolphin RVZ (magic "RVZ\x01", 12-byte group entries, RVZ packing, Zstandard).</summary>
-    Rvz,
+    Rvz
 }

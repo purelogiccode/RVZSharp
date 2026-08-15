@@ -32,8 +32,10 @@ public readonly struct ChunkDecodeResult
 public static class ChunkDecoder
 {
     /// <summary>Number of exception lists per partition chunk (Dolphin: max(1, chunk/2 MiB)).</summary>
-    public static int ExceptionListCount(int partitionChunkSize) =>
-        Math.Max(1, partitionChunkSize / PartitionGroupDataSize);
+    public static int ExceptionListCount(int partitionChunkSize)
+    {
+        return Math.Max(1, partitionChunkSize / PartitionGroupDataSize);
+    }
 
     private const int PartitionGroupDataSize = 0x1F0000; // 0x7C00 * 64 (2 MiB minus hashes)
     private const int GroupTotalSize = 0x200000; // one 2 MiB Wii group, incl. hashes

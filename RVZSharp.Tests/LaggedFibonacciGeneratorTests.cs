@@ -10,10 +10,10 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class LaggedFibonacciGeneratorTests
 {
-    public static TheoryData<long> Offsets => new()
-    {
-        0, 1, 3, 4, 0x7C00, 0x8000, 0x8001, 0x1234, 0x12345, 0x20000, 0x1FFC0,
-    };
+    public static TheoryData<long> Offsets =>
+    [
+        0, 1, 3, 4, 0x7C00, 0x8000, 0x8001, 0x1234, 0x12345, 0x20000, 0x1FFC0
+    ];
 
     [Theory]
     [MemberData(nameof(Offsets))]

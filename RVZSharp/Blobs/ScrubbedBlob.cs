@@ -103,5 +103,8 @@ public sealed class ScrubbedBlob : IBlobReader
         return total;
     }
 
-    public void Dispose() => _inner.Dispose();
+    public void Dispose()
+    {
+        _inner.Dispose();
+    }
 }

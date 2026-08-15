@@ -1,6 +1,5 @@
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
-using RVZSharp.IO;
 
 namespace RVZSharp.Compression;
 
@@ -14,7 +13,10 @@ public sealed class LzmaDecoder : ICompressionDecoder
 {
     private readonly bool _useLzma2;
 
-    internal LzmaDecoder(bool useLzma2) => _useLzma2 = useLzma2;
+    internal LzmaDecoder(bool useLzma2)
+    {
+        _useLzma2 = useLzma2;
+    }
 
     public CompressionType Type => _useLzma2 ? CompressionType.Lzma2 : CompressionType.Lzma;
 
@@ -64,6 +66,8 @@ public sealed class LzmaDecoder : ICompressionDecoder
             presetDictionary: null, isLzma2: _useLzma2, leaveOpen: true);
     }
 
-    private static uint BinaryPrimitivesUInt32(ReadOnlySpan<byte> properties) =>
-        System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(properties.Slice(1, 4));
+    private static uint BinaryPrimitivesUInt32(ReadOnlySpan<byte> properties)
+    {
+        return System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(properties.Slice(1, 4));
+    }
 }

@@ -381,7 +381,7 @@ public static class TestLegacyBuilders
         decoded[0x61] = 1; // re-apply after the fill
 
         // Aes-128-CBC, IV = 8 zero bytes + big-endian block index (mirrors the reader).
-        using var aes = System.Security.Cryptography.Aes.Create();
+        using var aes = Aes.Create();
         aes.Key = key;
         aes.Mode = CipherMode.CBC;
         aes.Padding = PaddingMode.None;

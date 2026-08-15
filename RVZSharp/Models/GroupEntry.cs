@@ -33,9 +33,13 @@ public readonly struct GroupEntry
         RvzPackedSize = rvzPackedSize;
     }
 
-    public static GroupEntry FromRvz(RvzGroupEntry entry) =>
-        new(entry.FileOffset, entry.StoredSize, entry.UsesDiscCompression, entry.RvzPackedSize);
+    public static GroupEntry FromRvz(RvzGroupEntry entry)
+    {
+        return new GroupEntry(entry.FileOffset, entry.StoredSize, entry.UsesDiscCompression, entry.RvzPackedSize);
+    }
 
-    public static GroupEntry FromWia(WiaGroupEntry entry) =>
-        new(entry.FileOffset, entry.StoredSize, usesDiscCompression: true, rvzPackedSize: 0);
+    public static GroupEntry FromWia(WiaGroupEntry entry)
+    {
+        return new GroupEntry(entry.FileOffset, entry.StoredSize, usesDiscCompression: true, rvzPackedSize: 0);
+    }
 }

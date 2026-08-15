@@ -1,7 +1,5 @@
 #nullable disable
 
-using System;
-using System.IO;
 using System.Runtime.CompilerServices;
 #if !LEGACY_DOTNET
 using System.Buffers;
@@ -45,7 +43,10 @@ internal class Decoder
     // reading exactly one byte at a time, matching the legacy per-byte ReadByte() behavior.
     private bool _fastBufferSafeUnbounded;
 
-    public void SetFastLimit(long limit) => _fastLimit = limit;
+    public void SetFastLimit(long limit)
+    {
+        _fastLimit = limit;
+    }
 #endif
 
     public void Init(Stream stream)
@@ -93,9 +94,15 @@ internal class Decoder
 
     internal int FastBufferLen => _fastBufferLen;
 
-    internal void AddTotal(long consumed) => _total += consumed;
+    internal void AddTotal(long consumed)
+    {
+        _total += consumed;
+    }
 
-    internal void RefillFast() => FillFastBuffer();
+    internal void RefillFast()
+    {
+        FillFastBuffer();
+    }
 
     private void FillFastBuffer()
     {
@@ -164,7 +171,10 @@ internal class Decoder
         }
     }
 
-    public uint GetThreshold(uint total) => _code / (_range /= total);
+    public uint GetThreshold(uint total)
+    {
+        return _code / (_range /= total);
+    }
 
     public void Decode(uint start, uint size)
     {

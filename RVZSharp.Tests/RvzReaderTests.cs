@@ -1,4 +1,3 @@
-using RVZSharp;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
@@ -6,20 +5,23 @@ namespace RVZSharp.Tests;
 
 public class RvzReaderTests
 {
-    private static RvzSpec GcSpec(CompressionType compression, uint chunkSize, HashSet<int>? packed = null) =>
-        new()
+    private static RvzSpec GcSpec(CompressionType compression, uint chunkSize, HashSet<int>? packed = null)
+    {
+        return new RvzSpec
         {
             Compression = compression,
             ChunkSize = chunkSize,
             DiscType = DiscType.GameCube,
             RawSize = (int)(5 * chunkSize) + 0x12345,
             PackedChunks = packed ?? [],
-            Seed = 7,
+            Seed = 7
         };
+    }
 
     private static RvzSpec WiiSpec(CompressionType compression, uint chunkSize, bool exceptions,
-        HashSet<int>? packed = null) =>
-        new()
+        HashSet<int>? packed = null)
+    {
+        return new RvzSpec
         {
             Compression = compression,
             ChunkSize = chunkSize,
@@ -29,22 +31,23 @@ public class RvzReaderTests
             Partition = new PartitionSpec
             {
                 SectorCount = 70,
-                Exceptions = exceptions ? MakeExceptions() : [],
+                Exceptions = exceptions ? MakeExceptions() : []
             },
             PackedChunks = packed ?? [],
-            Seed = 3,
+            Seed = 3
         };
+    }
 
     private static HashExceptionEntry[][] MakeExceptions()
     {
         var e0 = new[]
         {
-            new HashExceptionEntry(0x100, Enumerable.Range(0, 20).Select(i => (byte)i).ToArray()),
-            new HashExceptionEntry(0x3E0, Enumerable.Range(0, 20).Select(i => (byte)(0x80 + i)).ToArray()),
+            new HashExceptionEntry(0x100, [.. Enumerable.Range(0, 20).Select(i => (byte)i)]),
+            new HashExceptionEntry(0x3E0, [.. Enumerable.Range(0, 20).Select(i => (byte)(0x80 + i))])
         };
         var e1 = new[]
         {
-            new HashExceptionEntry(0x200, Enumerable.Range(0, 20).Select(i => (byte)(0x40 + i)).ToArray()),
+            new HashExceptionEntry(0x200, [.. Enumerable.Range(0, 20).Select(i => (byte)(0x40 + i))])
         };
         return [e0, e1];
     }
@@ -154,7 +157,7 @@ public class RvzReaderTests
     {
         var bytes = TestRvzBuilder.Build(GcSpec(CompressionType.None, 0x200000));
         Assert.Throws<RvzFormatException>(() =>
-            RvzReader.Open(new MemoryStream(bytes.AsSpan(0, bytes.Length / 2).ToArray())));
+            RvzReader.Open(new MemoryStream([.. bytes.AsSpan(0, bytes.Length / 2)])));
     }
 
     [Fact]
@@ -167,7 +170,7 @@ public class RvzReaderTests
         var cut = (int)disc.GroupEntriesOffset + 10;
 
         Assert.Throws<RvzFormatException>(() =>
-            RvzReader.Open(new MemoryStream(bytes.AsSpan(0, cut).ToArray())));
+            RvzReader.Open(new MemoryStream([.. bytes.AsSpan(0, cut)])));
     }
 
     [Fact]
@@ -252,11 +255,15 @@ public class RvzReaderTests
         System.Security.Cryptography.SHA1.HashData(rvz.AsSpan(0, 0x34)).CopyTo(rvz, 0x34);
     }
 
-    private static uint ReadBe32(byte[] data, int offset) =>
-        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    private static uint ReadBe32(byte[] data, int offset)
+    {
+        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    }
 
-    private static ulong ReadBe64(byte[] data, int offset) =>
-        ((ulong)ReadBe32(data, offset) << 32) | ReadBe32(data, offset + 4);
+    private static ulong ReadBe64(byte[] data, int offset)
+    {
+        return ((ulong)ReadBe32(data, offset) << 32) | ReadBe32(data, offset + 4);
+    }
 
     private static void WriteBe32(byte[] data, int offset, uint value)
     {
@@ -293,15 +300,15 @@ public class RvzReaderMatrixTests
             Partition = new PartitionSpec
             {
                 SectorCount = 130, // spans 3 regions
-                Exceptions = new[]
-                {
-                    new[] { new RVZSharp.Models.HashExceptionEntry(0x100, new byte[20]) },
-                    new[] { new RVZSharp.Models.HashExceptionEntry(0x500, new byte[20]) },
-                    Array.Empty<RVZSharp.Models.HashExceptionEntry>(),
-                },
+                Exceptions =
+                [
+                    [new HashExceptionEntry(0x100, new byte[20])],
+                    [new HashExceptionEntry(0x500, new byte[20])],
+                    []
+                ]
             },
             PackedChunks = [0, 2, 5],
-            Seed = 11,
+            Seed = 11
         });
 
         using var reader = RvzReader.Open(new MemoryStream(rvz));
@@ -316,15 +323,15 @@ public class RvzReaderMatrixTests
             Compression = CompressionType.Zstd,
             ChunkSize = 0x200000,
             RawSize = 0x18000,
-            Seed = 2,
+            Seed = 2
         });
 
         // Corrupt a byte inside the first group's stored data.
-        var disc = RVZSharp.Models.WiaDisc.Parse(rvz.AsSpan(0x48, 0xDC));
+        var disc = WiaDisc.Parse(rvz.AsSpan(0x48, 0xDC));
         var gs = rvz.AsSpan((int)disc.GroupEntriesOffset, (int)disc.GroupEntriesSize).ToArray();
         byte[] table;
         using (var ms = new MemoryStream(gs))
-        using (var d = RVZSharp.Compression.CompressionCodecFactory.Create(disc.Compression)
+        using (var d = Compression.CompressionCodecFactory.Create(disc.Compression)
             .CreateDecompressor(ms, disc.ComprData.AsSpan(0, disc.ComprDataLen), gs.Length, disc.NumGroups * 12))
         {
             table = new byte[disc.NumGroups * 12];
@@ -341,12 +348,12 @@ public class RvzReaderMatrixTests
             }
         }
 
-        var g0 = RVZSharp.Models.RvzGroupEntry.Parse(table.AsSpan(0, 12));
+        var g0 = RvzGroupEntry.Parse(table.AsSpan(0, 12));
         var corrupted = (byte[])rvz.Clone();
         corrupted[(int)g0.FileOffset] ^= 0xFF; // break the zstd frame magic
 
         using var reader = RvzReader.Open(new MemoryStream(corrupted));
-        Assert.ThrowsAny<RVZSharp.RvzException>(() => reader.ReadFully());
+        Assert.ThrowsAny<RvzException>(() => reader.ReadFully());
     }
 }
 

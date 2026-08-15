@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using RVZSharp.Interfaces;
-using RVZSharp.Chunks;
 using RVZSharp.Compression;
 using RVZSharp.Models;
 using RVZSharp.Packing;
@@ -87,7 +86,10 @@ public static class RvzWriter
             return read;
         }
 
-        public void Dispose() => _inner.Dispose();
+        public void Dispose()
+        {
+            _inner.Dispose();
+        }
     }
 
     /// <summary>
@@ -197,7 +199,7 @@ public static class RvzWriter
                     Type = partition.Type,
                     DataOffset = partition.DataOffset,
                     DataSize = partition.DataSize,
-                    Key = key,
+                    Key = key
                 };
 
                 // Partitions overlapping the data already encoded (e.g. update partitions)
@@ -463,7 +465,7 @@ public static class RvzWriter
         RvzWriteOptions options, ICompressionEncoder encoder, List<byte[]> groupData,
         List<GroupEntry> groupEntries)
     {
-        var blocksPerChunk = (int)(options.ChunkSize / 0x8000);
+        var blocksPerChunk = options.ChunkSize / 0x8000;
         var chunkPayload = blocksPerChunk * WiiHashCalculator.SectorDataSize;
         var extractor = new WiiPartitionExtractor(input, area.Partition.Key);
         var processedBlocks = 0UL;
@@ -729,10 +731,15 @@ public static class RvzWriter
         return padding == 0 ? data : Concat(data, new byte[padding]);
     }
 
-    private static ulong AlignUp(ulong value, ulong alignment) =>
-        (value + alignment - 1) / alignment * alignment;
+    private static ulong AlignUp(ulong value, ulong alignment)
+    {
+        return (value + alignment - 1) / alignment * alignment;
+    }
 
-    private static ulong AlignDown(ulong value, ulong alignment) => value / alignment * alignment;
+    private static ulong AlignDown(ulong value, ulong alignment)
+    {
+        return value / alignment * alignment;
+    }
 
     private static void WriteBe32(Stream stream, uint value)
     {
@@ -762,6 +769,8 @@ public static class RvzWriter
         WriteBe32(data, offset + 4, (uint)value);
     }
 
-    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset)
+    {
+        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+    }
 }

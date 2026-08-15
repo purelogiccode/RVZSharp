@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using RVZSharp.Blobs;
-using RVZSharp.Interfaces;
 using RVZSharp.Models;
 
 namespace RVZSharp.Tests;
@@ -26,7 +25,7 @@ public static class RealRvzCatalog
     public const string WiiDir = @"F:\Nintendo Wii";
 
     public static readonly RealRvz[] GameCube =
-    {
+    [
         new("Advance Game Port (Unl)", "Advance Game Port (USA) (Unl).rvz",
             "305fe256e4927b1e8fb54a02e886197b97263508", 1459978240),
         new("Advance Game Port (Unl) (Rev 1)", "Advance Game Port (USA) (Unl) (Rev 1).rvz",
@@ -56,11 +55,11 @@ public static class RealRvzCatalog
         new("Sum of All Fears, The", "Sum of All Fears, The (USA).rvz",
             "c7214e84362f41983703328a187f4e056177da37", 1459978240),
         new("Tak and the Power of Juju", "Tak and the Power of Juju (USA).rvz",
-            "ac9b16004e7a8eb87e5acebb5c095541ace72e18", 1459978240),
-    };
+            "ac9b16004e7a8eb87e5acebb5c095541ace72e18", 1459978240)
+    ];
 
     public static readonly RealRvz[] Wii =
-    {
+    [
         new("Big Brain Academy - Wii Degree", "Big Brain Academy - Wii Degree (USA) (En,Fr,Es).rvz",
             "37896d2a60172695467d911e1d77d02f846a9856", 4699979776),
         new("Cabela's Monster Buck Hunter", "Cabela's Monster Buck Hunter (USA).rvz",
@@ -90,8 +89,8 @@ public static class RealRvzCatalog
         new("Smurfs 2, The", "Smurfs 2, The (USA) (En,Fr,Es).rvz",
             "ac13785a09a4ad45d5b7a741061cdc1a501caff6", 4699979776),
         new("Wii Fit Plus", "Wii Fit Plus (USA) (En,Fr,Es).rvz",
-            "5b9c83266681293f16dafba0cfe5ac5775df0330", 4699979776),
-    };
+            "5b9c83266681293f16dafba0cfe5ac5775df0330", 4699979776)
+    ];
 }
 
 /// <summary>Shared helpers for tests that run only when a real RVZ file is present.</summary>
@@ -100,8 +99,8 @@ public static class RealRvzOnly
     /// <summary>Full path of the catalog entry in <paramref name="dir"/>, or null when absent.</summary>
     public static string? PathIfPresent(RealRvzCatalog.RealRvz entry, string dir)
     {
-        var path = System.IO.Path.Combine(dir, entry.File);
-        return System.IO.File.Exists(path) ? path : null;
+        var path = Path.Combine(dir, entry.File);
+        return File.Exists(path) ? path : null;
     }
 
     /// <summary>Streaming SHA-1 of the entire decoded disc image.</summary>
@@ -118,7 +117,7 @@ public static class RealRvzOnly
             pos += read;
         }
 
-        sha.TransformFinalBlock(System.Array.Empty<byte>(), 0, 0);
+        sha.TransformFinalBlock([], 0, 0);
         return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
     }
 }
@@ -152,30 +151,30 @@ public class RealRvzDecodeTests
         var missing = new List<string>();
         foreach (var e in RealRvzCatalog.GameCube)
         {
-            var path = System.IO.Path.Combine(RealRvzCatalog.GcDir, e.File);
-            if (System.IO.File.Exists(path) && System.IO.Directory.Exists(RealRvzCatalog.GcDir))
+            var path = Path.Combine(RealRvzCatalog.GcDir, e.File);
+            if (File.Exists(path) && Directory.Exists(RealRvzCatalog.GcDir))
             {
                 continue;
             }
 
-            if (System.IO.Directory.Exists(RealRvzCatalog.GcDir)) missing.Add(path);
+            if (Directory.Exists(RealRvzCatalog.GcDir)) missing.Add(path);
         }
 
         foreach (var e in RealRvzCatalog.Wii)
         {
-            var path = System.IO.Path.Combine(RealRvzCatalog.WiiDir, e.File);
-            if (System.IO.File.Exists(path) && System.IO.Directory.Exists(RealRvzCatalog.WiiDir))
+            var path = Path.Combine(RealRvzCatalog.WiiDir, e.File);
+            if (File.Exists(path) && Directory.Exists(RealRvzCatalog.WiiDir))
             {
                 continue;
             }
 
-            if (System.IO.Directory.Exists(RealRvzCatalog.WiiDir)) missing.Add(path);
+            if (Directory.Exists(RealRvzCatalog.WiiDir)) missing.Add(path);
         }
 
         // The drive is absent on machines without the games — the per-file tests no-op
         // there, so this guard does too. When the drive IS mounted, nothing may be missing.
-        if (System.IO.Directory.Exists(RealRvzCatalog.GcDir) ||
-            System.IO.Directory.Exists(RealRvzCatalog.WiiDir))
+        if (Directory.Exists(RealRvzCatalog.GcDir) ||
+            Directory.Exists(RealRvzCatalog.WiiDir))
         {
             Assert.Empty(missing);
         }
@@ -185,10 +184,10 @@ public class RealRvzDecodeTests
     [MemberData(nameof(Files))]
     public void DecodesToExpectedNoIntroSha1(string dir, string file, string expectedSha1)
     {
-        var path = System.IO.Path.Combine(dir, file);
-        if (!System.IO.File.Exists(path)) return;
+        var path = Path.Combine(dir, file);
+        if (!File.Exists(path)) return;
 
-        using var fs = System.IO.File.OpenRead(path);
+        using var fs = File.OpenRead(path);
         using var reader = RvzReader.Open(fs, leaveOpen: true);
         Assert.Equal(expectedSha1, RealRvzOnly.Sha1(reader));
     }
@@ -197,8 +196,8 @@ public class RealRvzDecodeTests
     [MemberData(nameof(Files))]
     public void ReportsExpectedIsoSize(string dir, string file, string _)
     {
-        var path = System.IO.Path.Combine(dir, file);
-        if (!System.IO.File.Exists(path)) return;
+        var path = Path.Combine(dir, file);
+        if (!File.Exists(path)) return;
 
         using var reader = RvzReader.Open(
             new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read), leaveOpen: false);
@@ -243,10 +242,10 @@ public class RealRvzStructureTests
     [MemberData(nameof(WiiFiles))]
     public void HeaderAndDiscAreValid(string dir, string file)
     {
-        var path = System.IO.Path.Combine(dir, file);
-        if (!System.IO.File.Exists(path)) return;
+        var path = Path.Combine(dir, file);
+        if (!File.Exists(path)) return;
 
-        using var fs = System.IO.File.OpenRead(path);
+        using var fs = File.OpenRead(path);
         using var reader = RvzReader.Open(fs, leaveOpen: true);
 
         Assert.True(reader.FileHead.IsRvz, "expected an RVZ file");
@@ -257,7 +256,7 @@ public class RealRvzStructureTests
         Assert.Contains(reader.Disc.Compression, new[]
         {
             CompressionType.None, CompressionType.Bzip2, CompressionType.Lzma,
-            CompressionType.Lzma2, CompressionType.Zstd,
+            CompressionType.Lzma2, CompressionType.Zstd
         });
 
         var chunk = reader.Disc.ChunkSize;
@@ -283,7 +282,7 @@ public class RealRvzRegionTests
         var path = RealRvzOnly.PathIfPresent(e, RealRvzCatalog.GcDir);
         if (path is null) return;
 
-        using var fs = System.IO.File.OpenRead(path);
+        using var fs = File.OpenRead(path);
         using var reader = RvzReader.Open(fs, leaveOpen: true);
         var full = reader.ReadFully(); // GameCube image (~1.4 GiB) fits in a byte[].
         Assert.Equal(e.Sha1, Convert.ToHexString(SHA1.HashData(full)).ToLowerInvariant());
@@ -296,12 +295,12 @@ public class RealRvzRegionTests
         var path = RealRvzOnly.PathIfPresent(e, RealRvzCatalog.GcDir);
         if (path is null) return;
 
-        using var fs = System.IO.File.OpenRead(path);
+        using var fs = File.OpenRead(path);
         using var reader = RvzReader.Open(fs, leaveOpen: true);
         var full = reader.ReadFully();
 
         var chunk = reader.BlockSize;
-        long[] offsets = { 0, chunk - 17, chunk, chunk + 5, 2 * chunk - 3, 7 * chunk + 11 };
+        long[] offsets = [0, chunk - 17, chunk, chunk + 5, 2 * chunk - 3, 7 * chunk + 11];
         foreach (var off in offsets)
         {
             if (off >= full.Length) continue;
@@ -320,7 +319,7 @@ public class RealRvzRegionTests
         var path = RealRvzOnly.PathIfPresent(e, RealRvzCatalog.WiiDir);
         if (path is null) return;
 
-        using var fs = System.IO.File.OpenRead(path);
+        using var fs = File.OpenRead(path);
         using var reader = RvzReader.Open(fs, leaveOpen: true);
         var buffer = new byte[16];
         Assert.Equal(0, reader.ReadAt(reader.Length, buffer));
@@ -359,22 +358,22 @@ public class RealRvzWriteRoundTripTests
     private static void ReencodeAndVerifySha1(string path, string expectedSha1)
     {
         using var decoded = Blob.Open(path);
-        var filename = System.IO.Path.Combine(
-            System.IO.Path.GetTempPath(), "rvzsharp_roundtrip_" + Guid.NewGuid().ToString("N") + ".rvz");
+        var filename = Path.Combine(
+            Path.GetTempPath(), "rvzsharp_roundtrip_" + Guid.NewGuid().ToString("N") + ".rvz");
         try
         {
-            using (var outFile = System.IO.File.Create(filename))
+            using (var outFile = File.Create(filename))
             {
                 RvzWriter.Write(decoded, outFile, RvzWriteOptions.Default);
             }
 
-            using var fs = System.IO.File.OpenRead(filename);
+            using var fs = File.OpenRead(filename);
             using var reader = RvzReader.Open(fs, leaveOpen: true);
             Assert.Equal(expectedSha1, RealRvzOnly.Sha1(reader));
         }
         finally
         {
-            System.IO.File.Delete(filename);
+            File.Delete(filename);
         }
     }
 }

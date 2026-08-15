@@ -1,7 +1,5 @@
-using RVZSharp;
 using RVZSharp.Blobs;
 using RVZSharp.Compression;
-using RVZSharp.Interfaces;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
@@ -38,7 +36,7 @@ public class WiaReaderTests
             ChunkSize = WiaDisc.GroupSize,
             RawSize = 3 * 0x8000 + 0x1234,
             RawTailSize = 0x9000,
-            Seed = 4,
+            Seed = 4
         };
         var (file, iso) = TestRvzBuilder.BuildWithIso(spec);
 
@@ -60,7 +58,7 @@ public class WiaReaderTests
         var exceptions = new[]
         {
             new[] { new HashExceptionEntry(0x100, Enumerable.Range(0, 20).Select(i => (byte)i).ToArray()) },
-            Array.Empty<HashExceptionEntry>(),
+            Array.Empty<HashExceptionEntry>()
         };
         var spec = new RvzSpec
         {
@@ -69,7 +67,7 @@ public class WiaReaderTests
             ChunkSize = WiaDisc.GroupSize,
             RawSize = 0x8000,
             Partition = new PartitionSpec { SectorCount = 130, Exceptions = exceptions },
-            Seed = 5,
+            Seed = 5
         };
         var (file, iso) = TestRvzBuilder.BuildWithIso(spec);
 
@@ -87,7 +85,7 @@ public class WiaReaderTests
             ChunkSize = WiaDisc.GroupSize,
             RawSize = 2 * 0x200000 + 0x8000,
             Partition = new PartitionSpec { SectorCount = 70 },
-            Seed = 6,
+            Seed = 6
         };
         var (file, iso) = TestRvzBuilder.BuildWithIso(spec);
 
@@ -110,7 +108,7 @@ public class WiaReaderTests
             IsWia = true,
             Compression = CompressionType.Zstd,
             ChunkSize = WiaDisc.GroupSize,
-            RawSize = 0x8000,
+            RawSize = 0x8000
         };
         var file = TestRvzBuilder.Build(spec);
 
@@ -124,7 +122,7 @@ public class WiaReaderTests
         {
             Compression = CompressionType.Purge,
             ChunkSize = WiaDisc.GroupSize,
-            RawSize = 0x8000,
+            RawSize = 0x8000
         };
         var file = TestRvzBuilder.Build(spec);
 
@@ -139,7 +137,7 @@ public class WiaReaderTests
             IsWia = true,
             Compression = CompressionType.None,
             ChunkSize = 0x8000, // RVZ-legal small chunk, not a multiple of 2 MiB
-            RawSize = 0x8000,
+            RawSize = 0x8000
         };
         var file = TestRvzBuilder.Build(spec);
 
@@ -166,7 +164,7 @@ public class WiaReaderTests
             IsWia = true,
             Compression = CompressionType.Bzip2,
             ChunkSize = WiaDisc.GroupSize,
-            RawSize = 0x8000,
+            RawSize = 0x8000
         };
         var file = TestRvzBuilder.Build(spec);
 

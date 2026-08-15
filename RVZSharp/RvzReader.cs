@@ -34,7 +34,7 @@ public sealed class RvzReader : IBlobReader
     private enum AreaKind
     {
         Raw,
-        Partition,
+        Partition
     }
 
     private readonly record struct DataArea(long Start, long End, AreaKind Kind, int Index, int Segment);
@@ -101,12 +101,16 @@ public sealed class RvzReader : IBlobReader
     public long Length { get; }
 
     /// <summary>Parses and validates an RVZ file. The stream must be seekable.</summary>
-    public static RvzReader Open(Stream stream, bool leaveOpen = false) =>
-        Open(stream, leaveOpen, WiaRvzFormat.Rvz);
+    public static RvzReader Open(Stream stream, bool leaveOpen = false)
+    {
+        return Open(stream, leaveOpen, WiaRvzFormat.Rvz);
+    }
 
     /// <summary>Parses and validates a WIA file. The stream must be seekable.</summary>
-    public static RvzReader OpenWia(Stream stream, bool leaveOpen = false) =>
-        Open(stream, leaveOpen, WiaRvzFormat.Wia);
+    public static RvzReader OpenWia(Stream stream, bool leaveOpen = false)
+    {
+        return Open(stream, leaveOpen, WiaRvzFormat.Wia);
+    }
 
     private static RvzReader Open(Stream stream, bool leaveOpen, WiaRvzFormat format)
     {
@@ -167,13 +171,6 @@ public sealed class RvzReader : IBlobReader
 
         // End-keyed map of every non-empty data area (std::map::emplace: first wins).
         var ends = new SortedDictionary<long, (bool IsPartition, int Index, int Segment)>();
-        void AddEnd(long end, bool isPartition, int index, int segment)
-        {
-            if (!ends.ContainsKey(end))
-            {
-                ends[end] = (isPartition, index, segment);
-            }
-        }
 
         for (var i = 0; i < partitions.Length; i++)
         {
@@ -195,29 +192,13 @@ public sealed class RvzReader : IBlobReader
             }
         }
 
-        // Each area's start must be covered by exactly its own end-keyed entry (Dolphin:
-        // upper_bound(start) must find the entry itself — anything else is an overlap or
-        // a gap/ordering error).
-        bool Covered(long start, bool isPartition, int index, int segment)
-        {
-            foreach (var pair in ends)
-            {
-                if (pair.Key > start)
-                {
-                    return pair.Value == (isPartition, index, segment);
-                }
-            }
-
-            return false;
-        }
-
         for (var i = 0; i < partitions.Length; i++)
         {
             for (var segment = 0; segment < 2; segment++)
             {
                 var entry = partitions[i].Data[segment];
                 if (entry.NumSectors != 0 &&
-                    !Covered((long)entry.FirstSector * blockSize, true, i, segment))
+                    !Covered(entry.FirstSector * blockSize, true, i, segment))
                 {
                     throw new RvzFormatException(
                         "The disc tables contain overlapping or misplaced partition data.");
@@ -233,6 +214,32 @@ public sealed class RvzReader : IBlobReader
                 throw new RvzFormatException(
                     "The disc tables contain overlapping or misplaced raw data.");
             }
+        }
+
+        return;
+
+        void AddEnd(long end, bool isPartition, int index, int segment)
+        {
+            if (!ends.ContainsKey(end))
+            {
+                ends[end] = (isPartition, index, segment);
+            }
+        }
+
+        // Each area's start must be covered by exactly its own end-keyed entry (Dolphin:
+        // upper_bound(start) must find the entry itself — anything else is an overlap or
+        // a gap/ordering error).
+        bool Covered(long start, bool isPartition, int index, int segment)
+        {
+            foreach (var pair in ends)
+            {
+                if (pair.Key > start)
+                {
+                    return pair.Value == (isPartition, index, segment);
+                }
+            }
+
+            return false;
         }
     }
 
@@ -349,7 +356,7 @@ public sealed class RvzReader : IBlobReader
         if (_cachedRawKey != key || _cachedRawPayload == null)
         {
             var entry = RawDataEntries[rawIndex];
-            var groupIndex = (long)entry.GroupIndex + chunkIndex;
+            var groupIndex = entry.GroupIndex + chunkIndex;
             if (groupIndex >= GroupEntries.Length)
             {
                 throw new RvzFormatException(
@@ -365,7 +372,7 @@ public sealed class RvzReader : IBlobReader
                     Group = group,
                     IsPartition = false,
                     ExpectedSize = expectedSize,
-                    DataOffset = chunkIndex * Disc.ChunkSize,
+                    DataOffset = chunkIndex * Disc.ChunkSize
                 });
             _cachedRawPayload = result.Payload;
             _cachedRawKey = key;
@@ -428,10 +435,10 @@ public sealed class RvzReader : IBlobReader
         {
             var pd = Partitions[area.Index].Data[area.Segment];
             var sectorsPerChunk = Disc.ChunkSize / WiaDisc.SectorSize;
-            var remainingSectors = (long)pd.NumSectors - chunkIndex * sectorsPerChunk;
+            var remainingSectors = pd.NumSectors - chunkIndex * sectorsPerChunk;
             var expectedSize = (int)(Math.Min(sectorsPerChunk, remainingSectors) * WiiHashCalculator.SectorDataSize);
 
-            var groupIndex = (long)pd.GroupIndex + chunkIndex;
+            var groupIndex = pd.GroupIndex + chunkIndex;
             if (groupIndex >= GroupEntries.Length)
             {
                 throw new RvzFormatException(
@@ -446,7 +453,7 @@ public sealed class RvzReader : IBlobReader
                     Group = group,
                     IsPartition = true,
                     ExpectedSize = expectedSize,
-                    DataOffset = chunkIndex * PartitionChunkPayloadSize,
+                    DataOffset = chunkIndex * PartitionChunkPayloadSize
                 });
             _cachedChunkPayload = result.Payload;
             _cachedChunkLists = result.ExceptionLists;

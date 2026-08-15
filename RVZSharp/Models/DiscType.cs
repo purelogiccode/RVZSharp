@@ -5,5 +5,5 @@ public enum DiscType : uint
 {
     Unknown = 0,
     GameCube = 1,
-    Wii = 2,
+    Wii = 2
 }

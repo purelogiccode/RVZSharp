@@ -435,4 +435,5 @@ foreach (var partition in WiiVolume.GetPartitions(blob))
 - Dependencies: `LZMA-SDK` (encoding), `SharpZipLib` (BZip2), `ZstdSharp.Port`
   (Zstandard) — all pure managed, all netstandard-compatible.
 - The RVZ/WIA container logic is derived from Dolphin; the library is
-  **GPL-2.0-or-later**. See `LICENSE` and `THIRD-PARTY-NOTICES.md` in the package.
+  **GPL-2.0-or-later** (the same license Dolphin uses), so distributing or consuming it
+  follows the GPL. See `LICENSE` and `THIRD-PARTY-NOTICES.md` in the package.

@@ -8,11 +8,11 @@ how to build it, how to publish it, and the quality gates that protect the API.
 | | |
 |---|---|
 | Package ID | `RVZSharp` |
-| Version | `0.1.0` (SemVer; bumped per release) |
+| Version | `1.0.0` (SemVer; bumped per release) |
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | License | GPL-2.0-or-later (`PackageLicenseExpression`) |
 | Dependencies | `LZMA-SDK`, `SharpZipLib`, `ZstdSharp.Port` (all pure managed) |
-| Symbols | `RVZSharp.0.1.0.snupkg` (source link + embedded sources) |
+| Symbols | `RVZSharp.1.0.0.snupkg` (source link + embedded sources) |
 | Reproducible | deterministic builds (`ContinuousIntegrationBuild` for release packs) |
 
 ## What's inside the package
@@ -64,7 +64,7 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
 dotnet pack RVZSharp/RVZSharp.csproj -c Release
 
 # 2. Push (the API key comes from nuget.org → API Keys).
-dotnet nuget push RVZSharp/bin/Release/RVZSharp.0.1.0.nupkg \
+dotnet nuget push RVZSharp/bin/Release/RVZSharp.1.0.0.nupkg \
     --source https://api.nuget.org/v3/index.json \
     --api-key <NUGET_API_KEY>
 ```
@@ -98,7 +98,7 @@ To test the package without publishing:
 ```
 
 ```bash
-dotnet add package RVZSharp --version 0.1.0
+dotnet add package RVZSharp --version 1.0.0
 ```
 
 ## The CLI

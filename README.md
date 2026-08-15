@@ -20,21 +20,93 @@ dotnet add package RVZSharp
 
 ### Library
 
-```csharp
-using RVZSharp;
-
-using var file = File.OpenRead("game.rvz");
-using var reader = RvzReader.Open(file);
-
-Console.WriteLine($"ISO size: {reader.Length} bytes");
-Console.WriteLine($"Compression: {reader.Disc.Compression}");
-
-// Random-access decode (the whole image, or ReadAt any range)
-var iso = reader.ReadFully();
+```bash
+dotnet add package RVZSharp
 ```
 
-`RvzReader.Open` parses and validates the whole container; `ReadAt(position, span)` serves
-decoded bytes at any offset; `ReadFully()` decodes the entire image.
+**1. Open any disc image** — the format is auto-detected from the magic bytes (RVZ, WIA,
+GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO):
+
+```csharp
+using RVZSharp.Blobs;
+
+// From a file path:
+using var blob = Blob.Open(@"C:\games\game.rvz");
+
+// From a stream (same result for any supported format):
+using var stream = File.OpenRead(@"C:\games\game.gcz");
+using var blob2 = Blob.Open(stream);
+
+// NFS images carry their AES key outside the file (Dolphin convention):
+using var blob3 = Blob.Open(nfsStream, nfsKey, leaveOpen: true);
+```
+
+**2. Decode — the whole image, or random-access ranges:**
+
+```csharp
+using var file = File.OpenRead(@"C:\games\game.rvz");
+using var reader = RvzReader.Open(file);
+
+Console.WriteLine($"ISO size: {reader.Length} bytes");             // 1459978240
+Console.WriteLine($"Disc: {reader.Disc.DiscType}");                // Wii
+Console.WriteLine($"Compression: {reader.Disc.Compression}");      // Zstd
+
+// Decode everything (the full disc image, byte-for-byte):
+var iso = reader.ReadFully();
+
+// ...or stream any range without decoding the whole file:
+var buffer = new byte[0x80000];
+long read = reader.ReadAt(partitionStart, buffer);
+```
+
+`RvzReader.Open` parses and validates the whole container (magic, versions, every SHA-1,
+structure rules) and throws `RvzHashMismatchException` / `RvzFormatException` on damage.
+
+**3. Write an RVZ from any supported image** (mirrors Dolphin's converter):
+
+```csharp
+using RVZSharp;
+using RVZSharp.Blobs;
+
+using var input = Blob.Open(@"C:\games\game.wia");
+using var output = File.Create(@"C:\games\game.rvz");
+
+var options = new RvzWriteOptions
+{
+    Compression = CompressionType.Zstd,   // None, Bzip2, Lzma, Lzma2, Zstd
+    CompressionLevel = 5,                 // Zstd: -131072..22 (negative = fast), others 1-9
+    ChunkSize = 131072,
+    Packing = true                        // PRNG-junk packing (smaller files)
+};
+
+RvzWriter.Write(input: input, output: output, options: options);
+```
+
+Wii partitions are stored decrypted with hash exceptions, exactly like Dolphin produces.
+`options` defaults to the Dolphin-compatible settings (Zstd / level 5 / 2 MiB chunks,
+packing on). To get a plain ISO back, use the CLI's `convert -f iso` (or a reader + copy).
+
+**4. Progress and cancellation** for long conversions:
+
+```csharp
+using var cts = new CancellationTokenSource();
+var progress = new Progress<double>(f => Console.Error.Write($"\r{f,6:P1}"));
+
+RvzWriter.Write(input: input, output: output, options: options,
+    progress: progress, cancellationToken: cts.Token);
+```
+
+**5. Handling errors** — every format problem raises `RvzException` subclasses:
+
+```csharp
+try
+{
+    using var reader = RvzReader.Open(file);
+    _ = reader.ReadFully();
+}
+catch (RvzHashMismatchException) { /* a SHA-1 failed (corrupt container) */ }
+catch (RvzFormatException)       { /* structural damage / unsupported feature */ }
+```
 
 ### CLI
 
@@ -122,3 +194,19 @@ real Wii game with the default **2 MiB chunk size**, the writer used the ISO tic
 instead of the RVZ partition-table key (No-Intro dumps carry re-signed tickets whose key
 differs), producing files the reader rejected. `RvzWriter` now prefers the container's
 partition-table key and falls back to the ticket key for plain ISO inputs.
+
+## License
+
+RVZSharp is copyright (c) 2025-2026 by **Peterson Fernandes**
+([github.com/drpetersonfernandes](https://github.com/drpetersonfernandes)) and **Pure Logic
+Code** ([github.com/purelogiccode](https://github.com/purelogiccode)).
+
+The RVZ/WIA format logic in this library is derived from
+[Dolphin](https://github.com/dolphin-emu/dolphin), which is licensed under the
+**GNU General Public License, version 2 or later**. To stay fully compliant, RVZSharp is
+distributed under the **same license (GPL-2.0-or-later)** — see [LICENSE](LICENSE).
+
+All third-party code and dependencies are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) (MIT SharpCompress LZMA decoder port,
+MIT/public-domain runtime dependencies, GPL Dolphin as the format source, BSD Go reader as
+validation reference).

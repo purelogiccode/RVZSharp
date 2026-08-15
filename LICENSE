@@ -1,3 +1,11 @@
+RVZSharp - Copyright (C) 2025-2026 Peterson Fernandes (https://github.com/drpetersonfernandes)
+             and Pure Logic Code (https://github.com/purelogiccode).
+
+RVZSharp implements the Dolphin RVZ/WIA disc container (https://github.com/dolphin-emu/dolphin)
+and its format logic is derived from Dolphin's DiscIO module. It is therefore distributed
+under the same license Dolphin uses: the GNU General Public License, version 2 or any later
+version. The full license text follows.
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 2, June 1991
 

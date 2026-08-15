@@ -13,15 +13,20 @@
     <Description>
       A pure managed .NET library for reading and writing Dolphin RVZ/WIA disc images and
       decoding the legacy GameCube/Wii formats (GCZ, CISO/WBI, WBFS, TGC, NFS) to a canonical
-      ISO view. Licensed under GPL-2.0-or-later (format logic derived from Dolphin).
+      ISO view. Written by Peterson Fernandes (Pure Logic Code); the RVZ/WIA format logic is
+      derived from Dolphin and the library is GPL-2.0-or-later, like Dolphin itself.
     </Description>
     <PackageTags>dolphin;rvz;wia;gcz;ciso;wbfs;tgc;nfs;gamecube;wii;iso;disc-image</PackageTags>
     <PackageLicenseExpression>GPL-2.0-or-later</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReleaseNotes>Initial release: RVZ/WIA reader, legacy format decoders, RVZ writer with packing and hash exceptions.</PackageReleaseNotes>
-    <RepositoryUrl>https://github.com/drpetersonfernandes/RVZSharp</RepositoryUrl>
+    <PackageReleaseNotes>
+      1.0.0 release: fully documented API (XML docs), RVZ/WIA reader, legacy format
+      decoders, RVZ writer with packing and hash exceptions, real-game validation suite.
+    </PackageReleaseNotes>
+    <RepositoryUrl>https://github.com/purelogiccode/RVZSharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/purelogiccode/RVZSharp</PackageProjectUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>

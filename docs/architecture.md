@@ -19,7 +19,7 @@
 | Module | Files | Responsibility |
 |---|---|---|
 | `Blobs/` | `Blob`, `BlobType`, `IBlobReader`, `PlainBlob`, `GczBlob`, `CisoBlob`, `WbfsBlob`, `TgcBlob`, `NfsBlob` | Format detection and per-format random-access decoding to ISO bytes |
-| `Format/` | `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `WiaRawDataEntry`, `GroupEntry`, `WiaRvzFormat`, `CompressionType` | Container structs (RVZ/WIA) |
+| `Models/` | `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `WiaRawDataEntry`, `GroupEntry`, `WiaRvzFormat`, `CompressionType` | Container structs (RVZ/WIA) |
 | `Chunks/` | `ChunkDecoder`, `HashExceptionEntry`, `TableParser` | Group decompression, exception-list parsing, table loading |
 | `Compression/` | `CompressionCodecFactory`, `CompressionEncoderFactory`, `ICompressionDecoder`, `ICompressionEncoder`, codecs, `Lzma/` (vendored 7-Zip decoder) | Read-side decompression and write-side compression |
 | `Packing/` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator`, `LaggedFibonacciPrng` | RVZ junk packing: segment streams and PRNG seed recovery |

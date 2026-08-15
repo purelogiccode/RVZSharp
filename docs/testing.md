@@ -1,26 +1,27 @@
 # Testing
 
-The suite has **351 tests** and runs on every target framework (`net8.0`, `net9.0`,
-`net10.0`). Tests are categorized with the xUnit trait `Category`:
+The test suite is split into **two projects**, so the default run is always the fast one:
 
-- **fast** — 254 synthetic tests (~30 seconds per framework), tagged implicitly by *not*
-  being marked slow;
-- **slow** — 97 real-file tests (full decode, structural checks, writer round trips against
-  real game images), tagged `[Trait(TestCategories.Category, TestCategories.Slow)]` (see
-  `TestCategories.cs`).
+- **`RVZSharp.Tests`** — **313 synthetic tests** (unit + end-to-end round trips), ~30
+  seconds per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
+- **`RVZSharp.Slow.Tests`** — **97 real-file tests** (full decode, structural checks,
+  writer round trips against real game images), ~12 minutes when the games are mounted.
+  It is deliberately kept **out of the solution**, so a plain `dotnet test` / solution run
+  never executes it.
 
 ```bash
-# full suite
-dotnet test CSharp_RVZSharp.slnx -c Release
+# fast suite (default; runs per target framework of the solution)
+dotnet test CSharp_RVZSharp.sln -c Release
 
-# fast subset only (skips the real-file suite, ~30 s per framework)
-dotnet test CSharp_RVZSharp.slnx -c Release --filter "Category!=Slow"
+# a single class
+dotnet test CSharp_RVZSharp.sln -c Release --filter "FullyQualifiedName~RvzWriterTests"
 
-# slow / real-file subset only
-dotnet test CSharp_RVZSharp.slnx -c Release --filter "Category=Slow"
+# slow / real-file suite (explicit opt-in; not part of the solution)
+dotnet test RVZSharp.Slow.Tests -c Release
+
+# a single framework (either project)
+dotnet test RVZSharp.Slow.Tests -c Release --framework net8.0
 ```
-
-A single framework can be selected with `--framework net8.0` (etc.).
 
 ## Strategy
 
@@ -48,21 +49,26 @@ byte-for-byte against their official No-Intro SHA-1s:
 |---|---|
 | `WiaFileHeadTests`, `WiaDiscTests`, `TableParserTests` | container structs, tables, hash validation |
 | `CompressionCodecTests`, `CompressionLzmaTests` | every codec round trip, props, LZMA1/LZMA2 framing |
+| `ExceptionListParserTests` | exception-list parsing: multiple lists, 4-byte alignment of the last list, truncation errors |
 | `ChunkDecoderTests`, `ChunkDecoderPackingTests` | group decoding, exception lists, packed chunks, every codec |
 | `PackingTests` | segment streams, mixed literal/junk, skip semantics |
 | `LaggedFibonacciGeneratorTests` | `GetSeed` at 11 offsets (incl. unaligned), random-data rejection, PRNG equivalence |
 | `RvzPackingEncoderTests` | pack → decode round trips, literal shortcut, zero-junk header |
 | `PartitionRegionBuilderTests` | hash tree, encryption, exceptions |
+| `WiiHashCalculatorTests`, `WiiPartitionExtractorTests` | h0/h1/h2 layout, exception application, AES region round trips and corruption detection |
+| `ScrubbedBlobTests`, `PlainBlobTests` | scrubbing of non-game partitions, plain-ISO reads and ownership |
 | `BlobDetectionTests` | magic-byte auto-detection |
+| `Adler32Tests`, `SpanReader`/`SectionStreamTests`, `NonDisposingStreamTests` | checksums, big-endian reads, section bounds, stream ownership |
 | `GczBlobTests`, `CisoBlobTests`, `WbfsBlobTests`, `TgcBlobTests`, `NfsBlobTests` | legacy decoders |
-| `WiaReaderTests`, `RvzReaderTests`, `RvzReaderMatrixTests`, `RealFileDecodeTests` | full-container decoding across codecs/chunk sizes; env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`, Slow) |
+| `WiaReaderTests`, `RvzReaderTests`, `RvzReaderMatrixTests` | full-container decoding across codecs/chunk sizes |
 | `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, junk-only image, >2 MiB chunks, overlapping/odd partitions, scrubbing, raw-table group counts |
-| `RealRvzFileTests` | 97 real-file tests (Slow): 30 full-decode SHA-1 (15 GameCube + 15 Wii vs No-Intro DAT), 30 structural, 3 region/random-access, 2 writer round-trips — self-skipping when the games aren't mounted |
-| `SectionStreamTests` | section bounds under external seeks |
+| `RVZSharp.Slow.Tests/RealRvzFileTests.cs` | 97 real-file tests (see below) |
+| `RVZSharp.Slow.Tests/RealFileDecodeTests.cs` | env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`) |
 
 ## Real-file suite
 
-`RealRvzFileTests.cs` validates the library against actual game images on a local drive
+`RVZSharp.Slow.Tests/RealRvzFileTests.cs` validates the library against actual game
+images on a local drive
 (`F:\Nintendo GameCube` / `F:\Nintendo Wii`). The expected ISO SHA-1s come from the official
 No-Intro DAT files in `References/rvz-1.0.3/testdata/`, so a passing test proves the decoder
 reproduces the original disc image byte-for-byte:
@@ -82,7 +88,7 @@ and pinned a production writer bug (default 2 MiB chunks used the ISO ticket key
 the RVZ partition-table key on re-signed No-Intro tickets); `RvzWriter` now prefers the
 container key and falls back to the ticket key for plain ISO inputs.
 
-## Synthetic builders (`tests/RVZSharp.Tests/Helpers/`)
+## Synthetic builders (`RVZSharp.Tests/Helpers/`)
 
 | Helper | Purpose |
 |---|---|

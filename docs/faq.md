@@ -61,9 +61,11 @@ reader and RVZSharp all agree), and it's what makes seed-based packing possible.
 `GetSeed` is best-effort: non-PRNG data is stored literally. The output stays fully valid
 — just less compressed.
 
-**Why `CSharp_RVZSharp.slnx` and not `.sln`?**
-The project uses the XML solution format; the legacy `.sln` parser in the .NET CLI rejects
-it (`MSB5010`). Keep the `.slnx` extension.
+**Why `CSharp_RVZSharp.sln` and not `.slnx`?**
+The repository uses the classic `.sln` solution format, which the .NET CLI fully supports
+(`dotnet build`, `dotnet test`, `dotnet sln add`). The slow test project
+(`RVZSharp.Slow.Tests`) is intentionally not part of the solution, so solution-level
+test runs are always fast-only.
 
 **How are warnings handled?**
 `TreatWarningsAsErrors` is enabled — the build must stay at zero warnings.

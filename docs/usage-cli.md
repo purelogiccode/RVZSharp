@@ -17,7 +17,7 @@ rvzsharp decode <FILE> <OUT> [--sha1 <hex>]       (decode any blob to a plain IS
 Run the CLI with:
 
 ```bash
-dotnet run --project src/RVZSharp.Cli -c Release -- <command> [args…]
+dotnet run --project RVZSharp.Cli -c Release -- <command> [args…]
 ```
 
 ## Input auto-detection

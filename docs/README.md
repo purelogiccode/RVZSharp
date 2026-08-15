@@ -11,8 +11,8 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 | | |
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
-| Solution file | `CSharp_RVZSharp.slnx` (XML solution — do **not** rename to `.sln`) |
-| Tests | 350, green on every framework (`dotnet test CSharp_RVZSharp.slnx -c Release`) — incl. a 95-test real-file suite validated against official No-Intro SHA-1s |
+| Solution file | `CSharp_RVZSharp.sln` |
+| Tests | 313 fast (every framework, ~30 s) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |

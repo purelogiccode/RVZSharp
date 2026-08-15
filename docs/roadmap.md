@@ -9,7 +9,7 @@
 | 3 — RVZ writer | `RvzWriter`, encoders, junk packing, CLI `convert` | ✅ done |
 | 4 — Distribution | NuGet package (net8.0/9.0/10.0), multi-target tests, progress/cancellation API | ✅ done |
 | 5 — Reference alignment | audit against dolphin-master + rvz-1.0.3; every finding fixed or documented (see TODO.md) | ✅ done |
-| 6 — Real-world validation | 95 real-file tests against 30 GameCube/Wii RVZ games (No-Intro SHA-1) incl. writer round-trips — found & fixed the 2 MiB ticket-key writer bug | ✅ done |
+| 6 — Real-world validation | 97 real-file tests (`RVZSharp.Slow.Tests`) against 30 GameCube/Wii RVZ games (No-Intro SHA-1) incl. writer round-trips — found & fixed the 2 MiB ticket-key writer bug | ✅ done |
 
 ## Supported
 

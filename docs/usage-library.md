@@ -16,11 +16,12 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 |---|---|
 | `RVZSharp.Blobs` | `IBlobReader`, `Blob` (factory), `BlobType`, per-format readers |
 | `RVZSharp` | `RvzReader`, `RvzWriter`, `RvzWriteOptions` |
-| `RVZSharp.Format` | container structs: `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `CompressionType` |
-| `RVZSharp.Chunks` | `ChunkDecoder`, `HashExceptionEntry` |
-| `RVZSharp.Compression` | codec factories: `CompressionCodecFactory`, `CompressionEncoderFactory` |
+| `RVZSharp.Models` | container structs: `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `CompressionType` |
+| `RVZSharp.Chunks` | `ChunkDecoder`, `HashExceptionEntry`, `ExceptionListParser` |
+| `RVZSharp.Compression` | codec factories: `CompressionCodecFactory`, `CompressionEncoderFactory` (the vendored 7-Zip LZMA port is internal) |
+| `RVZSharp.IO` | `Adler32`, `SpanReader`, `SectionStream`, `NonDisposingStream` |
 | `RVZSharp.Packing` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator` |
-| `RVZSharp.Wii` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume` |
+| `RVZSharp.Wii` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor` |
 
 ---
 
@@ -29,7 +30,7 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 ```csharp
 using RVZSharp;
 using RVZSharp.Blobs;
-using RVZSharp.Format;
+using RVZSharp.Models;
 
 // 1. Open any disc image (format is auto-detected from the magic bytes).
 using var blob = Blob.Open(@"C:\games\my-game.rvz");

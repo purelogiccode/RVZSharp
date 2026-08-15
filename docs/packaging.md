@@ -30,14 +30,14 @@ THIRD-PARTY-NOTICES.md         MIT notice for the vendored LZMA decoder
 ## Building the package
 
 ```bash
-dotnet pack src/RVZSharp/RVZSharp.csproj -c Release
-# output: src/RVZSharp/bin/Release/RVZSharp.<version>.nupkg (+ .snupkg)
+dotnet pack RVZSharp/RVZSharp.csproj -c Release
+# output: RVZSharp/bin/Release/RVZSharp.<version>.nupkg (+ .snupkg)
 ```
 
 For a deterministic release build (reproducible SourceLink paths):
 
 ```bash
-dotnet pack src/RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=true
+dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=true
 ```
 
 ## Quality gates
@@ -49,8 +49,9 @@ dotnet pack src/RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuil
    frameworks. Once the API stabilizes (before `1.0.0`), add
    `PackageValidationBaselineVersion` to diff the public API against the previous release
    (API-compat analysis) — see the roadmap.
-3. **Tests on every framework** — `dotnet test CSharp_RVZSharp.slnx -c Release` runs the
-   full suite (255 tests) on `net8.0`, `net9.0` and `net10.0`.
+3. **Tests on every framework** — `dotnet test CSharp_RVZSharp.sln -c Release` runs the
+   fast suite (313 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
+   (`dotnet test RVZSharp.Slow.Tests -c Release`) runs on machines with the games mounted.
 4. **Consumer smoke test** — before publishing, a fresh project consuming only the nupkg
    (from a local feed) must compile and run on .NET 8 and .NET 10, converting and decoding
    a disc image byte-exactly. This catches packaging mistakes (missing files, wrong
@@ -60,10 +61,10 @@ dotnet pack src/RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuil
 
 ```bash
 # 1. Build the package and the symbols package.
-dotnet pack src/RVZSharp/RVZSharp.csproj -c Release
+dotnet pack RVZSharp/RVZSharp.csproj -c Release
 
 # 2. Push (the API key comes from nuget.org → API Keys).
-dotnet nuget push src/RVZSharp/bin/Release/RVZSharp.0.1.0.nupkg \
+dotnet nuget push RVZSharp/bin/Release/RVZSharp.0.1.0.nupkg \
     --source https://api.nuget.org/v3/index.json \
     --api-key <NUGET_API_KEY>
 ```
@@ -90,7 +91,7 @@ To test the package without publishing:
 <configuration>
   <packageSources>
     <clear />
-    <add key="local" value="D:\path\to\src\RVZSharp\bin\Release" />
+    <add key="local" value="D:\path\to\RVZSharp\bin\Release" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
 </configuration>
@@ -102,11 +103,11 @@ dotnet add package RVZSharp --version 0.1.0
 
 ## The CLI
 
-The command-line tool (`src/RVZSharp.Cli`) is **not** packaged as a NuGet tool — it is a
+The command-line tool (`RVZSharp.Cli`) is **not** packaged as a NuGet tool — it is a
 reference implementation and smoke-test surface for the library. It targets `net8.0` so it
 runs on .NET 8, 9 and 10 runtimes alike:
 
 ```bash
-dotnet build CSharp_RVZSharp.slnx -c Release
-dotnet run --project src/RVZSharp.Cli -c Release -- header -i game.rvz
+dotnet build CSharp_RVZSharp.sln -c Release
+dotnet run --project RVZSharp.Cli -c Release -- header -i game.rvz
 ```

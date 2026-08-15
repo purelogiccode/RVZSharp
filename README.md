@@ -39,9 +39,9 @@ decoded bytes at any offset; `ReadFully()` decodes the entire image.
 ### CLI
 
 ```
-dotnet run --project src/RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
-dotnet run --project src/RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1]
-dotnet run --project src/RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz \
+dotnet run --project RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
+dotnet run --project RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1]
+dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz \
     [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>] [-s]
 ```
 
@@ -67,25 +67,28 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
 
 ## Project layout
 
-- `src/RVZSharp` — the library: `Format` (container structs), `Io` (big-endian reading,
-  section streams), `Compression` (codecs + `ICompressionEncoder`), `Chunks` (group decoding,
-  exception lists), `Packing` (RVZ packing + PRNG, encoder and decoder), `Wii` (hash tree +
-  region rebuild, partition extraction for the writer), `RvzReader`, `RvzWriter`.
-- `src/RVZSharp.Cli` — the `info`/`decode`/`convert` tool.
-- `tests/RVZSharp.Tests` — 351 tests (net8.0 + net9.0 + net10.0): unit (headers, tables, codecs,
-  PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of synthetic RVZ files
-  built by `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii,
-  legacy → RVZ, split WBFS, scrubbing), package-facing API tests (path open, ReadFully,
-  progress, cancellation), and a 97-test real-file suite (`RealRvzFileTests`) that decodes
-  real GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
-  Real-file tests are tagged `Category=Slow`; run only the fast subset with
-  `dotnet test --filter "Category!=Slow"` (details in [docs/testing.md](docs/testing.md)).
+- `RVZSharp` — the library: `Models` (container structs), `Interfaces` (`IBlobReader`,
+  codec contracts), `IO` (big-endian reading, section streams), `Compression` (codecs +
+  factories), `Chunks` (group decoding, exception lists), `Packing` (RVZ packing + PRNG,
+  encoder and decoder), `Wii` (hash tree + region rebuild, partition extraction for the
+  writer), `RvzReader`, `RvzWriter`. Every public and internal type and member carries XML
+  documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
+- `RVZSharp.Cli` — the `header`/`verify`/`convert` tool (DolphinTool-compatible surface,
+  plus the legacy `info`/`decode` commands).
+- `RVZSharp.Tests` — 313 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+  tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
+  synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
+  packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), package-facing API tests (path
+  open, ReadFully, progress, cancellation).
+- `RVZSharp.Slow.Tests` — 97 real-file tests (`RealRvzFileTests`) that decode real
+  GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
+  Kept out of the solution, so a plain `dotnet test` never runs them (~12 min); run
+  explicitly with `dotnet test RVZSharp.Slow.Tests` (details in [docs/testing.md](docs/testing.md)).
 
 ## Real-world validation
 
-The suite includes a real-file test class (`tests/RVZSharp.Tests/RealRvzFileTests.cs`) that
-validates the decoder and writer against actual game images on a local drive
-(`F:\Nintendo GameCube` / `F:\Nintendo Wii`). It contains:
+The slow suite validates the decoder and writer against actual game images on a local
+drive (`F:\Nintendo GameCube` / `F:\Nintendo Wii`):
 
 - **60 decode tests** — 30 full-decode SHA-1 checks (15 GameCube + 15 Wii) plus an
   expected-ISO-size check per file, each compared byte-for-byte against its official

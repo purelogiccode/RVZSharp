@@ -1,4 +1,4 @@
-using RVZSharp.Blobs;
+using RVZSharp.Interfaces;
 
 namespace RVZSharp.Wii;
 

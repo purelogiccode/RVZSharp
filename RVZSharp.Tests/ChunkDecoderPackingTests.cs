@@ -1,8 +1,9 @@
 using RVZSharp;
 using RVZSharp.Chunks;
 using RVZSharp.Compression;
-using RVZSharp.Format;
+using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
+using ChunkDecodeResult = RVZSharp.Chunks.ChunkDecodeResult;
 
 namespace RVZSharp.Tests;
 

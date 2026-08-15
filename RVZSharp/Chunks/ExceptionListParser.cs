@@ -1,3 +1,5 @@
+using RVZSharp.Models;
+
 namespace RVZSharp.Chunks;
 
 /// <summary>

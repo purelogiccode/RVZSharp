@@ -1,5 +1,5 @@
 using RVZSharp;
-using RVZSharp.Format;
+using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;

@@ -1,4 +1,6 @@
 using RVZSharp.Wii;
+using RVZSharp.Interfaces;
+using RVZSharp.Models;
 
 namespace RVZSharp.Blobs;
 

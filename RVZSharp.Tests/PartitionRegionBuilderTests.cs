@@ -1,4 +1,4 @@
-using RVZSharp.Chunks;
+using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 using RVZSharp.Wii;
 

@@ -1,7 +1,7 @@
 using ICSharpCode.SharpZipLib.BZip2;
 using RVZSharp;
 using RVZSharp.Compression;
-using RVZSharp.Format;
+using RVZSharp.Models;
 
 namespace RVZSharp.Tests;
 

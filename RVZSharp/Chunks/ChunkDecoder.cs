@@ -1,27 +1,11 @@
 using RVZSharp.Compression;
-using RVZSharp.Format;
+using RVZSharp.Interfaces;
+using RVZSharp.Models;
 using RVZSharp.IO;
 using RVZSharp.Packing;
 
 namespace RVZSharp.Chunks;
 
-/// <summary>What is needed to decode one group chunk.</summary>
-public readonly struct ChunkDecodeRequest
-{
-    public required GroupEntry Group { get; init; }
-
-    /// <summary>True for Wii partition chunks (they start with hash exception lists).</summary>
-    public required bool IsPartition { get; init; }
-
-    /// <summary>Expected payload size in bytes (chunk size, or less for the last chunk).</summary>
-    public required int ExpectedSize { get; init; }
-
-    /// <summary>
-    /// Offset of this chunk's data: disc-relative for raw data, partition-data-relative for
-    /// partitions. Used for the PRNG skip in RVZ packing.
-    /// </summary>
-    public required long DataOffset { get; init; }
-}
 
 /// <summary>The decoded content of one group chunk.</summary>
 public readonly struct ChunkDecodeResult

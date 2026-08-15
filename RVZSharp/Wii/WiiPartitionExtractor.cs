@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using RVZSharp.Chunks;
+using RVZSharp.Interfaces;
+using RVZSharp.Models;
 
 namespace RVZSharp.Wii;
 
@@ -12,11 +14,11 @@ namespace RVZSharp.Wii;
 /// </summary>
 public sealed class WiiPartitionExtractor
 {
-    private readonly Blobs.IBlobReader _input;
+    private readonly Interfaces.IBlobReader _input;
     private readonly byte[] _key;
     private readonly Aes _aes;
 
-    public WiiPartitionExtractor(Blobs.IBlobReader input, ReadOnlySpan<byte> key)
+    public WiiPartitionExtractor(Interfaces.IBlobReader input, ReadOnlySpan<byte> key)
     {
         _input = input;
         _key = key.ToArray();

@@ -1,5 +1,6 @@
 using RVZSharp.Blobs;
-using RVZSharp.Format;
+using RVZSharp.Interfaces;
+using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;

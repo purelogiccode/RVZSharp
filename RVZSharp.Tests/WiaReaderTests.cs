@@ -1,8 +1,8 @@
 using RVZSharp;
 using RVZSharp.Blobs;
-using RVZSharp.Chunks;
 using RVZSharp.Compression;
-using RVZSharp.Format;
+using RVZSharp.Interfaces;
+using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;

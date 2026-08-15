@@ -3,8 +3,11 @@ using System.Text;
 using System.Text.Json.Nodes;
 using RVZSharp;
 using RVZSharp.Blobs;
-using RVZSharp.Format;
+using RVZSharp.Interfaces;
+using RVZSharp.Models;
 using RVZSharp.Wii;
+using Serilog;
+using RVZSharp.Cli.Logging;
 
 namespace RVZSharp.Cli;
 
@@ -16,6 +19,7 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        LogSetup.Initialize();
         try
         {
             if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
@@ -37,8 +41,13 @@ internal static class Program
         }
         catch (Exception e)
         {
+            Log.Error(e, "Unhandled exception in Main");
             Console.Error.WriteLine($"Error: {e.Message}");
             return 1;
+        }
+        finally
+        {
+            LogSetup.Shutdown();
         }
     }
 
@@ -68,6 +77,7 @@ internal static class Program
 
     private static int Fail(string message)
     {
+        Log.Warning("Command failed: {Message}", message);
         Console.Error.WriteLine($"Error: {message}");
         return 1;
     }
@@ -189,242 +199,252 @@ internal static class Program
 
     private static int ConvertCommand(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
+        try
         {
-            Console.Error.WriteLine(
-                "usage: convert [options]... [FILE]...\n"
-                + "  -u, --user <dir>           user folder path (accepted for compatibility)\n"
-                + "  -i, --input <FILE>         path to disc image FILE\n"
-                + "  -o, --output <FILE>        path to the destination FILE\n"
-                + "  -f, --format <format>      container format: iso, gcz, wia, rvz\n"
-                + "  -s, --scrub                scrub junk data (not supported)\n"
-                + "  -b, --block_size <int>     block size in bytes (required for GCZ/WIA/RVZ)\n"
-                + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
-                + "  -l, --compression_level    level of compression for the selected method");
-            return args.Count == 0 ? 1 : 0;
-        }
+            if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
+            {
+                Console.Error.WriteLine(
+                    "usage: convert [options]... [FILE]...\n"
+                    + "  -u, --user <dir>           user folder path (accepted for compatibility)\n"
+                    + "  -i, --input <FILE>         path to disc image FILE\n"
+                    + "  -o, --output <FILE>        path to the destination FILE\n"
+                    + "  -f, --format <format>      container format: iso, gcz, wia, rvz\n"
+                    + "  -s, --scrub                scrub junk data (not supported)\n"
+                    + "  -b, --block_size <int>     block size in bytes (required for GCZ/WIA/RVZ)\n"
+                    + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
+                    + "  -l, --compression_level    level of compression for the selected method");
+                return args.Count == 0 ? 1 : 0;
+            }
 
-        // Legacy positional form: convert <input> <output> [options]
-        if (!args[0].StartsWith('-'))
-        {
-            if (args.Count < 2)
+            // Legacy positional form: convert <input> <output> [options]
+            if (!args[0].StartsWith('-'))
+            {
+                if (args.Count < 2)
+                {
+                    return Fail("No input set");
+                }
+
+                return ConvertLegacy(args[0], args[1], args.Skip(2).ToArray());
+            }
+
+            ParsedArgs options;
+            try
+            {
+                options = ParseArgs(args, ConvertSpec);
+            }
+            catch (CliError e)
+            {
+                Log.Warning(e, "CLI parse error in ConvertCommand");
+                return Fail(e.Message);
+            }
+
+            if (!options.IsSet("input"))
             {
                 return Fail("No input set");
             }
 
-            return ConvertLegacy(args[0], args[1], args.Skip(2).ToArray());
-        }
-
-        ParsedArgs options;
-        try
-        {
-            options = ParseArgs(args, ConvertSpec);
-        }
-        catch (CliError e)
-        {
-            return Fail(e.Message);
-        }
-
-        if (!options.IsSet("input"))
-        {
-            return Fail("No input set");
-        }
-
-        if (!options.IsSet("output"))
-        {
-            return Fail("No output set");
-        }
-
-        var format = options.Get("format");
-        if (format is not ("iso" or "gcz" or "wia" or "rvz"))
-        {
-            return Fail("No output format set");
-        }
-
-        var inputPath = options.Get("input")!;
-        var outputPath = options.Get("output")!;
-
-        IBlobReader blob;
-        try
-        {
-            var file = File.OpenRead(inputPath);
-            blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
-        {
-            return Fail("The input file could not be opened.");
-        }
-
-        using (blob)
-        {
-            var input = (IBlobReader)blob;
-            if (format is "gcz" or "wia")
+            if (!options.IsSet("output"))
             {
-                return Fail(
-                    $"Converting to {format.ToUpperInvariant()} is not supported by this implementation (supported: iso, rvz).");
+                return Fail("No output set");
             }
 
-            if (options.HasFlag("scrub"))
+            var format = options.Get("format");
+            if (format is not ("iso" or "gcz" or "wia" or "rvz"))
             {
-                // Dolphin scrubs the input before converting (ConvertCommand.cpp:170-197).
-                // Without a filesystem (FST) parser, scrubbing zeroes the data of non-game
-                // Wii partitions (update/channel) — the safe subset of DiscScrubber.
-                var scrubbed = ScrubbedBlob.Create(blob);
-                if (scrubbed == null)
+                return Fail("No output format set");
+            }
+
+            var inputPath = options.Get("input")!;
+            var outputPath = options.Get("output")!;
+
+            IBlobReader blob;
+            try
+            {
+                var file = File.OpenRead(inputPath);
+                blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
+            {
+                Log.Error(e, "Failed to open input file '{InputPath}'", inputPath);
+                return Fail("The input file could not be opened.");
+            }
+
+            using (blob)
+            {
+                var input = (IBlobReader)blob;
+                if (format is "gcz" or "wia")
                 {
-                    return Fail("Unable to process disc image. Try again without --scrub.");
+                    return Fail(
+                        $"Converting to {format.ToUpperInvariant()} is not supported by this implementation (supported: iso, rvz).");
                 }
 
-                input = scrubbed;
+                if (options.HasFlag("scrub"))
+                {
+                    var scrubbed = ScrubbedBlob.Create(blob);
+                    if (scrubbed == null)
+                    {
+                        return Fail("Unable to process disc image. Try again without --scrub.");
+                    }
+
+                    input = scrubbed;
+                    if (format == "rvz")
+                    {
+                        Console.Error.WriteLine(
+                            "Warning: Scrubbing an RVZ container does not offer significant space "
+                            + "advantages. Continuing anyway.");
+                    }
+                    else if (format == "iso")
+                    {
+                        Console.Error.WriteLine(
+                            "Warning: Scrubbing does not save space when converting to ISO unless "
+                            + "using external compression. Continuing anyway.");
+                    }
+                }
+
+                var blockSize = 0;
+                if (format is "gcz" or "wia" or "rvz")
+                {
+                    var blockSizeArg = options.IsSet("block_size")
+                        ? options.Get("block_size")
+                        : options.Get("chunk-size");
+                    if (blockSizeArg == null || !int.TryParse(blockSizeArg, out blockSize))
+                    {
+                        return Fail("Block size must be set for GCZ/RVZ/WIA");
+                    }
+
+                    if (!IsDiscImageBlockSizeValid(blockSize, format))
+                    {
+                        return Fail("Block size is not valid for this format");
+                    }
+
+                    if (blockSize < 0x8000 || blockSize > 0x200000)
+                    {
+                        Console.Error.WriteLine(
+                            "Warning: Block size is not ideal for performance. Continuing anyway.");
+                    }
+                }
+
+                var compression = CompressionType.Zstd;
+                var level = 0;
+                var packing = true;
                 if (format == "rvz")
                 {
-                    Console.Error.WriteLine(
-                        "Warning: Scrubbing an RVZ container does not offer significant space "
-                        + "advantages. Continuing anyway.");
-                }
-                else if (format == "iso")
-                {
-                    Console.Error.WriteLine(
-                        "Warning: Scrubbing does not save space when converting to ISO unless "
-                        + "using external compression. Continuing anyway.");
-                }
-            }
-
-            // --block_size
-            var blockSize = 0;
-            if (format is "gcz" or "wia" or "rvz")
-            {
-                var blockSizeArg = options.IsSet("block_size")
-                    ? options.Get("block_size")
-                    : options.Get("chunk-size"); // RVZSharp extension: alias for -b (bytes)
-                if (blockSizeArg == null || !int.TryParse(blockSizeArg, out blockSize))
-                {
-                    return Fail("Block size must be set for GCZ/RVZ/WIA");
-                }
-
-                if (!IsDiscImageBlockSizeValid(blockSize, format))
-                {
-                    return Fail("Block size is not valid for this format");
-                }
-
-                if (blockSize < 0x8000 || blockSize > 0x200000)
-                {
-                    Console.Error.WriteLine(
-                        "Warning: Block size is not ideal for performance. Continuing anyway.");
-                }
-            }
-
-            // --compression / --compression_level
-            var compression = CompressionType.Zstd;
-            var level = 0;
-            var packing = true;
-            if (format == "rvz")
-            {
-                var compressionName = options.Get("compression");
-                if (compressionName is null)
-                {
-                    return Fail("Compression method must be set for WIA or RVZ");
-                }
-
-                compression = ParseCompression(compressionName);
-                if (compression == CompressionType.Purge)
-                {
-                    return Fail("Compression type is not supported for the container format");
-                }
-
-                if (compression == CompressionType.None)
-                {
-                    level = 0;
-                }
-                else
-                {
-                    if (!options.IsSet("compression_level") ||
-                        !int.TryParse(options.Get("compression_level"), out level))
+                    var compressionName = options.Get("compression");
+                    if (compressionName is null)
                     {
-                        return Fail("Compression level must be set when compression type is not 'none'");
+                        return Fail("Compression method must be set for WIA or RVZ");
                     }
 
-                    var (min, max) = GetAllowedCompressionLevels(compression);
-                    if (level < min || level > max)
+                    compression = ParseCompression(compressionName);
+                    if (compression == CompressionType.Purge)
                     {
-                        return Fail("Compression level not in acceptable range");
+                        return Fail("Compression type is not supported for the container format");
+                    }
+
+                    if (compression == CompressionType.None)
+                    {
+                        level = 0;
+                    }
+                    else
+                    {
+                        if (!options.IsSet("compression_level") ||
+                            !int.TryParse(options.Get("compression_level"), out level))
+                        {
+                            return Fail("Compression level must be set when compression type is not 'none'");
+                        }
+
+                        var (min, max) = GetAllowedCompressionLevels(compression);
+                        if (level < min || level > max)
+                        {
+                            return Fail("Compression level not in acceptable range");
+                        }
+                    }
+
+                    if (options.IsSet("no-packing"))
+                    {
+                        packing = false;
                     }
                 }
 
-                if (options.IsSet("no-packing"))
+                if (format == "iso")
                 {
-                    packing = false;
+                    return DecodeBlob(input, outputPath, expectedSha1: null);
                 }
+
+                var writeOptions = new RvzWriteOptions
+                {
+                    Compression = compression,
+                    CompressionLevel = level,
+                    ChunkSize = blockSize,
+                    Packing = packing,
+                };
+
+                using var output = File.Create(outputPath);
+                RvzWriter.Write(input, output, writeOptions);
+                return 0;
             }
-
-            if (format == "iso")
-            {
-                return DecodeBlob(input, outputPath, expectedSha1: null);
-            }
-
-            var writeOptions = new RvzWriteOptions
-            {
-                Compression = compression,
-                CompressionLevel = level,
-                ChunkSize = blockSize,
-                Packing = packing,
-            };
-
-            using var output = File.Create(outputPath);
-            RvzWriter.Write(input, output, writeOptions);
-            return 0;
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Convert command failed");
+            return Fail(e.Message);
         }
     }
 
     /// <summary>Legacy positional convert: rvzsharp convert &lt;in&gt; &lt;out&gt; [options].</summary>
     private static int ConvertLegacy(string inputPath, string outputPath, IReadOnlyList<string> args)
     {
-        // Dolphin-style suggested defaults (level 5, 131072-byte chunks); -b/-c/-l are not
-        // required in this legacy form, but provided values are validated like the flag form.
-        var options = new RvzWriteOptions { CompressionLevel = 5, ChunkSize = 131072 };
-        for (var i = 0; i < args.Count; i++)
+        try
         {
-            switch (args[i])
+            var options = new RvzWriteOptions { CompressionLevel = 5, ChunkSize = 131072 };
+            for (var i = 0; i < args.Count; i++)
             {
-                case "--compression" when i + 1 < args.Count:
-                    options = options with { Compression = ParseCompression(args[++i]) };
-                    break;
-                case "--level" when i + 1 < args.Count:
-                    options = options with { CompressionLevel = int.Parse(args[++i]) };
-                    break;
-                // Bytes, like -b (--chunk-size used to be KiB).
-                case "--chunk-size" when i + 1 < args.Count:
-                    options = options with { ChunkSize = int.Parse(args[++i]) };
-                    break;
-                case "--no-packing":
-                    options = options with { Packing = false };
-                    break;
+                switch (args[i])
+                {
+                    case "--compression" when i + 1 < args.Count:
+                        options = options with { Compression = ParseCompression(args[++i]) };
+                        break;
+                    case "--level" when i + 1 < args.Count:
+                        options = options with { CompressionLevel = int.Parse(args[++i]) };
+                        break;
+                    case "--chunk-size" when i + 1 < args.Count:
+                        options = options with { ChunkSize = int.Parse(args[++i]) };
+                        break;
+                    case "--no-packing":
+                        options = options with { Packing = false };
+                        break;
+                }
             }
-        }
 
-        if (options.Compression == CompressionType.Purge)
+            if (options.Compression == CompressionType.Purge)
+            {
+                return Fail("PURGE compression is not supported for RVZ files.");
+            }
+
+            var (min, max) = GetAllowedCompressionLevels(options.Compression);
+            if (options.CompressionLevel < min || options.CompressionLevel > max)
+            {
+                return Fail("Compression level not in acceptable range");
+            }
+
+            if (options.ChunkSize < 0x8000 ||
+                (options.ChunkSize < (int)WiaDisc.GroupSize && (options.ChunkSize & (options.ChunkSize - 1)) != 0) ||
+                (options.ChunkSize > (int)WiaDisc.GroupSize && options.ChunkSize % (int)WiaDisc.GroupSize != 0))
+            {
+                return Fail("Block size is not valid for this format");
+            }
+
+            using var input = File.OpenRead(inputPath);
+            using var blob = Blob.Open(input, filePath: inputPath, leaveOpen: true);
+            using var output = File.Create(outputPath);
+            RvzWriter.Write(blob, output, options);
+            return 0;
+        }
+        catch (Exception e)
         {
-            return Fail("PURGE compression is not supported for RVZ files.");
+            Log.Error(e, "ConvertLegacy command failed");
+            return Fail(e.Message);
         }
-
-        var (min, max) = GetAllowedCompressionLevels(options.Compression);
-        if (options.CompressionLevel < min || options.CompressionLevel > max)
-        {
-            return Fail("Compression level not in acceptable range");
-        }
-
-        if (options.ChunkSize < 0x8000 ||
-            (options.ChunkSize < (int)WiaDisc.GroupSize && (options.ChunkSize & (options.ChunkSize - 1)) != 0) ||
-            (options.ChunkSize > (int)WiaDisc.GroupSize && options.ChunkSize % (int)WiaDisc.GroupSize != 0))
-        {
-            return Fail("Block size is not valid for this format");
-        }
-
-        using var input = File.OpenRead(inputPath);
-        using var blob = Blob.Open(input, filePath: inputPath, leaveOpen: true);
-        using var output = File.Create(outputPath);
-        RvzWriter.Write(blob, output, options);
-        return 0;
     }
 
     private static bool IsDiscImageBlockSizeValid(int blockSize, string format) => format switch
@@ -479,149 +499,158 @@ internal static class Program
 
     private static int HeaderCommand(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
-        {
-            Console.Error.WriteLine(
-                "usage: header [options]...\n"
-                + "  -i, --input <FILE>   path to disc image FILE\n"
-                + "  -j, --json           print the information as JSON\n"
-                + "  -b, --block_size     print the block size of GCZ/WIA/RVZ formats\n"
-                + "  -c, --compression    print the compression method of GCZ/WIA/RVZ formats\n"
-                + "  -l, --compression_level  print the level of compression for WIA/RVZ formats");
-            return args.Count == 0 ? 1 : 0;
-        }
-
-        ParsedArgs options;
         try
         {
-            options = ParseArgs(args, HeaderSpec);
-        }
-        catch (CliError e)
-        {
-            return Fail(e.Message);
-        }
-
-        var inputPath = options.Get("input");
-        if (string.IsNullOrEmpty(inputPath))
-        {
-            return Fail("No input set");
-        }
-
-        IBlobReader blob;
-        try
-        {
-            var file = File.OpenRead(inputPath);
-            blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
-        {
-            return Fail("Unable to open disc image");
-        }
-
-        using (blob)
-        {
-            var volume = DiscVolumeInfo.TryRead(blob);
-
-            var blockSize = blob.BlockSize;
-            var compressionMethod = GetCompressionMethod(blob);
-            var compressionLevel = GetCompressionLevel(blob);
-
-            if (options.HasFlag("json"))
+            if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
             {
-                var json = new JsonObject();
+                Console.Error.WriteLine(
+                    "usage: header [options]...\n"
+                    + "  -i, --input <FILE>   path to disc image FILE\n"
+                    + "  -j, --json           print the information as JSON\n"
+                    + "  -b, --block_size     print the block size of GCZ/WIA/RVZ formats\n"
+                    + "  -c, --compression    print the compression method of GCZ/WIA/RVZ formats\n"
+                    + "  -l, --compression_level  print the level of compression for WIA/RVZ formats");
+                return args.Count == 0 ? 1 : 0;
+            }
+
+            ParsedArgs options;
+            try
+            {
+                options = ParseArgs(args, HeaderSpec);
+            }
+            catch (CliError e)
+            {
+                Log.Warning(e, "CLI parse error in HeaderCommand");
+                return Fail(e.Message);
+            }
+
+            var inputPath = options.Get("input");
+            if (string.IsNullOrEmpty(inputPath))
+            {
+                return Fail("No input set");
+            }
+
+            IBlobReader blob;
+            try
+            {
+                var file = File.OpenRead(inputPath);
+                blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
+            {
+                Log.Error(e, "Failed to open input file '{InputPath}'", inputPath);
+                return Fail("Unable to open disc image");
+            }
+
+            using (blob)
+            {
+                var volume = DiscVolumeInfo.TryRead(blob);
+
+                var blockSize = blob.BlockSize;
+                var compressionMethod = GetCompressionMethod(blob);
+                var compressionLevel = GetCompressionLevel(blob);
+
+                if (options.HasFlag("json"))
+                {
+                    var json = new JsonObject();
+                    if (blockSize != 0)
+                    {
+                        json["block_size"] = blockSize;
+                    }
+
+                    if (compressionMethod.Length > 0)
+                    {
+                        json["compression_method"] = compressionMethod;
+                    }
+
+                    if (compressionLevel is not null)
+                    {
+                        json["compression_level"] = compressionLevel;
+                    }
+
+                    if (volume is not null)
+                    {
+                        json["internal_name"] = volume.InternalName;
+                        if (volume.Revision is not null)
+                        {
+                            json["revision"] = volume.Revision.Value;
+                        }
+
+                        json["game_id"] = volume.GameId;
+                        if (volume.TitleId is not null)
+                        {
+                            json["title_id"] = volume.TitleId.Value;
+                        }
+
+                        json["region"] = volume.Region;
+                        json["country"] = volume.Country;
+                    }
+
+                    Console.WriteLine(json.ToJsonString());
+                    return 0;
+                }
+
+                if (options.HasFlag("block_size") || options.HasFlag("compression") ||
+                    options.HasFlag("compression_level"))
+                {
+                    if (options.HasFlag("block_size"))
+                    {
+                        Console.WriteLine(blockSize == 0 ? "N/A" : blockSize.ToString());
+                    }
+
+                    if (options.HasFlag("compression"))
+                    {
+                        Console.WriteLine(compressionMethod.Length == 0 ? "N/A" : compressionMethod);
+                    }
+
+                    if (options.HasFlag("compression_level"))
+                    {
+                        Console.WriteLine(compressionLevel?.ToString() ?? "N/A");
+                    }
+
+                    return 0;
+                }
+
                 if (blockSize != 0)
                 {
-                    json["block_size"] = blockSize;
+                    Console.WriteLine($"Block Size: {blockSize}");
                 }
 
                 if (compressionMethod.Length > 0)
                 {
-                    json["compression_method"] = compressionMethod;
+                    Console.WriteLine($"Compression Method: {compressionMethod}");
                 }
 
                 if (compressionLevel is not null)
                 {
-                    json["compression_level"] = compressionLevel;
+                    Console.WriteLine($"Compression Level: {compressionLevel}");
                 }
 
                 if (volume is not null)
                 {
-                    json["internal_name"] = volume.InternalName;
+                    Console.WriteLine($"Internal Name: {volume.InternalName}");
                     if (volume.Revision is not null)
                     {
-                        json["revision"] = volume.Revision.Value;
+                        Console.WriteLine($"Revision: {volume.Revision}");
                     }
 
-                    json["game_id"] = volume.GameId;
+                    Console.WriteLine($"Game ID: {volume.GameId}");
                     if (volume.TitleId is not null)
                     {
-                        json["title_id"] = volume.TitleId.Value;
+                        Console.WriteLine($"Title ID: {volume.TitleId:X16}");
                     }
 
-                    json["region"] = volume.Region;
-                    json["country"] = volume.Country;
-                }
-
-                Console.WriteLine(json.ToJsonString());
-                return 0;
-            }
-
-            if (options.HasFlag("block_size") || options.HasFlag("compression") ||
-                options.HasFlag("compression_level"))
-            {
-                if (options.HasFlag("block_size"))
-                {
-                    Console.WriteLine(blockSize == 0 ? "N/A" : blockSize.ToString());
-                }
-
-                if (options.HasFlag("compression"))
-                {
-                    Console.WriteLine(compressionMethod.Length == 0 ? "N/A" : compressionMethod);
-                }
-
-                if (options.HasFlag("compression_level"))
-                {
-                    Console.WriteLine(compressionLevel?.ToString() ?? "N/A");
+                    Console.WriteLine($"Region: {volume.Region}");
+                    Console.WriteLine($"Country: {volume.Country}");
                 }
 
                 return 0;
             }
-
-            // Full report.
-            if (blockSize != 0)
-            {
-                Console.WriteLine($"Block Size: {blockSize}");
-            }
-
-            if (compressionMethod.Length > 0)
-            {
-                Console.WriteLine($"Compression Method: {compressionMethod}");
-            }
-
-            if (compressionLevel is not null)
-            {
-                Console.WriteLine($"Compression Level: {compressionLevel}");
-            }
-
-            if (volume is not null)
-            {
-                Console.WriteLine($"Internal Name: {volume.InternalName}");
-                if (volume.Revision is not null)
-                {
-                    Console.WriteLine($"Revision: {volume.Revision}");
-                }
-
-                Console.WriteLine($"Game ID: {volume.GameId}");
-                if (volume.TitleId is not null)
-                {
-                    Console.WriteLine($"Title ID: {volume.TitleId:X16}");
-                }
-
-                Console.WriteLine($"Region: {volume.Region}");
-                Console.WriteLine($"Country: {volume.Country}");
-            }
-
-            return 0;
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Header command failed");
+            return Fail(e.Message);
         }
     }
 
@@ -662,112 +691,119 @@ internal static class Program
 
     private static int VerifyCommand(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
-        {
-            Console.Error.WriteLine(
-                "usage: verify [options]...\n"
-                + "  -u, --user <dir>           user folder path (accepted for compatibility)\n"
-                + "  -i, --input <FILE>         path to input file\n"
-                + "  -a, --algorithm <algo>     compute one digest: crc32, md5, sha1");
-            return args.Count == 0 ? 1 : 0;
-        }
-
-        ParsedArgs options;
         try
         {
-            options = ParseArgs(args, VerifySpec);
-        }
-        catch (CliError e)
-        {
-            return Fail(e.Message);
-        }
-
-        if (!options.IsSet("input"))
-        {
-            return Fail("No input set");
-        }
-
-        var algorithm = options.Get("algorithm");
-
-        var inputPath = options.Get("input")!;
-        IBlobReader blob;
-        try
-        {
-            var file = File.OpenRead(inputPath);
-            blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
-        {
-            return Fail("Unable to open input file");
-        }
-
-        using (blob)
-        {
-            // Dolphin's verify requires a GC/Wii volume (VerifyCommand.cpp:148-154): check
-            // the disc magic (GC DVD magic at 0x1C, Wii magic at 0x18) so non-disc blobs
-            // fail like Dolphin.
-            Span<byte> discHeader = stackalloc byte[0x80];
-            if (blob.ReadAt(0, discHeader) != discHeader.Length)
+            if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
             {
-                return Fail("The input file is not a GC/Wii disc.");
+                Console.Error.WriteLine(
+                    "usage: verify [options]...\n"
+                    + "  -u, --user <dir>           user folder path (accepted for compatibility)\n"
+                    + "  -i, --input <FILE>         path to input file\n"
+                    + "  -a, --algorithm <algo>     compute one digest: crc32, md5, sha1");
+                return args.Count == 0 ? 1 : 0;
             }
 
-            var wiiMagic = (uint)((discHeader[0x18] << 24) | (discHeader[0x19] << 16) |
-                                  (discHeader[0x1A] << 8) | discHeader[0x1B]);
-            var gcMagic = (uint)((discHeader[0x1C] << 24) | (discHeader[0x1D] << 16) |
-                                 (discHeader[0x1E] << 8) | discHeader[0x1F]);
-            if (wiiMagic != WiiVolume.WII_MAGIC && gcMagic != WiiVolume.GC_MAGIC)
+            ParsedArgs options;
+            try
             {
-                return Fail("The input file is not a GC/Wii disc.");
+                options = ParseArgs(args, VerifySpec);
+            }
+            catch (CliError e)
+            {
+                Log.Warning(e, "CLI parse error in VerifyCommand");
+                return Fail(e.Message);
             }
 
-            var wantCrc32 = algorithm is null || algorithm == "crc32";
-            var wantMd5 = algorithm is null || algorithm == "md5";
-            var wantSha1 = algorithm is null || algorithm == "sha1";
-
-            uint crc = 0xFFFFFFFF;
-            var md5 = wantMd5 ? MD5.Create() : null;
-            var sha1 = wantSha1 ? SHA1.Create() : null;
-
-            var buffer = new byte[1 << 20];
-            var position = 0L;
-            while (position < blob.Length)
+            if (!options.IsSet("input"))
             {
-                var read = blob.ReadAt(position, buffer);
-                if (read <= 0)
+                return Fail("No input set");
+            }
+
+            var algorithm = options.Get("algorithm");
+
+            var inputPath = options.Get("input")!;
+            IBlobReader blob;
+            try
+            {
+                var file = File.OpenRead(inputPath);
+                blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
+            {
+                Log.Error(e, "Failed to open input file '{InputPath}'", inputPath);
+                return Fail("Unable to open input file");
+            }
+
+            using (blob)
+            {
+                Span<byte> discHeader = stackalloc byte[0x80];
+                if (blob.ReadAt(0, discHeader) != discHeader.Length)
                 {
-                    return Fail($"Verification stopped at offset 0x{position:X}.");
+                    return Fail("The input file is not a GC/Wii disc.");
                 }
 
-                if (wantCrc32)
+                var wiiMagic = (uint)((discHeader[0x18] << 24) | (discHeader[0x19] << 16) |
+                                      (discHeader[0x1A] << 8) | discHeader[0x1B]);
+                var gcMagic = (uint)((discHeader[0x1C] << 24) | (discHeader[0x1D] << 16) |
+                                     (discHeader[0x1E] << 8) | discHeader[0x1F]);
+                if (wiiMagic != WiiVolume.WII_MAGIC && gcMagic != WiiVolume.GC_MAGIC)
                 {
-                    crc = Crc32.Update(crc, buffer.AsSpan(0, read));
+                    return Fail("The input file is not a GC/Wii disc.");
                 }
 
-                md5?.TransformBlock(buffer, 0, read, null, 0);
-                sha1?.TransformBlock(buffer, 0, read, null, 0);
-                position += read;
-            }
+                var wantCrc32 = algorithm is null || algorithm == "crc32";
+                var wantMd5 = algorithm is null || algorithm == "md5";
+                var wantSha1 = algorithm is null || algorithm == "sha1";
 
-            md5?.TransformFinalBlock([], 0, 0);
-            sha1?.TransformFinalBlock([], 0, 0);
-            crc ^= 0xFFFFFFFF;
+                uint crc = 0xFFFFFFFF;
+                var md5 = wantMd5 ? MD5.Create() : null;
+                var sha1 = wantSha1 ? SHA1.Create() : null;
 
-            if (algorithm is not null)
-            {
-                Console.WriteLine(algorithm switch
+                var buffer = new byte[1 << 20];
+                var position = 0L;
+                while (position < blob.Length)
                 {
-                    "crc32" => crc.ToString("x8"),
-                    "md5" => ToLowerHex(md5!.Hash!),
-                    _ => ToLowerHex(sha1!.Hash!),
-                });
+                    var read = blob.ReadAt(position, buffer);
+                    if (read <= 0)
+                    {
+                        return Fail($"Verification stopped at offset 0x{position:X}.");
+                    }
+
+                    if (wantCrc32)
+                    {
+                        crc = Crc32.Update(crc, buffer.AsSpan(0, read));
+                    }
+
+                    md5?.TransformBlock(buffer, 0, read, null, 0);
+                    sha1?.TransformBlock(buffer, 0, read, null, 0);
+                    position += read;
+                }
+
+                md5?.TransformFinalBlock([], 0, 0);
+                sha1?.TransformFinalBlock([], 0, 0);
+                crc ^= 0xFFFFFFFF;
+
+                if (algorithm is not null)
+                {
+                    Console.WriteLine(algorithm switch
+                    {
+                        "crc32" => crc.ToString("x8"),
+                        "md5" => ToLowerHex(md5!.Hash!),
+                        _ => ToLowerHex(sha1!.Hash!),
+                    });
+                    return 0;
+                }
+
+                Console.WriteLine($"CRC32: {crc:x8}");
+                Console.WriteLine($"MD5: {ToLowerHex(md5!.Hash!)}");
+                Console.WriteLine($"SHA1: {ToLowerHex(sha1!.Hash!)}");
                 return 0;
             }
-
-            Console.WriteLine($"CRC32: {crc:x8}");
-            Console.WriteLine($"MD5: {ToLowerHex(md5!.Hash!)}");
-            Console.WriteLine($"SHA1: {ToLowerHex(sha1!.Hash!)}");
-            return 0;
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Verify command failed");
+            return Fail(e.Message);
         }
     }
 
@@ -823,36 +859,45 @@ internal static class Program
 
     private static int ExtractCommand(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
-        {
-            Console.Error.WriteLine(
-                "usage: extract [options]...\n"
-                + "  -i, --input <FILE>     path to disc image FILE\n"
-                + "  -o, --output <dir>     output directory\n"
-                + "  -p, --partition <name> extract only this partition\n"
-                + "  -s, --single <path>    extract a single file\n"
-                + "  -l, --list            list the files under this path\n"
-                + "  -q, --quiet            do not print progress\n"
-                + "  -g, --gameonly         only extract the main game partition");
-            return args.Count == 0 ? 1 : 0;
-        }
-
-        ParsedArgs options;
         try
         {
-            options = ParseArgs(args, ExtractSpec);
+            if (args.Count == 0 || args.Any(a => a is "-h" or "--help"))
+            {
+                Console.Error.WriteLine(
+                    "usage: extract [options]...\n"
+                    + "  -i, --input <FILE>     path to disc image FILE\n"
+                    + "  -o, --output <dir>     output directory\n"
+                    + "  -p, --partition <name> extract only this partition\n"
+                    + "  -s, --single <path>    extract a single file\n"
+                    + "  -l, --list            list the files under this path\n"
+                    + "  -q, --quiet            do not print progress\n"
+                    + "  -g, --gameonly         only extract the main game partition");
+                return args.Count == 0 ? 1 : 0;
+            }
+
+            ParsedArgs options;
+            try
+            {
+                options = ParseArgs(args, ExtractSpec);
+            }
+            catch (CliError e)
+            {
+                Log.Warning(e, "CLI parse error in ExtractCommand");
+                return Fail(e.Message);
+            }
+
+            if (!options.IsSet("input"))
+            {
+                return Fail("No input set");
+            }
+
+            return Fail("The extract command is not supported by this implementation (no disc filesystem support yet).");
         }
-        catch (CliError e)
+        catch (Exception e)
         {
+            Log.Error(e, "Extract command failed");
             return Fail(e.Message);
         }
-
-        if (!options.IsSet("input"))
-        {
-            return Fail("No input set");
-        }
-
-        return Fail("The extract command is not supported by this implementation (no disc filesystem support yet).");
     }
 
     // ------------------------------------------------------------------
@@ -971,9 +1016,9 @@ internal static class Program
                     }
                 }
             }
-            catch (RvzException)
+            catch (RvzException ex)
             {
-                // Unreadable partition table — no title ID.
+                Log.Warning(ex, "Failed to read title ID from partition");
             }
 
             return null;
@@ -1143,107 +1188,134 @@ internal static class Program
 
     private static int Info(string path)
     {
-        using var file = File.OpenRead(path);
-        using var reader = Blob.Open(file, filePath: path, leaveOpen: true);
-
-        Console.WriteLine($"file:            {path}");
-        Console.WriteLine($"format:          {Blob.GetName(reader.Type)}");
-        Console.WriteLine($"iso size:        {reader.Length} bytes (0x{reader.Length:X})");
-
-        if (reader is RvzReader rvz)
+        try
         {
-            Console.WriteLine($"version:         {WiaFileHead.FormatVersion(rvz.FileHead.Version)}");
-            Console.WriteLine($"disc type:       {rvz.Disc.DiscType} ({(uint)rvz.Disc.DiscType})");
-            Console.WriteLine($"compression:     {rvz.Disc.Compression} (level {rvz.Disc.ComprLevel})");
-            Console.WriteLine($"chunk size:      0x{rvz.Disc.ChunkSize:X}");
-            Console.WriteLine($"partitions:      {rvz.Partitions.Length}");
-            Console.WriteLine($"raw data areas:  {rvz.RawDataEntries.Length}");
-            Console.WriteLine($"groups:          {rvz.GroupEntries.Length}");
+            using var file = File.OpenRead(path);
+            using var reader = Blob.Open(file, filePath: path, leaveOpen: true);
 
-            foreach (var part in rvz.Partitions)
+            Console.WriteLine($"file:            {path}");
+            Console.WriteLine($"format:          {Blob.GetName(reader.Type)}");
+            Console.WriteLine($"iso size:        {reader.Length} bytes (0x{reader.Length:X})");
+
+            if (reader is RvzReader rvz)
             {
-                for (var s = 0; s < 2; s++)
-                {
-                    var pd = part.Data[s];
-                    if (pd.NumSectors == 0)
-                    {
-                        continue;
-                    }
+                Console.WriteLine($"version:         {WiaFileHead.FormatVersion(rvz.FileHead.Version)}");
+                Console.WriteLine($"disc type:       {rvz.Disc.DiscType} ({(uint)rvz.Disc.DiscType})");
+                Console.WriteLine($"compression:     {rvz.Disc.Compression} (level {rvz.Disc.ComprLevel})");
+                Console.WriteLine($"chunk size:      0x{rvz.Disc.ChunkSize:X}");
+                Console.WriteLine($"partitions:      {rvz.Partitions.Length}");
+                Console.WriteLine($"raw data areas:  {rvz.RawDataEntries.Length}");
+                Console.WriteLine($"groups:          {rvz.GroupEntries.Length}");
 
-                    Console.WriteLine($"  partition @ sector {pd.FirstSector}: {pd.NumSectors} sectors, "
-                        + $"{pd.NumGroups} groups (key {Convert.ToHexString(part.Key)})");
+                foreach (var part in rvz.Partitions)
+                {
+                    for (var s = 0; s < 2; s++)
+                    {
+                        var pd = part.Data[s];
+                        if (pd.NumSectors == 0)
+                        {
+                            continue;
+                        }
+
+                        Console.WriteLine($"  partition @ sector {pd.FirstSector}: {pd.NumSectors} sectors, "
+                            + $"{pd.NumGroups} groups (key {Convert.ToHexString(part.Key)})");
+                    }
+                }
+
+                foreach (var raw in rvz.RawDataEntries)
+                {
+                    Console.WriteLine($"  raw data @ 0x{raw.RawDataOffset:X}: 0x{raw.RawDataSize:X} bytes, "
+                        + $"{raw.NumGroups} groups");
                 }
             }
-
-            foreach (var raw in rvz.RawDataEntries)
+            else if (reader is GczBlob gcz)
             {
-                Console.WriteLine($"  raw data @ 0x{raw.RawDataOffset:X}: 0x{raw.RawDataSize:X} bytes, "
-                    + $"{raw.NumGroups} groups");
+                Console.WriteLine($"block size:      0x{gcz.BlockSize:X}");
+                Console.WriteLine($"blocks:          {gcz.NumBlocks}");
+                Console.WriteLine($"compression:     Deflate");
             }
-        }
-        else if (reader is GczBlob gcz)
-        {
-            Console.WriteLine($"block size:      0x{gcz.BlockSize:X}");
-            Console.WriteLine($"blocks:          {gcz.NumBlocks}");
-            Console.WriteLine($"compression:     Deflate");
-        }
-        else if (reader.BlockSize != 0)
-        {
-            Console.WriteLine($"block size:      0x{reader.BlockSize:X}");
-        }
+            else if (reader.BlockSize != 0)
+            {
+                Console.WriteLine($"block size:      0x{reader.BlockSize:X}");
+            }
 
-        return 0;
+            return 0;
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Info command failed for path '{Path}'", path);
+            Console.Error.WriteLine($"Error: {e.Message}");
+            return 1 ;
+        }
     }
 
     private static int Decode(string inputPath, string outputPath, IReadOnlyList<string> args)
     {
-        string? expectedSha1 = null;
-        for (var i = 0; i < args.Count - 1; i++)
+        try
         {
-            if (args[i] == "--sha1")
+            string? expectedSha1 = null;
+            for (var i = 0; i < args.Count - 1; i++)
             {
-                expectedSha1 = args[i + 1];
+                if (args[i] == "--sha1")
+                {
+                    expectedSha1 = args[i + 1];
+                }
             }
-        }
 
-        using var input = File.OpenRead(inputPath);
-        using var reader = Blob.Open(input, filePath: inputPath, leaveOpen: true);
-        return DecodeBlob(reader, outputPath, expectedSha1);
+            using var input = File.OpenRead(inputPath);
+            using var reader = Blob.Open(input, filePath: inputPath, leaveOpen: true);
+            return DecodeBlob(reader, outputPath, expectedSha1);
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Decode command failed");
+            Console.Error.WriteLine($"Error: {e.Message}");
+            return 1 ;
+        }
     }
 
     private static int DecodeBlob(IBlobReader reader, string outputPath, string? expectedSha1)
     {
-        using var output = File.Create(outputPath);
-        using var sha1 = SHA1.Create();
-
-        var buffer = new byte[1 << 20];
-        var position = 0L;
-        while (position < reader.Length)
+        try
         {
-            var read = reader.ReadAt(position, buffer);
-            if (read <= 0)
+            using var output = File.Create(outputPath);
+            using var sha1 = SHA1.Create();
+
+            var buffer = new byte[1 << 20];
+            var position = 0L;
+            while (position < reader.Length)
             {
-                throw new RvzFormatException($"Decoding stopped at offset 0x{position:X}.");
+                var read = reader.ReadAt(position, buffer);
+                if (read <= 0)
+                {
+                    throw new RvzFormatException($"Decoding stopped at offset 0x{position:X}.");
+                }
+
+                output.Write(buffer, 0, read);
+                sha1.TransformBlock(buffer, 0, read, null, 0);
+                position += read;
             }
 
-            output.Write(buffer, 0, read);
-            sha1.TransformBlock(buffer, 0, read, null, 0);
-            position += read;
-        }
-
-        if (expectedSha1 != null)
-        {
-            sha1.TransformFinalBlock([], 0, 0);
-            var actual = Convert.ToHexString(sha1.Hash!).ToLowerInvariant();
-            Console.WriteLine($"sha1: {actual}");
-            if (!string.Equals(actual, expectedSha1.Trim().ToLowerInvariant(), StringComparison.Ordinal))
+            if (expectedSha1 != null)
             {
-                Console.Error.WriteLine($"error: SHA-1 mismatch (expected {expectedSha1}).");
-                return 1;
+                sha1.TransformFinalBlock([], 0, 0);
+                var actual = Convert.ToHexString(sha1.Hash!).ToLowerInvariant();
+                Console.WriteLine($"sha1: {actual}");
+                if (!string.Equals(actual, expectedSha1.Trim().ToLowerInvariant(), StringComparison.Ordinal))
+                {
+                    Console.Error.WriteLine($"error: SHA-1 mismatch (expected {expectedSha1}).");
+                    return 1;
+                }
             }
-        }
 
-        Console.WriteLine($"decoded {reader.Length} bytes to {outputPath}");
-        return 0;
+            Console.WriteLine($"decoded {reader.Length} bytes to {outputPath}");
+            return 0;
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "DecodeBlob failed");
+            Console.Error.WriteLine($"Error: {e.Message}");
+            return 1 ;
+        }
     }
 }

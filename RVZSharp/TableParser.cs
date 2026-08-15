@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using RVZSharp.Compression;
-using RVZSharp.Format;
+using RVZSharp.Models;
 using RVZSharp.IO;
 
 namespace RVZSharp;

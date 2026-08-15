@@ -1,4 +1,5 @@
-using RVZSharp.Format;
+using RVZSharp.Interfaces;
+using RVZSharp.Models;
 
 namespace RVZSharp.Compression;
 

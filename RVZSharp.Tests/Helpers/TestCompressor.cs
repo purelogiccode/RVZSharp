@@ -1,5 +1,5 @@
 using ICSharpCode.SharpZipLib.BZip2;
-using RVZSharp.Format;
+using RVZSharp.Models;
 
 namespace RVZSharp.Tests.Helpers;
 

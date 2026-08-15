@@ -1,7 +1,6 @@
 using System;
 using System.Security.Cryptography;
-using RVZSharp.Chunks;
-using RVZSharp.Format;
+using RVZSharp.Models;
 using RVZSharp.Wii;
 
 namespace RVZSharp.Tests.Helpers;

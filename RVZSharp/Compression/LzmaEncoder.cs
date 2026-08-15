@@ -1,4 +1,5 @@
 using SevenZip;
+using RVZSharp.Interfaces;
 
 namespace RVZSharp.Compression;
 

@@ -1,6 +1,5 @@
 using RVZSharp;
-using RVZSharp.Chunks;
-using RVZSharp.Format;
+using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
@@ -296,9 +295,9 @@ public class RvzReaderMatrixTests
                 SectorCount = 130, // spans 3 regions
                 Exceptions = new[]
                 {
-                    new[] { new RVZSharp.Chunks.HashExceptionEntry(0x100, new byte[20]) },
-                    new[] { new RVZSharp.Chunks.HashExceptionEntry(0x500, new byte[20]) },
-                    Array.Empty<RVZSharp.Chunks.HashExceptionEntry>(),
+                    new[] { new RVZSharp.Models.HashExceptionEntry(0x100, new byte[20]) },
+                    new[] { new RVZSharp.Models.HashExceptionEntry(0x500, new byte[20]) },
+                    Array.Empty<RVZSharp.Models.HashExceptionEntry>(),
                 },
             },
             PackedChunks = [0, 2, 5],
@@ -321,7 +320,7 @@ public class RvzReaderMatrixTests
         });
 
         // Corrupt a byte inside the first group's stored data.
-        var disc = RVZSharp.Format.WiaDisc.Parse(rvz.AsSpan(0x48, 0xDC));
+        var disc = RVZSharp.Models.WiaDisc.Parse(rvz.AsSpan(0x48, 0xDC));
         var gs = rvz.AsSpan((int)disc.GroupEntriesOffset, (int)disc.GroupEntriesSize).ToArray();
         byte[] table;
         using (var ms = new MemoryStream(gs))
@@ -342,7 +341,7 @@ public class RvzReaderMatrixTests
             }
         }
 
-        var g0 = RVZSharp.Format.RvzGroupEntry.Parse(table.AsSpan(0, 12));
+        var g0 = RVZSharp.Models.RvzGroupEntry.Parse(table.AsSpan(0, 12));
         var corrupted = (byte[])rvz.Clone();
         corrupted[(int)g0.FileOffset] ^= 0xFF; // break the zstd frame magic
 

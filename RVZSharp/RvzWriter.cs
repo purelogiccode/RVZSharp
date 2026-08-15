@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
-using RVZSharp.Blobs;
+using RVZSharp.Interfaces;
 using RVZSharp.Chunks;
 using RVZSharp.Compression;
-using RVZSharp.Format;
+using RVZSharp.Models;
 using RVZSharp.Packing;
 using RVZSharp.Wii;
 

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using RVZSharp.Interfaces;
 
 namespace RVZSharp.Compression;
 

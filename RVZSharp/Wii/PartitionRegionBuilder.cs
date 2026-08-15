@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using RVZSharp.Chunks;
+using RVZSharp.Models;
 
 namespace RVZSharp.Wii;
 

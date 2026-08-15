@@ -172,6 +172,7 @@ public class LibraryApiTests
                 if (cancelOnFirstReport)
                 {
                     cancelOnFirstReport = false;
+                    // ReSharper disable once AccessToDisposedClosure
                     cts.Cancel();
                 }
             });

@@ -1,15 +1,14 @@
 #nullable disable
 
-#if !LEGACY_DOTNET
 using System.Runtime.CompilerServices;
 using RVZSharp.Compression.Lzma.LZ;
 
 namespace RVZSharp.Compression.Lzma;
 
-// Fast LZMA decode path used on .NET targets that support it (everything except
-// net48/netstandard2.0/netstandard2.1, see LEGACY_DOTNET). This mirrors the design of the
-// reference LZMA SDK / 7-Zip C decoder (LzmaDec.c): probabilities are stored in flat ushort
-// arrays (instead of arrays of BitDecoder structs reached through nested decoder objects),
+// Fast LZMA decode path (net8.0+ only, see Directory.Build.props target frameworks). This
+// mirrors the design of the reference LZMA SDK / 7-Zip C decoder (LzmaDec.c): probabilities
+// are stored in flat ushort arrays (instead of arrays of BitDecoder structs reached through
+// nested decoder objects),
 // range/code/dictionary-position/input-buffer-position are kept in local variables (pinned
 // with `fixed` and accessed through raw pointers, exactly like the C reference's `probs`/
 // `dic`/`buf` locals) for the duration of the decode loop, instead of being re-read from
@@ -17,14 +16,16 @@ namespace RVZSharp.Compression.Lzma;
 // buffered reader (RangeCoder.Decoder's fast buffer) instead of one virtual Stream.ReadByte()
 // call per byte.
 //
-// These tables are separate from (and not kept in sync with) the BitDecoder-based tables used
-// by the async decode path (LzmaDecoder.Async.cs), which remains unchanged on every target.
-// Both sets are kept up to date by SetDecoderProperties/Init, so either decode path can be used
-// on a given Decoder instance, as long as sync and async decoding are not interleaved on the
-// same instance.
+// This is the decoder's only decode path: the tables live here (_f* arrays below), kept
+// up to date by SetDecoderProperties/Init.
 public partial class Decoder
 {
     private const int KNumMoveBitsFast = 5;
+
+    // Range-coder bit-model constants (formerly RangeCoder.BitDecoder's), needed by the
+    // branchless probability-update formula in DecodeBitFastCore.
+    private const int KNumBitModelTotalBits = 11;
+    private const uint KBitModelTotal = (1 << KNumBitModelTotalBits);
 
     // Bias used by the branchless probability-update formula in DecodeBitFast (see there for
     // the derivation): (1 << KNumMoveBitsFast) - 1.
@@ -88,7 +89,7 @@ public partial class Decoder
 
     private void InitFastModel()
     {
-        const ushort probInit = (ushort)(RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL >> 1);
+        const ushort probInit = (ushort)(KBitModelTotal >> 1);
         Array.Fill(_fIsMatch, probInit);
         Array.Fill(_fIsRep, probInit);
         Array.Fill(_fIsRepG0, probInit);
@@ -251,8 +252,8 @@ public partial class Decoder
         {
             var rs = new FastRangeState
             {
-                Range = rangeDecoder._range,
-                Code = rangeDecoder._code,
+                Range = rangeDecoder.Range2,
+                Code = rangeDecoder.Code2,
                 InBuf = pIn,
                 InPos = rangeDecoder.FastBufferPos,
                 InLen = rangeDecoder.FastBufferLen,
@@ -418,8 +419,8 @@ public partial class Decoder
                         break;
                     }
 
-                    rangeDecoder._range = rs.Range;
-                    rangeDecoder._code = rs.Code;
+                    rangeDecoder.Range2 = rs.Range;
+                    rangeDecoder.Code2 = rs.Code;
                     rangeDecoder.FastBufferPos = rs.InPos;
                     rangeDecoder.AddTotal(rs.Consumed);
                     outWindow.FastPos = os.Pos;
@@ -430,8 +431,8 @@ public partial class Decoder
                 os.CopyBlock((int)_rep0, (int)len);
             }
 
-            rangeDecoder._range = rs.Range;
-            rangeDecoder._code = rs.Code;
+            rangeDecoder.Range2 = rs.Range;
+            rangeDecoder.Code2 = rs.Code;
             rangeDecoder.FastBufferPos = rs.InPos;
             rangeDecoder.AddTotal(rs.Consumed);
             outWindow.FastPos = os.Pos;
@@ -455,7 +456,7 @@ public partial class Decoder
     )
     {
         var range = rs.Range;
-        var bound = (range >> RangeCoder.BitDecoder.K_NUM_BIT_MODEL_TOTAL_BITS) * prob;
+        var bound = (range >> KNumBitModelTotalBits) * prob;
 
         // Branchless bit decode + probability update, mirroring 7-Zip's ASM decoder
         // (Asm/x86/LzmaDecOpt.asm) rather than the reference C decoder's data-dependent
@@ -475,7 +476,7 @@ public partial class Decoder
         // logical-shift result from a target of 0, so both formulas collapse into one
         // branchless expression selected by the same mask used above.
         int target = (int)(
-            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | (KBitModelOffsetFast & mask)
+            (KBitModelTotal & ~mask) | (KBitModelOffsetFast & mask)
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
 
@@ -503,7 +504,7 @@ public partial class Decoder
     private static uint DecodeBitFastNoUpdate(ref FastRangeState rs, uint prob, out uint mask)
     {
         var range = rs.Range;
-        var bound = (range >> RangeCoder.BitDecoder.K_NUM_BIT_MODEL_TOTAL_BITS) * prob;
+        var bound = (range >> KNumBitModelTotalBits) * prob;
         var symbol = rs.Code < bound ? 0u : 1u;
         mask = (uint)-(int)symbol;
         rs.Range = (bound & ~mask) | ((range - bound) & mask);
@@ -521,7 +522,7 @@ public partial class Decoder
     private static unsafe void UpdateProbFast(ushort* probSlot, uint prob, uint mask)
     {
         int target = (int)(
-            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | (KBitModelOffsetFast & mask)
+            (KBitModelTotal & ~mask) | (KBitModelOffsetFast & mask)
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
     }
@@ -753,6 +754,7 @@ public partial class Decoder
             symbol = (symbol << 1) | bit;
         }
 
+        // ReSharper disable once IntVariableOverflowInUncheckedContext
         return (byte)symbol;
     }
 
@@ -811,4 +813,3 @@ public partial class Decoder
         return (byte)symbol;
     }
 }
-#endif

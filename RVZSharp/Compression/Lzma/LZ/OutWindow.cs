@@ -14,9 +14,8 @@ internal class OutWindow : IDisposable
 
     public long Total => FastTotal;
 
-#if !LEGACY_DOTNET
     // Fast-path accessors used by the local-variable LZMA decode loop (see
-    // LzmaDecoder.Fast.cs). CodeFast snapshots pos/total/buffer into locals for the whole
+    // Decoder.Fast.cs). CodeFast snapshots pos/total/buffer into locals for the whole
     // decode call instead of going through PutByte/GetByte/CopyBlock (and re-reading the
     // fields of this object) for every single output byte, mirroring how the reference
     // 7-Zip C decoder caches dicPos/dic as locals for the duration of one decode call.
@@ -40,7 +39,6 @@ internal class OutWindow : IDisposable
         _pendingDist = distance;
         _pendingLen = len;
     }
-#endif
 
     public void Create(int windowSize)
     {

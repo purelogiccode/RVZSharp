@@ -1,34 +1,31 @@
 #nullable disable
 
-using System.Runtime.CompilerServices;
-#if !LEGACY_DOTNET
 using System.Buffers;
-#endif
+using System.Runtime.CompilerServices;
 
 namespace RVZSharp.Compression.Lzma.RangeCoder;
 
 internal class Decoder
 {
     public const uint K_TOP_VALUE = (1 << 24);
-    public uint _range;
-    public uint _code;
+    public uint Range2;
+    public uint Code2;
 
     public uint Range
     {
-        get => _range;
-        set => _range = value;
+        get => Range2;
+        set => Range2 = value;
     }
 
     public uint Code
     {
-        get => _code;
-        set => _code = value;
+        get => Code2;
+        set => Code2 = value;
     }
 
     public Stream Stream;
     public long Total;
 
-#if !LEGACY_DOTNET
     // Upper bound (in terms of _total) that the fast buffered reader is allowed to physically
     // read up to. -1 means unbounded. This matters for formats like LZMA2 where multiple
     // independent chunks share one underlying stream: chunk headers are read directly from that
@@ -49,45 +46,39 @@ internal class Decoder
     // signal here: some wrapper streams (e.g. SharpCompressStream's ring-buffer mode used for
     // over-read recording on non-seekable Zip streams) expose a Length without actually
     // bounding Read() to the current logical stream's end. In the unsafe case we fall back to
-    // reading exactly one byte at a time, matching the legacy per-byte ReadByte() behavior.
+    // reading exactly one byte at a time, matching a plain per-byte read of the stream.
     private bool _fastBufferSafeUnbounded;
 
     public void SetFastLimit(long limit)
     {
         _fastLimit = limit;
     }
-#endif
 
     public void Init(Stream stream)
     {
         Stream = stream;
 
-        _code = 0;
-        _range = 0xFFFFFFFF;
+        Code2 = 0;
+        Range2 = 0xFFFFFFFF;
         for (var i = 0; i < 5; i++)
         {
-            _code = (_code << 8) | (byte)Stream.ReadByte();
+            Code2 = (Code2 << 8) | (byte)Stream.ReadByte();
         }
 
         Total = 5;
-#if !LEGACY_DOTNET
         _fastLimit = -1;
         FastBufferPos = 0;
         FastBufferLen = 0;
         _fastEndOfStream = false;
         _fastBufferSafeUnbounded = false;
-#endif
     }
 
     public void ReleaseStream()
     {
-#if !LEGACY_DOTNET
         ReleaseFastBuffer();
-#endif
         Stream = null;
     }
 
-#if !LEGACY_DOTNET
     private const int FastBufferSize = 1 << 16;
     private byte[] _fastBuffer;
     private bool _fastEndOfStream;
@@ -156,14 +147,15 @@ internal class Decoder
         FastBufferLen = 0;
         _fastEndOfStream = false;
     }
-#endif
+
+    public bool IsFinished => Code2 == 0;
 
     public void Normalize()
     {
-        while (_range < K_TOP_VALUE)
+        while (Range2 < K_TOP_VALUE)
         {
-            _code = (_code << 8) | (byte)Stream.ReadByte();
-            _range <<= 8;
+            Code2 = (Code2 << 8) | (byte)Stream.ReadByte();
+            Range2 <<= 8;
             Total++;
         }
     }
@@ -171,30 +163,30 @@ internal class Decoder
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Normalize2()
     {
-        if (_range < K_TOP_VALUE)
+        if (Range2 < K_TOP_VALUE)
         {
-            _code = (_code << 8) | (byte)Stream.ReadByte();
-            _range <<= 8;
+            Code2 = (Code2 << 8) | (byte)Stream.ReadByte();
+            Range2 <<= 8;
             Total++;
         }
     }
 
     public uint GetThreshold(uint total)
     {
-        return _code / (_range /= total);
+        return Code2 / (Range2 /= total);
     }
 
     public void Decode(uint start, uint size)
     {
-        _code -= start * _range;
-        _range *= size;
+        Code2 -= start * Range2;
+        Range2 *= size;
         Normalize();
     }
 
     public uint DecodeDirectBits(int numTotalBits)
     {
-        var range = _range;
-        var code = _code;
+        var range = Range2;
+        var code = Code2;
         uint result = 0;
         for (var i = numTotalBits; i > 0; i--)
         {
@@ -211,30 +203,28 @@ internal class Decoder
             }
         }
 
-        _range = range;
-        _code = code;
+        Range2 = range;
+        Code2 = code;
         return result;
     }
 
     public uint DecodeBit(uint size0, int numTotalBits)
     {
-        var newBound = (_range >> numTotalBits) * size0;
+        var newBound = (Range2 >> numTotalBits) * size0;
         uint symbol;
-        if (_code < newBound)
+        if (Code2 < newBound)
         {
             symbol = 0;
-            _range = newBound;
+            Range2 = newBound;
         }
         else
         {
             symbol = 1;
-            _code -= newBound;
-            _range -= newBound;
+            Code2 -= newBound;
+            Range2 -= newBound;
         }
 
         Normalize();
         return symbol;
     }
-
-    public bool IsFinished => _code == 0;
 }

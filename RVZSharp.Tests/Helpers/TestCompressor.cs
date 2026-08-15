@@ -182,17 +182,4 @@ public static class TestCompressor
         outStream.WriteByte(0x00);
         return outStream.ToArray();
     }
-
-    private static byte[] Concat(params byte[][] arrays)
-    {
-        var result = new byte[arrays.Sum(a => a.Length)];
-        var offset = 0;
-        foreach (var a in arrays)
-        {
-            a.CopyTo(result, offset);
-            offset += a.Length;
-        }
-
-        return result;
-    }
 }

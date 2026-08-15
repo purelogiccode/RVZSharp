@@ -4,6 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Company>PureLogicCode.com</Company>
+    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <FileVersion>1.0.0</FileVersion>
+    <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
 
   <!-- NuGet package metadata (dotnet pack). -->
@@ -18,6 +22,7 @@
     </Description>
     <PackageTags>dolphin;rvz;wia;gcz;ciso;wbfs;tgc;nfs;gamecube;wii;iso;disc-image</PackageTags>
     <PackageLicenseExpression>GPL-2.0-or-later</PackageLicenseExpression>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReleaseNotes>
@@ -52,6 +57,7 @@
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\LICENSE" Pack="true" PackagePath="\" />
     <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+    <None Include="icon\icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>

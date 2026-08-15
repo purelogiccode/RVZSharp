@@ -1,11 +1,23 @@
 # Testing
 
-The suite has **350 tests** and runs on every target framework (`net8.0`, `net9.0`,
-`net10.0`). The 255 synthetic tests complete in ~50 seconds per framework; the 95-test
-real-file suite adds several minutes per framework when the real game images are mounted:
+The suite has **351 tests** and runs on every target framework (`net8.0`, `net9.0`,
+`net10.0`). Tests are categorized with the xUnit trait `Category`:
+
+- **fast** — 254 synthetic tests (~30 seconds per framework), tagged implicitly by *not*
+  being marked slow;
+- **slow** — 97 real-file tests (full decode, structural checks, writer round trips against
+  real game images), tagged `[Trait(TestCategories.Category, TestCategories.Slow)]` (see
+  `TestCategories.cs`).
 
 ```bash
+# full suite
 dotnet test CSharp_RVZSharp.slnx -c Release
+
+# fast subset only (skips the real-file suite, ~30 s per framework)
+dotnet test CSharp_RVZSharp.slnx -c Release --filter "Category!=Slow"
+
+# slow / real-file subset only
+dotnet test CSharp_RVZSharp.slnx -c Release --filter "Category=Slow"
 ```
 
 A single framework can be selected with `--framework net8.0` (etc.).
@@ -43,9 +55,9 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `PartitionRegionBuilderTests` | hash tree, encryption, exceptions |
 | `BlobDetectionTests` | magic-byte auto-detection |
 | `GczBlobTests`, `CisoBlobTests`, `WbfsBlobTests`, `TgcBlobTests`, `NfsBlobTests` | legacy decoders |
-| `WiaReaderTests`, `RvzReaderTests`, `RvzReaderMatrixTests` | full-container decoding across codecs/chunk sizes |
+| `WiaReaderTests`, `RvzReaderTests`, `RvzReaderMatrixTests`, `RealFileDecodeTests` | full-container decoding across codecs/chunk sizes; env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`, Slow) |
 | `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, junk-only image, >2 MiB chunks, overlapping/odd partitions, scrubbing, raw-table group counts |
-| `RealRvzFileTests` | 95 real-file tests: 30 full-decode SHA-1 (15 GameCube + 15 Wii vs No-Intro DAT), 30 structural, 3 region/random-access, 2 writer round-trips — self-skipping when the games aren't mounted |
+| `RealRvzFileTests` | 97 real-file tests (Slow): 30 full-decode SHA-1 (15 GameCube + 15 Wii vs No-Intro DAT), 30 structural, 3 region/random-access, 2 writer round-trips — self-skipping when the games aren't mounted |
 | `SectionStreamTests` | section bounds under external seeks |
 
 ## Real-file suite

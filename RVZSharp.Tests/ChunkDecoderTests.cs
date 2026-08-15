@@ -2,7 +2,7 @@ using RVZSharp.Chunks;
 using RVZSharp.Compression;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
-using ChunkDecodeResult = RVZSharp.Chunks.ChunkDecodeResult;
+using ChunkDecodeResult = RVZSharp.Models.ChunkDecodeResult;
 
 namespace RVZSharp.Tests;
 

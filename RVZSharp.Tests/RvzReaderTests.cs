@@ -353,6 +353,7 @@ public class RvzReaderMatrixTests
     }
 }
 
+[Trait(TestCategories.Category, TestCategories.Slow)]
 public class RealFileDecodeTests
 {
     private readonly ITestOutputHelper _testOutputHelper;

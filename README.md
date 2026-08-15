@@ -72,12 +72,14 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   exception lists), `Packing` (RVZ packing + PRNG, encoder and decoder), `Wii` (hash tree +
   region rebuild, partition extraction for the writer), `RvzReader`, `RvzWriter`.
 - `src/RVZSharp.Cli` — the `info`/`decode`/`convert` tool.
-- `tests/RVZSharp.Tests` — 350 tests (net8.0 + net9.0 + net10.0): unit (headers, tables, codecs,
+- `tests/RVZSharp.Tests` — 351 tests (net8.0 + net9.0 + net10.0): unit (headers, tables, codecs,
   PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of synthetic RVZ files
   built by `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii,
   legacy → RVZ, split WBFS, scrubbing), package-facing API tests (path open, ReadFully,
-  progress, cancellation), and a 95-test real-file suite (`RealRvzFileTests`) that decodes
+  progress, cancellation), and a 97-test real-file suite (`RealRvzFileTests`) that decodes
   real GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
+  Real-file tests are tagged `Category=Slow`; run only the fast subset with
+  `dotnet test --filter "Category!=Slow"` (details in [docs/testing.md](docs/testing.md)).
 
 ## Real-world validation
 

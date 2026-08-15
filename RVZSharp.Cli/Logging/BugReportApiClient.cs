@@ -8,13 +8,9 @@ namespace RVZSharp.Cli.Logging;
 internal sealed class BugReportApiClient : IDisposable
 {
     private const string ApiUrl = "https://www.purelogiccode.com/bugreport/api/send-bug-report";
-
-    private const string ApiKey =
-        "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
-
+    private const string ApiKey = "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
     private const int MaxMessageLength = 4000;
     private const int MaxStackTraceLength = 8000;
-
     private readonly HttpClient _httpClient;
     private readonly string _applicationName;
     private readonly string _version;

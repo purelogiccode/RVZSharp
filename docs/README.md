@@ -31,6 +31,7 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 | [Wii partitions](format/wii-partitions.md) | Encryption, hash tree, hash exceptions, tickets |
 | [Legacy formats](format/legacy.md) | GCZ, CISO/WBI, WBFS, TGC, NFS byte layouts |
 | [Testing](testing.md) | Test strategy and synthetic image builders |
+| [Release notes](release-notes-1.0.0.md) | 1.0.0 announcement content (GitHub release post) |
 | [Roadmap & status](roadmap.md) | Milestones, limitations, open questions |
 | [FAQ](faq.md) | Common questions |
 

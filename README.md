@@ -1,3 +1,8 @@
+[![.NET](https://img.shields.io/badge/.NET-8.0_%7C_9.0_%7C_10.0-blueviolet)](https://dotnet.microsoft.com/)
+[![NuGet](https://img.shields.io/nuget/v/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
+[![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-xUnit-brightgreen)](docs/testing.md)
+
 # RVZSharp
 
 A pure managed C# library and CLI (**.NET 8 / 9 / 10**) for decoding and encoding **Dolphin

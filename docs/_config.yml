@@ -1,0 +1,8 @@
+title: RVZSharp
+description: >-
+  RVZSharp — a .NET library and CLI for GameCube and Wii disc images:
+  read RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS; write RVZ files.
+theme: jekyll-theme-cayman
+relative_links:
+  enabled: true
+  collections: false

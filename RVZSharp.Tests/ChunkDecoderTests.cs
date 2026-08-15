@@ -115,7 +115,7 @@ public class ChunkDecoderTests
     public void ZeroGroup_ReturnsZeroes()
     {
         var disc = MakeDisc(CompressionType.Zstd);
-        var (file, group) = GroupFile([], compressed: false);
+        var (file, _) = GroupFile([], compressed: false);
         using (file)
         {
             var zeroGroup = new RvzGroupEntry(0, 0, 0);

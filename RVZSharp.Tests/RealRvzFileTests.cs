@@ -206,12 +206,26 @@ public class RealRvzDecodeTests
 
     private static long FindSize(string dir, string file)
     {
-        if (dir == RealRvzCatalog.GcDir)
-            foreach (var e in RealRvzCatalog.GameCube)
-                if (e.File == file) return e.IsoSize;
-        if (dir == RealRvzCatalog.WiiDir)
-            foreach (var e in RealRvzCatalog.Wii)
-                if (e.File == file) return e.IsoSize;
+        switch (dir)
+        {
+            case RealRvzCatalog.GcDir:
+            {
+                foreach (var e in RealRvzCatalog.GameCube)
+                    if (e.File == file)
+                        return e.IsoSize;
+
+                break;
+            }
+            case RealRvzCatalog.WiiDir:
+            {
+                foreach (var e in RealRvzCatalog.Wii)
+                    if (e.File == file)
+                        return e.IsoSize;
+
+                break;
+            }
+        }
+
         return -1;
     }
 }

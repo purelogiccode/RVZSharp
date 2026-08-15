@@ -28,7 +28,6 @@ public sealed class LzmaStream : Stream
     private bool _endReached;
     private long _availableBytes;
     private long _rangeDecoderLimit;
-    private long _inputPosition;
 
     // LZMA2
     private readonly bool _isLzma2;
@@ -201,7 +200,7 @@ public sealed class LzmaStream : Stream
             _outWindow.SetLimit(toProcess);
             if (_uncompressedChunk)
             {
-                _inputPosition += _outWindow.CopyStream(_inputStream, toProcess);
+                CompressedBytesRead += _outWindow.CopyStream(_inputStream, toProcess);
             }
             else if (_decoder!.Code(_dictionarySize, _outWindow, _rangeDecoder))
             {
@@ -238,7 +237,7 @@ public sealed class LzmaStream : Stream
 
                 _rangeDecoder.ReleaseStream();
 
-                _inputPosition += _rangeDecoder._total;
+                CompressedBytesRead += _rangeDecoder._total;
                 if (_outWindow.HasPending)
                 {
                     throw new DataErrorException();
@@ -248,7 +247,7 @@ public sealed class LzmaStream : Stream
 
         if (_endReached)
         {
-            if (_inputSize >= 0 && _inputPosition != _inputSize)
+            if (_inputSize >= 0 && CompressedBytesRead != _inputSize)
             {
                 throw new DataErrorException();
             }
@@ -282,7 +281,7 @@ public sealed class LzmaStream : Stream
 
         if (_endReached)
         {
-            if (_inputSize >= 0 && _inputPosition != _inputSize)
+            if (_inputSize >= 0 && CompressedBytesRead != _inputSize)
             {
                 throw new DataErrorException();
             }
@@ -297,7 +296,7 @@ public sealed class LzmaStream : Stream
         _outWindow.SetLimit(1);
         if (_uncompressedChunk)
         {
-            _inputPosition += _outWindow.CopyStream(_inputStream, 1);
+            CompressedBytesRead += _outWindow.CopyStream(_inputStream, 1);
         }
         else if (_decoder!.Code(_dictionarySize, _outWindow, _rangeDecoder))
         {
@@ -332,7 +331,7 @@ public sealed class LzmaStream : Stream
 
             _rangeDecoder.ReleaseStream();
 
-            _inputPosition += _rangeDecoder._total;
+            CompressedBytesRead += _rangeDecoder._total;
             if (_outWindow.HasPending)
             {
                 throw new DataErrorException();
@@ -345,7 +344,7 @@ public sealed class LzmaStream : Stream
     private void DecodeChunkHeader()
     {
         var control = _inputStream!.ReadByte();
-        _inputPosition++;
+        CompressedBytesRead++;
 
         if (control == 0x00)
         {
@@ -375,16 +374,16 @@ public sealed class LzmaStream : Stream
 
             _availableBytes = (control & 0x1F) << 16;
             _availableBytes += (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-            _inputPosition += 2;
+            CompressedBytesRead += 2;
 
             _rangeDecoderLimit = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-            _inputPosition += 2;
+            CompressedBytesRead += 2;
 
             if (control >= 0xC0)
             {
                 _needProps = false;
                 Properties[0] = (byte)_inputStream.ReadByte();
-                _inputPosition++;
+                CompressedBytesRead++;
 
                 _decoder = new Decoder();
                 _decoder.SetDecoderProperties(Properties);
@@ -414,7 +413,7 @@ public sealed class LzmaStream : Stream
         {
             _uncompressedChunk = true;
             _availableBytes = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-            _inputPosition += 2;
+            CompressedBytesRead += 2;
         }
     }
 
@@ -448,5 +447,5 @@ public sealed class LzmaStream : Stream
 
     public byte[] Properties { get; } = new byte[5];
 
-    internal long CompressedBytesRead => _inputPosition;
+    internal long CompressedBytesRead { get; private set; }
 }

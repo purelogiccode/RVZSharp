@@ -25,7 +25,6 @@ public sealed class GczBlob : IBlobReader
     private readonly long[] _blockOffsets;
     private readonly bool[] _blockCompressed;
     private readonly uint[] _blockHashes;
-    private readonly int _blockSize;
 
     private GczBlob(Stream file, bool leaveOpen, long dataOffset, long compressedDataSize,
         long[] blockOffsets, bool[] blockCompressed, uint[] blockHashes, int blockSize, long length)
@@ -37,7 +36,7 @@ public sealed class GczBlob : IBlobReader
         _blockOffsets = blockOffsets;
         _blockCompressed = blockCompressed;
         _blockHashes = blockHashes;
-        _blockSize = blockSize;
+        BlockSize = blockSize;
         Length = length;
     }
 
@@ -46,7 +45,7 @@ public sealed class GczBlob : IBlobReader
 
     public BlobType Type => BlobType.Gcz;
     public long Length { get; }
-    public int BlockSize => _blockSize;
+    public int BlockSize { get; }
 
     /// <summary>Parses and validates a GCZ file. The stream must be seekable.</summary>
     public static GczBlob Open(Stream stream, bool leaveOpen = false)
@@ -169,7 +168,7 @@ public sealed class GczBlob : IBlobReader
         var total = 0;
         while (!buffer.IsEmpty && position < Length)
         {
-            var blockIndex = (int)(position / _blockSize);
+            var blockIndex = (int)(position / BlockSize);
             if (blockIndex >= _blockOffsets.Length)
             {
                 // The header's disc_size exceeds the block table: reading past the last
@@ -178,8 +177,8 @@ public sealed class GczBlob : IBlobReader
                     $"GCZ read at 0x{position:X} is past the last block (disc_size exceeds the block table).");
             }
 
-            var offsetInBlock = (int)(position % _blockSize);
-            var take = (int)Math.Min(Math.Min(buffer.Length, _blockSize - offsetInBlock), Length - position);
+            var offsetInBlock = (int)(position % BlockSize);
+            var take = (int)Math.Min(Math.Min(buffer.Length, BlockSize - offsetInBlock), Length - position);
 
             var block = DecodeBlock(blockIndex);
             block.AsSpan(offsetInBlock, take).CopyTo(buffer);
@@ -221,15 +220,15 @@ public sealed class GczBlob : IBlobReader
         {
             using var compressed = new MemoryStream(stored, writable: false);
             using var zlib = new ZLibStream(compressed, CompressionMode.Decompress);
-            output = new byte[_blockSize];
+            output = new byte[BlockSize];
             var total = 0;
-            while (total < _blockSize)
+            while (total < BlockSize)
             {
-                var read = zlib.Read(output, total, _blockSize - total);
+                var read = zlib.Read(output, total, BlockSize - total);
                 if (read <= 0)
                 {
                     throw new RvzFormatException(
-                        $"GCZ block {blockIndex} decompressed to {total} bytes, expected {_blockSize}.");
+                        $"GCZ block {blockIndex} decompressed to {total} bytes, expected {BlockSize}.");
                 }
 
                 total += read;

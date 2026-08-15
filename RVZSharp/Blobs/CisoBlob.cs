@@ -19,21 +19,20 @@ public sealed class CisoBlob : IBlobReader
 
     private readonly Stream _file;
     private readonly bool _leaveOpen;
-    private readonly int _blockSize;
     private readonly ushort[] _blockMap; // sequential index of each present block, or 0xFFFF
 
     private CisoBlob(Stream file, bool leaveOpen, int blockSize, ushort[] blockMap)
     {
         _file = file;
         _leaveOpen = leaveOpen;
-        _blockSize = blockSize;
+        BlockSize = blockSize;
         _blockMap = blockMap;
         Length = (long)MapSize * blockSize;
     }
 
     public BlobType Type => BlobType.Ciso;
     public long Length { get; }
-    public int BlockSize => _blockSize;
+    public int BlockSize { get; }
 
     /// <summary>Parses a CISO file. The stream must be seekable.</summary>
     public static CisoBlob Open(Stream stream, bool leaveOpen = false)
@@ -90,9 +89,9 @@ public sealed class CisoBlob : IBlobReader
         var total = 0;
         while (!buffer.IsEmpty && position < Length)
         {
-            var block = (int)(position / _blockSize);
-            var offsetInBlock = (int)(position % _blockSize);
-            var take = (int)Math.Min(Math.Min(buffer.Length, _blockSize - offsetInBlock), Length - position);
+            var block = (int)(position / BlockSize);
+            var offsetInBlock = (int)(position % BlockSize);
+            var take = (int)Math.Min(Math.Min(buffer.Length, BlockSize - offsetInBlock), Length - position);
 
             var mapEntry = _blockMap[block];
             if (mapEntry == 0xFFFF)
@@ -101,7 +100,7 @@ public sealed class CisoBlob : IBlobReader
             }
             else
             {
-                var fileOffset = HeaderSize + (long)mapEntry * _blockSize + offsetInBlock;
+                var fileOffset = HeaderSize + (long)mapEntry * BlockSize + offsetInBlock;
                 if (!ReadExactlyAt(_file, fileOffset, buffer[..take]))
                 {
                     throw new RvzFormatException($"CISO block {block} is truncated.");

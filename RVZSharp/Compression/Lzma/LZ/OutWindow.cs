@@ -9,16 +9,14 @@ internal partial class OutWindow : IDisposable
 {
     private byte[] _buffer;
     private int _windowSize;
-    private int _pos;
     private int _streamPos;
     private int _pendingLen;
     private int _pendingDist;
     private Stream _stream;
 
-    private long _total;
     private long _limit;
 
-    public long Total => _total;
+    public long Total => FastTotal;
 
 #if !LEGACY_DOTNET
     // Fast-path accessors used by the local-variable LZMA decode loop (see
@@ -27,16 +25,10 @@ internal partial class OutWindow : IDisposable
     // fields of this object) for every single output byte, mirroring how the reference
     // 7-Zip C decoder caches dicPos/dic as locals for the duration of one decode call.
     internal byte[] FastBuffer => _buffer;
-    internal int FastPos
-    {
-        get => _pos;
-        set => _pos = value;
-    }
-    internal long FastTotal
-    {
-        get => _total;
-        set => _total = value;
-    }
+    internal int FastPos { get; set; }
+
+    internal long FastTotal { get; set; }
+
     internal int FastWindowSize => _windowSize;
     internal long FastLimit => _limit;
 
@@ -68,10 +60,10 @@ internal partial class OutWindow : IDisposable
         }
         _buffer[windowSize - 1] = 0;
         _windowSize = windowSize;
-        _pos = 0;
+        FastPos = 0;
         _streamPos = 0;
         _pendingLen = 0;
-        _total = 0;
+        FastTotal = 0;
         _limit = 0;
     }
 
@@ -103,15 +95,15 @@ internal partial class OutWindow : IDisposable
         var len = stream.Length;
         var size = (len < _windowSize) ? (int)len : _windowSize;
         stream.Position = len - size;
-        _total = 0;
+        FastTotal = 0;
         _limit = size;
-        _pos = _windowSize - size;
+        FastPos = _windowSize - size;
         CopyStream(stream, size);
-        if (_pos == _windowSize)
+        if (FastPos == _windowSize)
         {
-            _pos = 0;
+            FastPos = 0;
         }
-        _streamPos = _pos;
+        _streamPos = FastPos;
     }
 
     public void ReleaseStream()
@@ -126,17 +118,17 @@ internal partial class OutWindow : IDisposable
         {
             return;
         }
-        var size = _pos - _streamPos;
+        var size = FastPos - _streamPos;
         if (size == 0)
         {
             return;
         }
         _stream.Write(_buffer, _streamPos, size);
-        if (_pos >= _windowSize)
+        if (FastPos >= _windowSize)
         {
-            _pos = 0;
+            FastPos = 0;
         }
-        _streamPos = _pos;
+        _streamPos = FastPos;
     }
 
     public void CopyPending()
@@ -146,7 +138,7 @@ internal partial class OutWindow : IDisposable
             return;
         }
         var rem = _pendingLen;
-        var pos = (_pendingDist < _pos ? _pos : _pos + _windowSize) - _pendingDist - 1;
+        var pos = (_pendingDist < FastPos ? FastPos : FastPos + _windowSize) - _pendingDist - 1;
         while (rem > 0 && HasSpace)
         {
             if (pos >= _windowSize)
@@ -162,18 +154,18 @@ internal partial class OutWindow : IDisposable
     public void CopyBlock(int distance, int len)
     {
         var rem = len;
-        var pos = (distance < _pos ? _pos : _pos + _windowSize) - distance - 1;
-        var targetSize = HasSpace ? (int)Math.Min(rem, _limit - _total) : 0;
-        var sizeUntilWindowEnd = Math.Min(_windowSize - _pos, _windowSize - pos);
-        var sizeUntilOverlap = Math.Abs(pos - _pos);
+        var pos = (distance < FastPos ? FastPos : FastPos + _windowSize) - distance - 1;
+        var targetSize = HasSpace ? (int)Math.Min(rem, _limit - FastTotal) : 0;
+        var sizeUntilWindowEnd = Math.Min(_windowSize - FastPos, _windowSize - pos);
+        var sizeUntilOverlap = Math.Abs(pos - FastPos);
         var fastSize = Math.Min(Math.Min(sizeUntilWindowEnd, sizeUntilOverlap), targetSize);
         if (fastSize >= 2)
         {
-            _buffer.AsSpan(pos, fastSize).CopyTo(_buffer.AsSpan(_pos, fastSize));
-            _pos += fastSize;
+            _buffer.AsSpan(pos, fastSize).CopyTo(_buffer.AsSpan(FastPos, fastSize));
+            FastPos += fastSize;
             pos += fastSize;
-            _total += fastSize;
-            if (_pos >= _windowSize)
+            FastTotal += fastSize;
+            if (FastPos >= _windowSize)
             {
                 Flush();
             }
@@ -194,9 +186,9 @@ internal partial class OutWindow : IDisposable
 
     public void PutByte(byte b)
     {
-        _buffer[_pos++] = b;
-        _total++;
-        if (_pos >= _windowSize)
+        _buffer[FastPos++] = b;
+        FastTotal++;
+        if (FastPos >= _windowSize)
         {
             Flush();
         }
@@ -204,7 +196,7 @@ internal partial class OutWindow : IDisposable
 
     public byte GetByte(int distance)
     {
-        var pos = _pos - distance - 1;
+        var pos = FastPos - distance - 1;
         if (pos < 0)
         {
             pos += _windowSize;
@@ -215,26 +207,26 @@ internal partial class OutWindow : IDisposable
     public int CopyStream(Stream stream, int len)
     {
         var size = len;
-        while (size > 0 && _pos < _windowSize && _total < _limit)
+        while (size > 0 && FastPos < _windowSize && FastTotal < _limit)
         {
-            var curSize = _windowSize - _pos;
-            if (curSize > _limit - _total)
+            var curSize = _windowSize - FastPos;
+            if (curSize > _limit - FastTotal)
             {
-                curSize = (int)(_limit - _total);
+                curSize = (int)(_limit - FastTotal);
             }
             if (curSize > size)
             {
                 curSize = size;
             }
-            var numReadBytes = stream.Read(_buffer, _pos, curSize);
+            var numReadBytes = stream.Read(_buffer, FastPos, curSize);
             if (numReadBytes == 0)
             {
                 throw new DataErrorException();
             }
             size -= numReadBytes;
-            _pos += numReadBytes;
-            _total += numReadBytes;
-            if (_pos >= _windowSize)
+            FastPos += numReadBytes;
+            FastTotal += numReadBytes;
+            if (FastPos >= _windowSize)
             {
                 Flush();
             }
@@ -244,21 +236,21 @@ internal partial class OutWindow : IDisposable
 
     public void SetLimit(long size)
     {
-        _limit = _total + size;
+        _limit = FastTotal + size;
     }
 
-    public bool HasSpace => _pos < _windowSize && _total < _limit;
+    public bool HasSpace => FastPos < _windowSize && FastTotal < _limit;
 
     public bool HasPending => _pendingLen > 0;
 
     public int Read(byte[] buffer, int offset, int count)
     {
-        if (_streamPos >= _pos)
+        if (_streamPos >= FastPos)
         {
             return 0;
         }
 
-        var size = _pos - _streamPos;
+        var size = FastPos - _streamPos;
         if (size > count)
         {
             size = count;
@@ -267,7 +259,7 @@ internal partial class OutWindow : IDisposable
         _streamPos += size;
         if (_streamPos >= _windowSize)
         {
-            _pos = 0;
+            FastPos = 0;
             _streamPos = 0;
         }
         return size;
@@ -275,12 +267,12 @@ internal partial class OutWindow : IDisposable
 
     public int Read(Memory<byte> buffer, int offset, int count)
     {
-        if (_streamPos >= _pos)
+        if (_streamPos >= FastPos)
         {
             return 0;
         }
 
-        var size = _pos - _streamPos;
+        var size = FastPos - _streamPos;
         if (size > count)
         {
             size = count;
@@ -289,7 +281,7 @@ internal partial class OutWindow : IDisposable
         _streamPos += size;
         if (_streamPos >= _windowSize)
         {
-            _pos = 0;
+            FastPos = 0;
             _streamPos = 0;
         }
         return size;
@@ -297,7 +289,7 @@ internal partial class OutWindow : IDisposable
 
     public int ReadByte()
     {
-        if (_streamPos >= _pos)
+        if (_streamPos >= FastPos)
         {
             return -1;
         }
@@ -307,12 +299,12 @@ internal partial class OutWindow : IDisposable
         _streamPos++;
         if (_streamPos >= _windowSize)
         {
-            _pos = 0;
+            FastPos = 0;
             _streamPos = 0;
         }
 
         return value;
     }
 
-    public int AvailableBytes => _pos - _streamPos;
+    public int AvailableBytes => FastPos - _streamPos;
 }

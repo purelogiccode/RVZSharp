@@ -30,6 +30,7 @@ public class LibraryApiTests
             _handler(value);
         }
     }
+
     private static byte[] MakeGcIso(int size = 0x420000)
     {
         var iso = new byte[size];

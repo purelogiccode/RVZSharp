@@ -12,47 +12,47 @@ internal abstract class Base
 
     public struct State
     {
-        public uint _index;
+        public uint Index;
 
         public void Init()
         {
-            _index = 0;
+            Index = 0;
         }
 
         public void UpdateChar()
         {
-            if (_index < 4)
+            switch (Index)
             {
-                _index = 0;
-            }
-            else if (_index < 10)
-            {
-                _index -= 3;
-            }
-            else
-            {
-                _index -= 6;
+                case < 4:
+                    Index = 0;
+                    break;
+                case < 10:
+                    Index -= 3;
+                    break;
+                default:
+                    Index -= 6;
+                    break;
             }
         }
 
         public void UpdateMatch()
         {
-            _index = (uint)(_index < 7 ? 7 : 10);
+            Index = (uint)(Index < 7 ? 7 : 10);
         }
 
         public void UpdateRep()
         {
-            _index = (uint)(_index < 7 ? 8 : 11);
+            Index = (uint)(Index < 7 ? 8 : 11);
         }
 
         public void UpdateShortRep()
         {
-            _index = (uint)(_index < 7 ? 9 : 11);
+            Index = (uint)(Index < 7 ? 9 : 11);
         }
 
         public bool IsCharState()
         {
-            return _index < 7;
+            return Index < 7;
         }
     }
 

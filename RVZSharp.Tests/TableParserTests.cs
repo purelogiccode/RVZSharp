@@ -90,12 +90,12 @@ public class TableParserTests
                 disc.ComprDataLen = 0;
                 break;
             case CompressionType.Lzma:
-                {
-                    var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
-                    props.CopyTo(disc.ComprData, 0);
-                    disc.ComprDataLen = (byte)props.Length;
-                    break;
-                }
+            {
+                var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
+                props.CopyTo(disc.ComprData, 0);
+                disc.ComprDataLen = (byte)props.Length;
+                break;
+            }
             case CompressionType.Lzma2:
                 disc.ComprData[0] = 21;
                 disc.ComprDataLen = 1;
@@ -188,7 +188,7 @@ public class TableParserTests
         // 16-byte key at 0..15, first data entry at 16 (the second entry is beyond the
         // declared entry size and must be zero-filled).
         WriteBeU32(0x1234).CopyTo(partTable, 0x10); // first_sector
-        WriteBeU32(0x20).CopyTo(partTable, 0x14);   // number_of_sectors
+        WriteBeU32(0x20).CopyTo(partTable, 0x14); // number_of_sectors
         var disc = new TestDiscBuilder
         {
             DiscType = DiscType.Wii,

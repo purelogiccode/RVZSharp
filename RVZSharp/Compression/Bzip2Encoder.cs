@@ -16,10 +16,11 @@ public sealed class Bzip2Encoder : ICompressionEncoder
     {
         using var output = new MemoryStream();
         using (var bzip2 = new ICSharpCode.SharpZipLib.BZip2.BZip2OutputStream(output, _level)
-        { IsStreamOwner = false })
+                   { IsStreamOwner = false })
         {
             bzip2.Write(data);
         }
+
         return output.ToArray();
     }
 

@@ -62,7 +62,7 @@ internal class Decoder
         _total = 5;
 #if !LEGACY_DOTNET
         _fastLimit = -1;
-        _fastBufferPos = 0;
+        FastBufferPos = 0;
         _fastBufferLen = 0;
         _fastEndOfStream = false;
         _fastBufferSafeUnbounded = false;
@@ -80,17 +80,12 @@ internal class Decoder
 #if !LEGACY_DOTNET
     private const int FastBufferSize = 1 << 16;
     private byte[] _fastBuffer;
-    private int _fastBufferPos;
     private int _fastBufferLen;
     private bool _fastEndOfStream;
 
     internal byte[] FastBufferArray => _fastBuffer ??= ArrayPool<byte>.Shared.Rent(FastBufferSize);
 
-    internal int FastBufferPos
-    {
-        get => _fastBufferPos;
-        set => _fastBufferPos = value;
-    }
+    internal int FastBufferPos { get; set; }
 
     internal int FastBufferLen => _fastBufferLen;
 
@@ -109,7 +104,7 @@ internal class Decoder
         _fastBuffer ??= ArrayPool<byte>.Shared.Rent(FastBufferSize);
         if (_fastEndOfStream)
         {
-            _fastBufferPos = 0;
+            FastBufferPos = 0;
             _fastBufferLen = 1;
             _fastBuffer[0] = 0xFF;
             return;
@@ -128,12 +123,12 @@ internal class Decoder
         if (read <= 0)
         {
             _fastEndOfStream = true;
-            _fastBufferPos = 0;
+            FastBufferPos = 0;
             _fastBufferLen = 1;
             _fastBuffer[0] = 0xFF;
             return;
         }
-        _fastBufferPos = 0;
+        FastBufferPos = 0;
         _fastBufferLen = read;
     }
 
@@ -144,7 +139,7 @@ internal class Decoder
             ArrayPool<byte>.Shared.Return(_fastBuffer);
             _fastBuffer = null;
         }
-        _fastBufferPos = 0;
+        FastBufferPos = 0;
         _fastBufferLen = 0;
         _fastEndOfStream = false;
     }

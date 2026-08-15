@@ -122,7 +122,7 @@ public class WiaDiscTests
     }
 
     [Theory]
-    [InlineData(0x8000)]  // 32 KiB — min power of two, valid
+    [InlineData(0x8000)] // 32 KiB — min power of two, valid
     [InlineData(0x10000)] // 64 KiB
     [InlineData(0x200000)] // 2 MiB
     [InlineData(0x400000)] // 4 MiB (multiple of 2 MiB, not power of two)

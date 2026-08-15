@@ -428,12 +428,12 @@ public static class TestRvzBuilder
         var rawEntries = new List<(ulong Off, ulong Size, uint GroupIndex, uint NumGroups)>();
         var firstEntrySize = partition == null ? spec.RawSize : (int)(partitionOffset - 0x80);
         rawEntries.Add((0x80, (ulong)firstEntrySize, (uint)rawEntryChunkStart[0],
-            (uint)rawEntryChunkCountFor(spec, 0, firstEntrySize)));
+            (uint)RawEntryChunkCountFor(spec, 0, firstEntrySize)));
         if (partition != null)
         {
             var tailOffset = partitionOffset + partition.SectorCount * 0x8000L;
             rawEntries.Add(((ulong)tailOffset, (ulong)spec.RawTailSize, (uint)rawEntryChunkStart[1],
-                (uint)rawEntryChunkCountFor(spec, 1, spec.RawTailSize)));
+                (uint)RawEntryChunkCountFor(spec, 1, spec.RawTailSize)));
         }
 
         var rawTable = new byte[rawEntries.Count * 0x18];
@@ -507,7 +507,7 @@ public static class TestRvzBuilder
         }
 
         // Layout: file head | disc | part table | raw table | group table | group data
-        var partOff = 0x48L + WiaDisc.Size;
+        const long partOff = 0x48L + WiaDisc.Size;
         var rawOff = partOff + partTable.Length;
         var groupOff = rawOff + rawTableStored.Length;
 
@@ -525,7 +525,7 @@ public static class TestRvzBuilder
         // Pad to the aligned group-data start the table's offsets were computed from
         // (layoutSize may exceed the stored size; the difference is dead padding).
         var finalDataStart = AlignUp(0x48L + WiaDisc.Size + partTable.Length +
-            rawTableStored.Length + layoutSize, 4);
+                                     rawTableStored.Length + layoutSize, 4);
         while (outStream.Position + 0x48 < finalDataStart)
         {
             outStream.WriteByte(0);
@@ -558,7 +558,7 @@ public static class TestRvzBuilder
         return final;
     }
 
-    private static int rawEntryChunkCountFor(RvzSpec spec, int entryIndex, int entrySize)
+    private static int RawEntryChunkCountFor(RvzSpec spec, int entryIndex, int entrySize)
     {
         var chunkSize = (long)spec.ChunkSize;
         var aligned = entryIndex == 0
@@ -607,12 +607,12 @@ public static class TestRvzBuilder
             case CompressionType.Zstd:
                 return (0, new byte[7]);
             case CompressionType.Lzma:
-                {
-                    var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
-                    var data = new byte[7];
-                    props.CopyTo(data, 0);
-                    return ((byte)props.Length, data);
-                }
+            {
+                var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
+                var data = new byte[7];
+                props.CopyTo(data, 0);
+                return ((byte)props.Length, data);
+            }
             case CompressionType.Lzma2:
                 return (1, [21, 0, 0, 0, 0, 0, 0]);
             case CompressionType.Purge:

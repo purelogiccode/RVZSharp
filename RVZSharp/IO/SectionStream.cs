@@ -8,7 +8,6 @@ public sealed class SectionStream : Stream
 {
     private readonly Stream _base;
     private readonly long _start;
-    private readonly long _length;
 
     public SectionStream(Stream baseStream, long start, long length)
     {
@@ -23,12 +22,12 @@ public sealed class SectionStream : Stream
 
         _base = baseStream;
         _start = start;
-        _length = length;
+        Length = length;
         Position = 0;
     }
 
     /// <summary>Length of the section.</summary>
-    public override long Length => _length;
+    public override long Length { get; }
 
     public override bool CanRead => true;
     public override bool CanSeek => true;
@@ -38,10 +37,10 @@ public sealed class SectionStream : Stream
     {
         // The base stream may have been seeked externally; never report a position outside
         // the section.
-        get => Math.Clamp(_base.Position - _start, 0, _length);
+        get => Math.Clamp(_base.Position - _start, 0, Length);
         set
         {
-            if (value < 0 || value > _length)
+            if (value < 0 || value > Length)
             {
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
@@ -54,12 +53,12 @@ public sealed class SectionStream : Stream
     {
         // The base stream may have been seeked externally: never read outside the section
         // (return 0 instead of crossing the section bounds).
-        if (_base.Position < _start || _base.Position >= _start + _length)
+        if (_base.Position < _start || _base.Position >= _start + Length)
         {
             return 0;
         }
 
-        var remaining = _start + _length - _base.Position;
+        var remaining = _start + Length - _base.Position;
         count = (int)Math.Min(count, remaining);
         return _base.Read(buffer, offset, count);
     }
@@ -68,12 +67,12 @@ public sealed class SectionStream : Stream
     {
         // The base stream may have been seeked externally: never read outside the section
         // (return 0 instead of crossing the section bounds).
-        if (_base.Position < _start || _base.Position >= _start + _length)
+        if (_base.Position < _start || _base.Position >= _start + Length)
         {
             return 0;
         }
 
-        var remaining = _start + _length - _base.Position;
+        var remaining = _start + Length - _base.Position;
         buffer = buffer[..(int)Math.Min(buffer.Length, remaining)];
         return _base.Read(buffer);
     }
@@ -84,7 +83,7 @@ public sealed class SectionStream : Stream
         {
             SeekOrigin.Begin => offset,
             SeekOrigin.Current => Position + offset,
-            SeekOrigin.End => _length + offset,
+            SeekOrigin.End => Length + offset,
             _ => throw new ArgumentOutOfRangeException(nameof(origin))
         };
         Position = newPosition;

@@ -31,7 +31,7 @@ public class PackingTests
     {
         var seed = MakeSeed(seedValue);
         var offset = seedValue * 0x123;
-        var count = 100_000;
+        const int count = 100_000;
 
         var expected = GenerateJunk(seed, offset, count);
         var actual = new byte[count];

@@ -29,15 +29,13 @@ public sealed class LzmaDecoder : ICompressionDecoder
                 throw new RvzFormatException($"LZMA2 requires 1 byte of compressor data, got {properties.Length}.");
             }
 
-            if (properties[0] > 40)
+            switch (properties[0])
             {
-                throw new RvzFormatException($"Invalid LZMA2 dictionary size property {properties[0]}.");
-            }
-
-            if (properties[0] == 40)
-            {
-                throw new RvzUnsupportedException(
-                    "LZMA2 dictionary sizes of 4 GiB (property 40) are not supported.");
+                case > 40:
+                    throw new RvzFormatException($"Invalid LZMA2 dictionary size property {properties[0]}.");
+                case 40:
+                    throw new RvzUnsupportedException(
+                        "LZMA2 dictionary sizes of 4 GiB (property 40) are not supported.");
             }
         }
         else

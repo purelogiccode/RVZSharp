@@ -47,8 +47,7 @@ public sealed class LzmaEncoder : ICompressionEncoder
                 // 7-Zip LZMA2 dict-size byte: 2^(prop/2 + 12) for even props, 2^(prop/2 + 11)
                 // for odd ones (matches the reader's table).
                 var dictLog2 = 0;
-                var size = _dictionarySize;
-                while ((1 << dictLog2) < size)
+                while ((1 << dictLog2) < _dictionarySize)
                 {
                     dictLog2++;
                 }
@@ -59,8 +58,10 @@ public sealed class LzmaEncoder : ICompressionEncoder
 
             var encoder = new SevenZip.Compression.LZMA.Encoder();
             encoder.SetCoderProperties(
-                [CoderPropID.DictionarySize, CoderPropID.PosStateBits,
-                 CoderPropID.LitContextBits, CoderPropID.LitPosBits],
+                [
+                    CoderPropID.DictionarySize, CoderPropID.PosStateBits,
+                    CoderPropID.LitContextBits, CoderPropID.LitPosBits
+                ],
                 [_dictionarySize, 2, 3, 0]);
             using var props = new MemoryStream();
             encoder.WriteCoderProperties(props);
@@ -73,7 +74,9 @@ public sealed class LzmaEncoder : ICompressionEncoder
         return _lzma2 ? EncodeLzma2(data) : EncodeLzma1(data);
     }
 
-    public void AddPrecedingData(ReadOnlySpan<byte> data) { }
+    public void AddPrecedingData(ReadOnlySpan<byte> data)
+    {
+    }
 
     private byte[] EncodeLzma1(ReadOnlySpan<byte> data)
     {
@@ -149,8 +152,9 @@ public sealed class LzmaEncoder : ICompressionEncoder
     {
         var encoder = new SevenZip.Compression.LZMA.Encoder();
         encoder.SetCoderProperties(
-            [CoderPropID.DictionarySize, CoderPropID.PosStateBits,
-             CoderPropID.LitContextBits, CoderPropID.LitPosBits],
+            [
+                CoderPropID.DictionarySize, CoderPropID.PosStateBits,
+                CoderPropID.LitContextBits, CoderPropID.LitPosBits],
             [_dictionarySize, 2, 3, 0]);
         using var props = new MemoryStream();
         encoder.WriteCoderProperties(props);

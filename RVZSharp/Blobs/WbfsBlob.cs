@@ -247,7 +247,6 @@ public sealed class WbfsBlob : IBlobReader
         private readonly Stream[] _parts;
         private readonly long[] _starts;
         private readonly bool _leaveOpen;
-        private long _position;
 
         public MultiPartStream(List<Stream> parts, bool leaveOpen)
         {
@@ -269,25 +268,21 @@ public sealed class WbfsBlob : IBlobReader
         public override bool CanWrite => false;
         public override long Length { get; }
 
-        public override long Position
-        {
-            get => _position;
-            set => _position = value;
-        }
+        public override long Position { get; set; }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
             var total = 0;
-            while (total < count && _position < Length)
+            while (total < count && Position < Length)
             {
-                var partIndex = Array.BinarySearch(_starts, _position);
+                var partIndex = Array.BinarySearch(_starts, Position);
                 if (partIndex < 0)
                 {
                     partIndex = ~partIndex - 1;
                 }
 
                 var part = _parts[partIndex];
-                var local = _position - _starts[partIndex];
+                var local = Position - _starts[partIndex];
                 if (part.Position != local)
                 {
                     part.Position = local;
@@ -301,7 +296,7 @@ public sealed class WbfsBlob : IBlobReader
                 }
 
                 total += read;
-                _position += read;
+                Position += read;
             }
 
             return total;
@@ -309,16 +304,18 @@ public sealed class WbfsBlob : IBlobReader
 
         public override long Seek(long offset, SeekOrigin origin)
         {
-            _position = origin switch
+            Position = origin switch
             {
                 SeekOrigin.Begin => offset,
-                SeekOrigin.Current => _position + offset,
+                SeekOrigin.Current => Position + offset,
                 _ => Length + offset
             };
-            return _position;
+            return Position;
         }
 
-        public override void Flush() { }
+        public override void Flush()
+        {
+        }
 
         public override void SetLength(long value)
         {

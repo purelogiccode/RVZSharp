@@ -130,6 +130,7 @@ public partial class Decoder
                 InPos = RangeDecoder.FastBufferPos;
                 InLen = RangeDecoder.FastBufferLen;
             }
+
             Consumed++;
             return InBuf[InPos++];
         }
@@ -155,6 +156,7 @@ public partial class Decoder
             {
                 p += WindowSize;
             }
+
             return Dic[p];
         }
 
@@ -197,17 +199,21 @@ public partial class Decoder
                     OutWindow.FastFlush();
                     Pos = OutWindow.FastPos;
                 }
+
                 rem -= fastSize;
             }
+
             while (rem > 0 && Pos < WindowSize && Total < Limit)
             {
                 if (p >= WindowSize)
                 {
                     p = 0;
                 }
+
                 PutByte(Dic[p++]);
                 rem--;
             }
+
             OutWindow.SetPendingFast(distance, rem);
         }
     }
@@ -230,17 +236,17 @@ public partial class Decoder
         fixed (byte* pIn = inBuf)
         fixed (
             ushort* pIsMatch = _fIsMatch,
-                pIsRep = _fIsRep,
-                pIsRepG0 = _fIsRepG0,
-                pIsRepG1 = _fIsRepG1,
-                pIsRepG2 = _fIsRepG2,
-                pIsRep0Long = _fIsRep0Long,
-                pPosSlot = _fPosSlot,
-                pPosDecoders = _fPosDecoders,
-                pPosAlign = _fPosAlign,
-                pLenProbs = _fLenProbs,
-                pRepLenProbs = _fRepLenProbs,
-                pLiteral = _fLiteral
+            pIsRep = _fIsRep,
+            pIsRepG0 = _fIsRepG0,
+            pIsRepG1 = _fIsRepG1,
+            pIsRepG2 = _fIsRepG2,
+            pIsRep0Long = _fIsRep0Long,
+            pPosSlot = _fPosSlot,
+            pPosDecoders = _fPosDecoders,
+            pPosAlign = _fPosAlign,
+            pLenProbs = _fLenProbs,
+            pRepLenProbs = _fRepLenProbs,
+            pLiteral = _fLiteral
         )
         {
             var rs = new FastRangeState
@@ -267,7 +273,7 @@ public partial class Decoder
             while (os.Pos < os.WindowSize && os.Total < os.Limit)
             {
                 var posState = (uint)os.Total & _posStateMask;
-                var stateIndex = (int)_state._index;
+                var stateIndex = (int)_state.Index;
                 // (stateIndex << K_NUM_POS_STATES_BITS_MAX) + posState is used both as the
                 // IsMatch index and (numerically identical) the IsRep0Long/"short rep" index.
                 var matchIndex = (int)((stateIndex << Base.K_NUM_POS_STATES_BITS_MAX) + posState);
@@ -348,11 +354,14 @@ public partial class Decoder
                                 distance = _rep3;
                                 _rep3 = _rep2;
                             }
+
                             _rep2 = _rep1;
                         }
+
                         _rep1 = _rep0;
                         _rep0 = distance;
                     }
+
                     len = LenDecodeFast(ref rs, pRepLenProbs, posState) + Base.K_MATCH_MIN_LEN;
                     _state.UpdateRep();
                 }
@@ -408,6 +417,7 @@ public partial class Decoder
                         result = true;
                         break;
                     }
+
                     rangeDecoder._range = rs.Range;
                     rangeDecoder._code = rs.Code;
                     rangeDecoder.FastBufferPos = rs.InPos;
@@ -416,6 +426,7 @@ public partial class Decoder
                     outWindow.FastTotal = os.Total;
                     throw new DataErrorException();
                 }
+
                 os.CopyBlock((int)_rep0, (int)len);
             }
 
@@ -464,7 +475,7 @@ public partial class Decoder
         // logical-shift result from a target of 0, so both formulas collapse into one
         // branchless expression selected by the same mask used above.
         int target = (int)(
-            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | KBitModelOffsetFast & mask
+            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | (KBitModelOffsetFast & mask)
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
 
@@ -473,6 +484,7 @@ public partial class Decoder
             rs.Range <<= 8;
             rs.Code = (rs.Code << 8) | rs.ReadByte();
         }
+
         return symbol;
     }
 
@@ -501,6 +513,7 @@ public partial class Decoder
             rs.Range <<= 8;
             rs.Code = (rs.Code << 8) | rs.ReadByte();
         }
+
         return symbol;
     }
 
@@ -508,7 +521,7 @@ public partial class Decoder
     private static unsafe void UpdateProbFast(ushort* probSlot, uint prob, uint mask)
     {
         int target = (int)(
-            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | KBitModelOffsetFast & mask
+            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | (KBitModelOffsetFast & mask)
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
     }
@@ -550,6 +563,7 @@ public partial class Decoder
                 prob = (probChild0 & ~mask) | (probChild1 & mask);
             }
         }
+
         return m - ((uint)1 << numBits);
     }
 
@@ -586,6 +600,7 @@ public partial class Decoder
                 prob = (probChild0 & ~mask) | (probChild1 & mask);
             }
         }
+
         return symbol;
     }
 
@@ -605,6 +620,7 @@ public partial class Decoder
                 rs.Range <<= 8;
             }
         }
+
         return result;
     }
 
@@ -620,6 +636,7 @@ public partial class Decoder
                 Base.K_NUM_LOW_LEN_BITS
             );
         }
+
         var symbol = Base.K_NUM_LOW_LEN_SYMBOLS;
         if (DecodeBitFast(ref rs, probs, LenChoice2Index) == 0)
         {
@@ -635,6 +652,7 @@ public partial class Decoder
             symbol += Base.K_NUM_MID_LEN_SYMBOLS;
             symbol += BitTreeDecodeFast(ref rs, probs, LenHighBase, Base.K_NUM_HIGH_LEN_BITS);
         }
+
         return symbol;
     }
 
@@ -657,7 +675,6 @@ public partial class Decoder
         uint firstProb
     )
     {
-        var p = baseP;
         // Same one-level-ahead child-probability prefetch as BitTreeDecodeFast (see there),
         // applied to the hottest call site in the decoder: one 8-bit literal-tree decode per
         // literal byte. Manually unrolled (mirroring the ASM's explicit BIT_0/BIT_1x7
@@ -669,56 +686,56 @@ public partial class Decoder
         var prob = firstProb;
 
         var child0 = m << 1;
-        var probChild0 = p[child0];
-        var probChild1 = p[child0 + 1];
-        var bit = DecodeBitFastCore(ref rs, p + m, prob, out var mask);
+        var probChild0 = baseP[child0];
+        var probChild1 = baseP[child0 + 1];
+        var bit = DecodeBitFastCore(ref rs, baseP + m, prob, out var mask);
         m = child0 + bit;
         prob = (probChild0 & ~mask) | (probChild1 & mask);
 
         child0 = m << 1;
-        probChild0 = p[child0];
-        probChild1 = p[child0 + 1];
-        bit = DecodeBitFastCore(ref rs, p + m, prob, out mask);
+        probChild0 = baseP[child0];
+        probChild1 = baseP[child0 + 1];
+        bit = DecodeBitFastCore(ref rs, baseP + m, prob, out mask);
         m = child0 + bit;
         prob = (probChild0 & ~mask) | (probChild1 & mask);
 
         child0 = m << 1;
-        probChild0 = p[child0];
-        probChild1 = p[child0 + 1];
-        bit = DecodeBitFastCore(ref rs, p + m, prob, out mask);
+        probChild0 = baseP[child0];
+        probChild1 = baseP[child0 + 1];
+        bit = DecodeBitFastCore(ref rs, baseP + m, prob, out mask);
         m = child0 + bit;
         prob = (probChild0 & ~mask) | (probChild1 & mask);
 
         child0 = m << 1;
-        probChild0 = p[child0];
-        probChild1 = p[child0 + 1];
-        bit = DecodeBitFastCore(ref rs, p + m, prob, out mask);
+        probChild0 = baseP[child0];
+        probChild1 = baseP[child0 + 1];
+        bit = DecodeBitFastCore(ref rs, baseP + m, prob, out mask);
         m = child0 + bit;
         prob = (probChild0 & ~mask) | (probChild1 & mask);
 
         child0 = m << 1;
-        probChild0 = p[child0];
-        probChild1 = p[child0 + 1];
-        bit = DecodeBitFastCore(ref rs, p + m, prob, out mask);
+        probChild0 = baseP[child0];
+        probChild1 = baseP[child0 + 1];
+        bit = DecodeBitFastCore(ref rs, baseP + m, prob, out mask);
         m = child0 + bit;
         prob = (probChild0 & ~mask) | (probChild1 & mask);
 
         child0 = m << 1;
-        probChild0 = p[child0];
-        probChild1 = p[child0 + 1];
-        bit = DecodeBitFastCore(ref rs, p + m, prob, out mask);
+        probChild0 = baseP[child0];
+        probChild1 = baseP[child0 + 1];
+        bit = DecodeBitFastCore(ref rs, baseP + m, prob, out mask);
         m = child0 + bit;
         prob = (probChild0 & ~mask) | (probChild1 & mask);
 
         child0 = m << 1;
-        probChild0 = p[child0];
-        probChild1 = p[child0 + 1];
-        bit = DecodeBitFastCore(ref rs, p + m, prob, out mask);
+        probChild0 = baseP[child0];
+        probChild1 = baseP[child0 + 1];
+        bit = DecodeBitFastCore(ref rs, baseP + m, prob, out mask);
         m = child0 + bit;
         prob = (probChild0 & ~mask) | (probChild1 & mask);
 
         child0 = m << 1;
-        bit = DecodeBitFastCore(ref rs, p + m, prob, out mask);
+        bit = DecodeBitFastCore(ref rs, baseP + m, prob, out mask);
         m = child0 + bit;
 
         return (byte)m;
@@ -735,6 +752,7 @@ public partial class Decoder
             var bit = DecodeBitFastCore(ref rs, p + symbol, p[symbol], out _);
             symbol = (symbol << 1) | bit;
         }
+
         return (byte)symbol;
     }
 
@@ -749,8 +767,6 @@ public partial class Decoder
         uint firstProb
     )
     {
-        var p = baseP;
-
         // Same one-level-ahead prefetch as BitTreeDecodeFast, adapted for the matched-literal
         // zone: matchByte's bits are all known upfront (it comes from the dictionary, not from
         // decoding), so the *next* iteration's matched-zone index can be computed from it
@@ -772,16 +788,16 @@ public partial class Decoder
                 probChild1 = 0;
             if (hasNext)
             {
-                probChild0 = p[child0];
-                probChild1 = p[child0 + 1];
+                probChild0 = baseP[child0];
+                probChild1 = baseP[child0 + 1];
             }
 
-            var bit = DecodeBitFastCore(ref rs, p + index, prob, out var mask);
+            var bit = DecodeBitFastCore(ref rs, baseP + index, prob, out var mask);
             symbol = (symbol << 1) | bit;
 
             if (matchBit != bit)
             {
-                return LiteralDecodeTailFast(ref rs, p, symbol);
+                return LiteralDecodeTailFast(ref rs, baseP, symbol);
             }
 
             matchBit = nextMatchBit;
@@ -791,6 +807,7 @@ public partial class Decoder
                 prob = (probChild0 & ~mask) | (probChild1 & mask);
             }
         }
+
         return (byte)symbol;
     }
 }

@@ -17,13 +17,13 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         _outWindow = null;
     }
 
-    private partial class LenDecoder
+    private class LenDecoder
     {
         private BitDecoder _choice = new();
         private BitDecoder _choice2 = new();
         private readonly BitTreeDecoder[] _lowCoder = new BitTreeDecoder[Base.K_NUM_POS_STATES_MAX];
         private readonly BitTreeDecoder[] _midCoder = new BitTreeDecoder[Base.K_NUM_POS_STATES_MAX];
-        private BitTreeDecoder _highCoder = new(Base.K_NUM_HIGH_LEN_BITS);
+        private readonly BitTreeDecoder _highCoder = new(Base.K_NUM_HIGH_LEN_BITS);
         private uint _numPosStates;
 
         public void Create(uint numPosStates)
@@ -33,6 +33,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
                 _lowCoder[posState] = new BitTreeDecoder(Base.K_NUM_LOW_LEN_BITS);
                 _midCoder[posState] = new BitTreeDecoder(Base.K_NUM_MID_LEN_BITS);
             }
+
             _numPosStates = numPosStates;
         }
 
@@ -44,6 +45,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
                 _lowCoder[posState].Init();
                 _midCoder[posState].Init();
             }
+
             _choice2.Init();
             _highCoder.Init();
         }
@@ -54,6 +56,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
             {
                 return _lowCoder[posState].Decode(rangeDecoder);
             }
+
             var symbol = Base.K_NUM_LOW_LEN_SYMBOLS;
             if (_choice2.Decode(rangeDecoder) == 0)
             {
@@ -182,10 +185,12 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
     private readonly BitDecoder[] _isMatchDecoders = new BitDecoder[
         Base.K_NUM_STATES << Base.K_NUM_POS_STATES_BITS_MAX
     ];
+
     private readonly BitDecoder[] _isRepDecoders = new BitDecoder[Base.K_NUM_STATES];
     private readonly BitDecoder[] _isRepG0Decoders = new BitDecoder[Base.K_NUM_STATES];
     private readonly BitDecoder[] _isRepG1Decoders = new BitDecoder[Base.K_NUM_STATES];
     private readonly BitDecoder[] _isRepG2Decoders = new BitDecoder[Base.K_NUM_STATES];
+
     private readonly BitDecoder[] _isRep0LongDecoders = new BitDecoder[
         Base.K_NUM_STATES << Base.K_NUM_POS_STATES_BITS_MAX
     ];
@@ -193,6 +198,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
     private readonly BitTreeDecoder[] _posSlotDecoder = new BitTreeDecoder[
         Base.K_NUM_LEN_TO_POS_STATES
     ];
+
     private readonly BitDecoder[] _posDecoders = new BitDecoder[
         Base.K_NUM_FULL_DISTANCES - Base.K_END_POS_MODEL_INDEX
     ];
@@ -232,6 +238,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         {
             throw new InvalidParamException();
         }
+
         _outWindow = new OutWindow();
         var blockSize = Math.Max(_dictionarySize, (1 << 12));
         _outWindow.Create(blockSize);
@@ -239,14 +246,11 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
 
     private void SetLiteralProperties(int lp, int lc)
     {
-        if (lp > 8)
+        if (lp > 8 || lc > 8)
         {
             throw new InvalidParamException();
         }
-        if (lc > 8)
-        {
-            throw new InvalidParamException();
-        }
+
         _literalDecoder.Create(lp, lc);
     }
 
@@ -256,6 +260,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         {
             throw new InvalidParamException();
         }
+
         var numPosStates = (uint)1 << pb;
         _lenDecoder.Create(numPosStates);
         _repLenDecoder.Create(numPosStates);
@@ -273,6 +278,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
                 _isMatchDecoders[index].Init();
                 _isRep0LongDecoders[index].Init();
             }
+
             _isRepDecoders[i].Init();
             _isRepG0Decoders[i].Init();
             _isRepG1Decoders[i].Init();
@@ -314,6 +320,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         {
             CreateDictionary();
         }
+
         _outWindow.Init(outStream);
         if (outSize > 0)
         {

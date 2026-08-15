@@ -332,7 +332,7 @@ public class RvzReaderMatrixTests
         byte[] table;
         using (var ms = new MemoryStream(gs))
         using (var d = Compression.CompressionCodecFactory.Create(disc.Compression)
-            .CreateDecompressor(ms, disc.ComprData.AsSpan(0, disc.ComprDataLen), gs.Length, disc.NumGroups * 12))
+                   .CreateDecompressor(ms, disc.ComprData.AsSpan(0, disc.ComprDataLen), gs.Length, disc.NumGroups * 12))
         {
             table = new byte[disc.NumGroups * 12];
             var t = 0;

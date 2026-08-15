@@ -65,7 +65,7 @@ public class RvzWriterTests
         // would desync the fixed 22-byte exception entries.
         var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
         var iso = TestWiiIsoBuilder.Build(key, 130, TestWiiIsoBuilder.RandomData(130));
-        var dataStart = TestWiiIsoBuilder.PartitionOffset + TestWiiIsoBuilder.DataOffset;
+        const int dataStart = TestWiiIsoBuilder.PartitionOffset + TestWiiIsoBuilder.DataOffset;
         foreach (var paddingOffset in new[] { 0x26C, 0x320, 0x3E0 }) // padding_0/1/2 of sector 5
         {
             var at = dataStart + 5 * 0x8000 + paddingOffset;
@@ -174,15 +174,15 @@ public class RvzWriterTests
         WriteBe32(iso, 0x40000, 2);
         WriteBe32(iso, 0x40004, 0x8000 >> 2);
         WriteBe32(iso, 0x8000, 0x100000 >> 2);
-        WriteBe32(iso, 0x8004, 0);          // game partition type
+        WriteBe32(iso, 0x8004, 0); // game partition type
         WriteBe32(iso, 0x8008, 0x600000 >> 2);
-        WriteBe32(iso, 0x800C, 0x10);       // update partition type
+        WriteBe32(iso, 0x800C, 0x10); // update partition type
         WriteBe32(iso, 0x600000, 0x10001u);
         key.CopyTo(iso, 0x600000 + 0x1BF);
         WriteBe32(iso, 0x600000 + 0x2B8, 0x40000 >> 2);
         WriteBe32(iso, 0x600000 + 0x2BC, 0x100000 >> 2);
 
-        var updateDataStart = 0x600000 + 0x40000; // clamped to the disc end by the scrubber
+        const int updateDataStart = 0x600000 + 0x40000; // clamped to the disc end by the scrubber
         using var blob = PlainBlob.Open(new MemoryStream(iso));
         using var scrubbed = ScrubbedBlob.Create(blob);
         Assert.NotNull(scrubbed);

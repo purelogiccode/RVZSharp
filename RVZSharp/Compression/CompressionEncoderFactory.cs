@@ -24,15 +24,15 @@ public static class CompressionEncoderFactory
             case CompressionType.Zstd:
                 return (new ZstdEncoder(level), []);
             case CompressionType.Lzma:
-                {
-                    var encoder = new LzmaEncoder(lzma2: false, level);
-                    return (encoder, encoder.Properties);
-                }
+            {
+                var encoder = new LzmaEncoder(lzma2: false, level);
+                return (encoder, encoder.Properties);
+            }
             case CompressionType.Lzma2:
-                {
-                    var encoder = new LzmaEncoder(lzma2: true, level);
-                    return (encoder, encoder.Properties);
-                }
+            {
+                var encoder = new LzmaEncoder(lzma2: true, level);
+                return (encoder, encoder.Properties);
+            }
             default:
                 throw new RvzUnsupportedException(
                     $"Unsupported compression method {(uint)type}.");

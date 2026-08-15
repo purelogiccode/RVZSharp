@@ -20,7 +20,7 @@ public static class TestWiiIsoBuilder
     public static byte[] Build(byte[] key, int sectorCount, byte[] decryptedData,
         bool corruptSomeHashes = false)
     {
-        var dataStart = PartitionOffset + DataOffset;
+        const int dataStart = PartitionOffset + DataOffset;
         var dataSize = sectorCount * 0x8000;
         var isoSize = dataStart + dataSize + 0x120000;
         var iso = new byte[isoSize];

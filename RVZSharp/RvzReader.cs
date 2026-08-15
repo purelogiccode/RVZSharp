@@ -352,7 +352,7 @@ public sealed class RvzReader : IBlobReader
 
     private byte[] GetRawChunk(int rawIndex, long chunkIndex, long areaSize)
     {
-        var key = (long)rawIndex << 32 | chunkIndex;
+        var key = ((long)rawIndex << 32) | chunkIndex;
         if (_cachedRawKey != key || _cachedRawPayload == null)
         {
             var entry = RawDataEntries[rawIndex];

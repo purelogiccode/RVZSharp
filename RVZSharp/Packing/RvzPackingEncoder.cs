@@ -137,7 +137,7 @@ public static class RvzPackingEncoder
                 var junkBytes = nextJunkEnd - currentOffset;
                 if (junkBytes > 0)
                 {
-                    mainData.Add((byte)(junkBytes >> 24 | 0x80));
+                    mainData.Add((byte)((junkBytes >> 24) | 0x80));
                     mainData.Add((byte)(junkBytes >> 16));
                     mainData.Add((byte)(junkBytes >> 8));
                     mainData.Add((byte)junkBytes);

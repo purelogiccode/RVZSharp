@@ -121,7 +121,7 @@ public sealed class LaggedFibonacciGenerator
             var calculated = (_buffer[i - 17] << 23) ^ (_buffer[i - 16] >> 9) ^ _buffer[i - 1];
             if (check)
             {
-                var actual = (_buffer[i] & 0xFF00FFFF) | (_buffer[i] << 2 & 0x00FC0000);
+                var actual = (_buffer[i] & 0xFF00FFFF) | ((_buffer[i] << 2) & 0x00FC0000);
                 if ((calculated & 0xFFFCFFFF) != actual)
                 {
                     return false;
@@ -158,8 +158,8 @@ public sealed class LaggedFibonacciGenerator
 
         for (var i = 0; i < SeedWords; i++)
         {
-            _buffer[i] = (_buffer[i] & 0xFF00FFFF) | (_buffer[i] << 2 & 0x00FC0000) |
-                         ((_buffer[i + 16] ^ _buffer[i + 15]) << 9 & 0x00030000);
+            _buffer[i] = (_buffer[i] & 0xFF00FFFF) | ((_buffer[i] << 2) & 0x00FC0000) |
+                         (((_buffer[i + 16] ^ _buffer[i + 15]) << 9) & 0x00030000);
         }
 
         var seed = new byte[SeedSize];

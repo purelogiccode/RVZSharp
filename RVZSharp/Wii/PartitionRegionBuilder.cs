@@ -100,9 +100,9 @@ public sealed class PartitionRegionBuilder
 
             h1Arrays[group] = h1;
 
-            var h2hash = new byte[20];
-            SHA1.HashData(h1, h2hash);
-            h2hash.CopyTo(h2Array, group * 20);
+            var h2Hash = new byte[20];
+            SHA1.HashData(h1, h2Hash);
+            h2Hash.CopyTo(h2Array, group * 20);
         }
 
         var output = new byte[SectorCount * SectorSize];
@@ -140,7 +140,7 @@ public sealed class PartitionRegionBuilder
             {
                 var dataOut = new byte[WiiHashCalculator.SectorDataSize];
                 encryptor.TransformBlock(data, 0, data.Length, dataOut, 0);
-                dataOut.CopyTo(sectorOut.Slice(WiiHashCalculator.HashBlockSize));
+                dataOut.CopyTo(sectorOut[WiiHashCalculator.HashBlockSize..]);
             }
         }
 

@@ -1,5 +1,6 @@
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
+using Xunit.Abstractions;
 
 namespace RVZSharp.Tests;
 
@@ -359,6 +360,13 @@ public class RvzReaderMatrixTests
 
 public class RealFileDecodeTests
 {
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    public RealFileDecodeTests(ITestOutputHelper testOutputHelper)
+    {
+        _testOutputHelper = testOutputHelper;
+    }
+
     /// <summary>
     /// Optional real-world validation: set RVZ_REAL_FILE to a real .rvz path (and optionally
     /// RVZ_REAL_SHA1 to the expected SHA-1 of the decoded ISO) to run it.
@@ -395,7 +403,7 @@ public class RealFileDecodeTests
         }
         else
         {
-            Console.WriteLine($"decoded {path}: {reader.Length} bytes, sha1={actual}");
+            _testOutputHelper.WriteLine($"decoded {path}: {reader.Length} bytes, sha1={actual}");
         }
     }
 }

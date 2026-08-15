@@ -20,7 +20,7 @@ public ref struct SpanReader
     public int Position { get; private set; }
 
     /// <summary>Number of bytes that can still be read.</summary>
-    public int Remaining => _data.Length - Position;
+    public readonly int Remaining => _data.Length - Position;
 
     public ushort ReadUInt16()
     {
@@ -68,7 +68,7 @@ public ref struct SpanReader
         return _data[Position++];
     }
 
-    private void Ensure(int count)
+    private readonly void Ensure(int count)
     {
         if (count > Remaining)
         {

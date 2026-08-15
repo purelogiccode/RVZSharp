@@ -19,8 +19,8 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
 
     private class LenDecoder
     {
-        private BitDecoder _choice = new();
-        private BitDecoder _choice2 = new();
+        private BitDecoder _choice;
+        private BitDecoder _choice2;
         private readonly BitTreeDecoder[] _lowCoder = new BitTreeDecoder[Base.K_NUM_POS_STATES_MAX];
         private readonly BitTreeDecoder[] _midCoder = new BitTreeDecoder[Base.K_NUM_POS_STATES_MAX];
         private readonly BitTreeDecoder _highCoder = new(Base.K_NUM_HIGH_LEN_BITS);
@@ -67,13 +67,14 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
                 symbol += Base.K_NUM_MID_LEN_SYMBOLS;
                 symbol += _highCoder.Decode(rangeDecoder);
             }
+
             return symbol;
         }
     }
 
-    private partial class LiteralDecoder
+    private class LiteralDecoder
     {
-        private partial struct Decoder2
+        private struct Decoder2
         {
             private BitDecoder[] _decoders;
             private int _baseIndex;
@@ -84,7 +85,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
                 _baseIndex = baseIndex;
             }
 
-            public void Init()
+            public readonly void Init()
             {
                 for (var i = 0; i < 0x300; i++)
                 {
@@ -99,6 +100,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
                 {
                     symbol = (symbol << 1) | _decoders[_baseIndex + symbol].Decode(rangeDecoder);
                 } while (symbol < 0x100);
+
                 return (byte)symbol;
             }
 
@@ -119,9 +121,11 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
                             symbol =
                                 (symbol << 1) | _decoders[_baseIndex + symbol].Decode(rangeDecoder);
                         }
+
                         break;
                     }
                 } while (symbol < 0x100);
+
                 return (byte)symbol;
             }
         }
@@ -138,6 +142,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
             {
                 return;
             }
+
             _numPosBits = numPosBits;
             _posMask = ((uint)1 << numPosBits) - 1;
             _numPrevBits = numPrevBits;
@@ -203,7 +208,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         Base.K_NUM_FULL_DISTANCES - Base.K_END_POS_MODEL_INDEX
     ];
 
-    private BitTreeDecoder _posAlignDecoder = new(Base.K_NUM_ALIGN_BITS);
+    private readonly BitTreeDecoder _posAlignDecoder = new(Base.K_NUM_ALIGN_BITS);
 
     private readonly LenDecoder _lenDecoder = new();
     private readonly LenDecoder _repLenDecoder = new();
@@ -214,7 +219,8 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
 
     private uint _posStateMask;
 
-    private Base.State _state = new();
+    private Base.State _state;
+
     private uint _rep0,
         _rep1,
         _rep2,
@@ -489,6 +495,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         {
             throw new InvalidParamException();
         }
+
         var lc = properties[0] % 9;
         var remainder = properties[0] / 9;
         var lp = remainder % 5;
@@ -497,6 +504,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         {
             throw new InvalidParamException();
         }
+
         SetLiteralProperties(lp, lc);
         SetPosBitsProperties(pb);
         Init();
@@ -520,6 +528,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         {
             CreateDictionary();
         }
+
         _outWindow.Train(stream);
     }
 }

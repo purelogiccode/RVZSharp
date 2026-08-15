@@ -13,11 +13,20 @@ internal class Decoder
     public uint _range;
     public uint _code;
 
-    public uint Range { get => _range; set => _range = value; }
-    public uint Code { get => _code; set => _code = value; }
+    public uint Range
+    {
+        get => _range;
+        set => _range = value;
+    }
 
-    public Stream _stream;
-    public long _total;
+    public uint Code
+    {
+        get => _code;
+        set => _code = value;
+    }
+
+    public Stream Stream;
+    public long Total;
 
 #if !LEGACY_DOTNET
     // Upper bound (in terms of _total) that the fast buffered reader is allowed to physically
@@ -51,19 +60,20 @@ internal class Decoder
 
     public void Init(Stream stream)
     {
-        _stream = stream;
+        Stream = stream;
 
         _code = 0;
         _range = 0xFFFFFFFF;
         for (var i = 0; i < 5; i++)
         {
-            _code = (_code << 8) | (byte)_stream.ReadByte();
+            _code = (_code << 8) | (byte)Stream.ReadByte();
         }
-        _total = 5;
+
+        Total = 5;
 #if !LEGACY_DOTNET
         _fastLimit = -1;
         FastBufferPos = 0;
-        _fastBufferLen = 0;
+        FastBufferLen = 0;
         _fastEndOfStream = false;
         _fastBufferSafeUnbounded = false;
 #endif
@@ -74,24 +84,23 @@ internal class Decoder
 #if !LEGACY_DOTNET
         ReleaseFastBuffer();
 #endif
-        _stream = null;
+        Stream = null;
     }
 
 #if !LEGACY_DOTNET
     private const int FastBufferSize = 1 << 16;
     private byte[] _fastBuffer;
-    private int _fastBufferLen;
     private bool _fastEndOfStream;
 
     internal byte[] FastBufferArray => _fastBuffer ??= ArrayPool<byte>.Shared.Rent(FastBufferSize);
 
     internal int FastBufferPos { get; set; }
 
-    internal int FastBufferLen => _fastBufferLen;
+    internal int FastBufferLen { get; private set; }
 
     internal void AddTotal(long consumed)
     {
-        _total += consumed;
+        Total += consumed;
     }
 
     internal void RefillFast()
@@ -105,31 +114,34 @@ internal class Decoder
         if (_fastEndOfStream)
         {
             FastBufferPos = 0;
-            _fastBufferLen = 1;
+            FastBufferLen = 1;
             _fastBuffer[0] = 0xFF;
             return;
         }
+
         var requestSize = _fastBuffer.Length;
         if (_fastLimit >= 0)
         {
-            var remaining = _fastLimit - _total;
+            var remaining = _fastLimit - Total;
             requestSize = remaining <= 0 ? 1 : (int)Math.Min(requestSize, remaining);
         }
         else if (!_fastBufferSafeUnbounded)
         {
             requestSize = 1;
         }
-        var read = _stream.Read(_fastBuffer, 0, requestSize);
+
+        var read = Stream.Read(_fastBuffer, 0, requestSize);
         if (read <= 0)
         {
             _fastEndOfStream = true;
             FastBufferPos = 0;
-            _fastBufferLen = 1;
+            FastBufferLen = 1;
             _fastBuffer[0] = 0xFF;
             return;
         }
+
         FastBufferPos = 0;
-        _fastBufferLen = read;
+        FastBufferLen = read;
     }
 
     private void ReleaseFastBuffer()
@@ -139,8 +151,9 @@ internal class Decoder
             ArrayPool<byte>.Shared.Return(_fastBuffer);
             _fastBuffer = null;
         }
+
         FastBufferPos = 0;
-        _fastBufferLen = 0;
+        FastBufferLen = 0;
         _fastEndOfStream = false;
     }
 #endif
@@ -149,9 +162,9 @@ internal class Decoder
     {
         while (_range < K_TOP_VALUE)
         {
-            _code = (_code << 8) | (byte)_stream.ReadByte();
+            _code = (_code << 8) | (byte)Stream.ReadByte();
             _range <<= 8;
-            _total++;
+            Total++;
         }
     }
 
@@ -160,9 +173,9 @@ internal class Decoder
     {
         if (_range < K_TOP_VALUE)
         {
-            _code = (_code << 8) | (byte)_stream.ReadByte();
+            _code = (_code << 8) | (byte)Stream.ReadByte();
             _range <<= 8;
-            _total++;
+            Total++;
         }
     }
 
@@ -192,11 +205,12 @@ internal class Decoder
 
             if (range < K_TOP_VALUE)
             {
-                code = (code << 8) | (byte)_stream.ReadByte();
+                code = (code << 8) | (byte)Stream.ReadByte();
                 range <<= 8;
-                _total++;
+                Total++;
             }
         }
+
         _range = range;
         _code = code;
         return result;
@@ -217,6 +231,7 @@ internal class Decoder
             _code -= newBound;
             _range -= newBound;
         }
+
         Normalize();
         return symbol;
     }

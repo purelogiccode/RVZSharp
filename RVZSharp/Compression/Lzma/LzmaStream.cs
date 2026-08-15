@@ -128,6 +128,7 @@ public sealed class LzmaStream : Stream
                 lzma._needDictReset = false;
             }
         }
+
         return lzma;
     }
 
@@ -137,7 +138,9 @@ public sealed class LzmaStream : Stream
 
     public override bool CanWrite => false;
 
-    public override void Flush() { }
+    public override void Flush()
+    {
+    }
 
     protected override void Dispose(bool disposing)
     {
@@ -145,6 +148,7 @@ public sealed class LzmaStream : Stream
         {
             return;
         }
+
         _isDisposed = true;
         if (disposing)
         {
@@ -152,8 +156,10 @@ public sealed class LzmaStream : Stream
             {
                 _inputStream?.Dispose();
             }
+
             _outWindow.Dispose();
         }
+
         base.Dispose(disposing);
     }
 
@@ -185,6 +191,7 @@ public sealed class LzmaStream : Stream
                 {
                     _endReached = true;
                 }
+
                 if (_endReached)
                 {
                     break;
@@ -223,7 +230,7 @@ public sealed class LzmaStream : Stream
                 // Check range corruption scenario
                 if (
                     !_rangeDecoder.IsFinished
-                    || (_rangeDecoderLimit >= 0 && _rangeDecoder._total != _rangeDecoderLimit)
+                    || (_rangeDecoderLimit >= 0 && _rangeDecoder.Total != _rangeDecoderLimit)
                 )
                 {
                     // Stream might have End Of Stream marker
@@ -237,7 +244,7 @@ public sealed class LzmaStream : Stream
 
                 _rangeDecoder.ReleaseStream();
 
-                CompressedBytesRead += _rangeDecoder._total;
+                CompressedBytesRead += _rangeDecoder.Total;
                 if (_outWindow.HasPending)
                 {
                     throw new DataErrorException();
@@ -247,11 +254,7 @@ public sealed class LzmaStream : Stream
 
         if (_endReached)
         {
-            if (_inputSize >= 0 && CompressedBytesRead != _inputSize)
-            {
-                throw new DataErrorException();
-            }
-            if (_outputSize >= 0 && _position != _outputSize)
+            if ((_inputSize >= 0 && CompressedBytesRead != _inputSize) || (_outputSize >= 0 && _position != _outputSize))
             {
                 throw new DataErrorException();
             }
@@ -281,11 +284,7 @@ public sealed class LzmaStream : Stream
 
         if (_endReached)
         {
-            if (_inputSize >= 0 && CompressedBytesRead != _inputSize)
-            {
-                throw new DataErrorException();
-            }
-            if (_outputSize >= 0 && _position != _outputSize)
+            if ((_inputSize >= 0 && CompressedBytesRead != _inputSize) || (_outputSize >= 0 && _position != _outputSize))
             {
                 throw new DataErrorException();
             }
@@ -317,7 +316,7 @@ public sealed class LzmaStream : Stream
             // Check range corruption scenario
             if (
                 !_rangeDecoder.IsFinished
-                || (_rangeDecoderLimit >= 0 && _rangeDecoder._total != _rangeDecoderLimit)
+                || (_rangeDecoderLimit >= 0 && _rangeDecoder.Total != _rangeDecoderLimit)
             )
             {
                 // Stream might have End Of Stream marker
@@ -331,7 +330,7 @@ public sealed class LzmaStream : Stream
 
             _rangeDecoder.ReleaseStream();
 
-            CompressedBytesRead += _rangeDecoder._total;
+            CompressedBytesRead += _rangeDecoder.Total;
             if (_outWindow.HasPending)
             {
                 throw new DataErrorException();
@@ -346,74 +345,76 @@ public sealed class LzmaStream : Stream
         var control = _inputStream!.ReadByte();
         CompressedBytesRead++;
 
-        if (control == 0x00)
+        switch (control)
         {
-            if (_isLzma2 && _decoder is { HasEndMarker: true })
-            {
+            case 0x00 when _isLzma2 && _decoder is { HasEndMarker: true }:
                 throw new DataErrorException();
-            }
+            case 0x00:
+                _endReached = true;
+                return;
+            case >= 0xE0 or 0x01:
+                _needProps = true;
+                _needDictReset = false;
+                _outWindow.Reset();
+                break;
+            default:
+                {
+                    if (_needDictReset)
+                    {
+                        throw new DataErrorException();
+                    }
 
-            _endReached = true;
-            return;
+                    break;
+                }
         }
 
-        if (control is >= 0xE0 or 0x01)
+        switch (control)
         {
-            _needProps = true;
-            _needDictReset = false;
-            _outWindow.Reset();
-        }
-        else if (_needDictReset)
-        {
-            throw new DataErrorException();
-        }
+            case >= 0x80:
+                {
+                    _uncompressedChunk = false;
 
-        if (control >= 0x80)
-        {
-            _uncompressedChunk = false;
+                    _availableBytes = (control & 0x1F) << 16;
+                    _availableBytes += (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
+                    CompressedBytesRead += 2;
 
-            _availableBytes = (control & 0x1F) << 16;
-            _availableBytes += (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-            CompressedBytesRead += 2;
+                    _rangeDecoderLimit = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
+                    CompressedBytesRead += 2;
 
-            _rangeDecoderLimit = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-            CompressedBytesRead += 2;
+                    if (control >= 0xC0)
+                    {
+                        _needProps = false;
+                        Properties[0] = (byte)_inputStream.ReadByte();
+                        CompressedBytesRead++;
 
-            if (control >= 0xC0)
-            {
-                _needProps = false;
-                Properties[0] = (byte)_inputStream.ReadByte();
-                CompressedBytesRead++;
+                        _decoder = new Decoder();
+                        _decoder.SetDecoderProperties(Properties);
+                    }
+                    else if (_needProps)
+                    {
+                        throw new DataErrorException();
+                    }
+                    else if (control >= 0xA0)
+                    {
+                        _decoder = new Decoder();
+                        _decoder.SetDecoderProperties(Properties);
+                    }
 
-                _decoder = new Decoder();
-                _decoder.SetDecoderProperties(Properties);
-            }
-            else if (_needProps)
-            {
+                    _rangeDecoder.Init(_inputStream);
+                    // LZMA2 chunks share one underlying stream with the raw chunk-header bytes read
+                    // above/below, so the buffered fast-read path must never physically read past this
+                    // chunk's compressed size, or it would desynchronize the stream position for the
+                    // next chunk header.
+                    _rangeDecoder.SetFastLimit(_rangeDecoderLimit);
+                    break;
+                }
+            case > 0x02:
                 throw new DataErrorException();
-            }
-            else if (control >= 0xA0)
-            {
-                _decoder = new Decoder();
-                _decoder.SetDecoderProperties(Properties);
-            }
-
-            _rangeDecoder.Init(_inputStream);
-            // LZMA2 chunks share one underlying stream with the raw chunk-header bytes read
-            // above/below, so the buffered fast-read path must never physically read past this
-            // chunk's compressed size, or it would desynchronize the stream position for the
-            // next chunk header.
-            _rangeDecoder.SetFastLimit(_rangeDecoderLimit);
-        }
-        else if (control > 0x02)
-        {
-            throw new DataErrorException();
-        }
-        else
-        {
-            _uncompressedChunk = true;
-            _availableBytes = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-            CompressedBytesRead += 2;
+            default:
+                _uncompressedChunk = true;
+                _availableBytes = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
+                CompressedBytesRead += 2;
+                break;
         }
     }
 
@@ -445,7 +446,7 @@ public sealed class LzmaStream : Stream
         throw new NotSupportedException();
     }
 
-    public byte[] Properties { get; } = new byte[5];
+    public byte[] Properties { get; }
 
     internal long CompressedBytesRead { get; private set; }
 }

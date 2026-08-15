@@ -162,7 +162,7 @@ public static class TableParser
             throw;
         }
         catch (Exception e) when (e is IOException or InvalidDataException or ZstdSharp.ZstdException
-                                 or ICSharpCode.SharpZipLib.SharpZipBaseException)
+                                      or ICSharpCode.SharpZipLib.SharpZipBaseException)
         {
             throw new RvzFormatException($"Failed to decompress the {name} table: {e.Message}", e);
         }

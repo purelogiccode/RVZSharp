@@ -50,7 +50,7 @@ internal abstract class Base
             Index = (uint)(Index < 7 ? 9 : 11);
         }
 
-        public bool IsCharState()
+        public readonly bool IsCharState()
         {
             return Index < 7;
         }

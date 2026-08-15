@@ -156,7 +156,7 @@ public partial class ChunkDecoderPackingTests
     public void PartitionChunk_NoExceptions_Compressed()
     {
         var payload = Payload(0x1F000, seed: 9);
-        var stored = TestCompressor.Compress(CompressionType.Zstd, Concat([0x00, 0x00], payload));
+        var stored = TestCompressor.Compress(CompressionType.Zstd, Concat("\0\0"u8.ToArray(), payload));
         var disc = MakeDisc(CompressionType.Zstd);
         var (file, group) = GroupFile(stored, compressed: true);
         using (file)

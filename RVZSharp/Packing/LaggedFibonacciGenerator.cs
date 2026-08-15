@@ -68,7 +68,7 @@ public sealed class LaggedFibonacciGenerator
             for (var i = 0; i < take; i++)
             {
                 output[outPos + i] = (byte)(_buffer[(_positionBytes + i) >> 2] >>
-                    (8 * ((_positionBytes + i) & 3)));
+                                            (8 * ((_positionBytes + i) & 3)));
             }
 
             _positionBytes += take;
@@ -95,7 +95,7 @@ public sealed class LaggedFibonacciGenerator
         return b;
     }
 
-    private void Backward(int startWord, int endWord)
+    private void Backward(int startWord = 0, int endWord = BufferWords)
     {
         var loopEnd = Math.Max(J, startWord);
         for (var i = Math.Min(endWord, BufferWords); i > loopEnd; i--)
@@ -107,11 +107,6 @@ public sealed class LaggedFibonacciGenerator
         {
             _buffer[i - 1] ^= _buffer[i - 1 + BufferWords - J];
         }
-    }
-
-    private void Backward()
-    {
-        Backward(0, BufferWords);
     }
 
     private bool Initialize(bool check)

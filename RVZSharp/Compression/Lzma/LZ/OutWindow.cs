@@ -5,16 +5,12 @@ using System.Buffers;
 
 namespace RVZSharp.Compression.Lzma.LZ;
 
-internal partial class OutWindow : IDisposable
+internal class OutWindow : IDisposable
 {
-    private byte[] _buffer;
-    private int _windowSize;
     private int _streamPos;
     private int _pendingLen;
     private int _pendingDist;
     private Stream _stream;
-
-    private long _limit;
 
     public long Total => FastTotal;
 
@@ -24,13 +20,15 @@ internal partial class OutWindow : IDisposable
     // decode call instead of going through PutByte/GetByte/CopyBlock (and re-reading the
     // fields of this object) for every single output byte, mirroring how the reference
     // 7-Zip C decoder caches dicPos/dic as locals for the duration of one decode call.
-    internal byte[] FastBuffer => _buffer;
+    internal byte[] FastBuffer { get; private set; }
+
     internal int FastPos { get; set; }
 
     internal long FastTotal { get; set; }
 
-    internal int FastWindowSize => _windowSize;
-    internal long FastLimit => _limit;
+    internal int FastWindowSize { get; private set; }
+
+    internal long FastLimit { get; private set; }
 
     internal void FastFlush()
     {
@@ -50,38 +48,42 @@ internal partial class OutWindow : IDisposable
         {
             throw new DataErrorException($"LZMA: invalid dictionary size {windowSize}");
         }
-        if (_windowSize != windowSize)
+
+        if (FastWindowSize != windowSize)
         {
-            if (_buffer is not null)
+            if (FastBuffer is not null)
             {
-                ArrayPool<byte>.Shared.Return(_buffer);
+                ArrayPool<byte>.Shared.Return(FastBuffer);
             }
-            _buffer = ArrayPool<byte>.Shared.Rent(windowSize);
+
+            FastBuffer = ArrayPool<byte>.Shared.Rent(windowSize);
         }
-        _buffer[windowSize - 1] = 0;
-        _windowSize = windowSize;
+
+        FastBuffer[windowSize - 1] = 0;
+        FastWindowSize = windowSize;
         FastPos = 0;
         _streamPos = 0;
         _pendingLen = 0;
         FastTotal = 0;
-        _limit = 0;
+        FastLimit = 0;
     }
 
     public void Dispose()
     {
         ReleaseStream();
-        if (_buffer is null)
+        if (FastBuffer is null)
         {
             return;
         }
-        ArrayPool<byte>.Shared.Return(_buffer);
-        _buffer = null;
+
+        ArrayPool<byte>.Shared.Return(FastBuffer);
+        FastBuffer = null;
     }
 
     public void Reset()
     {
         ReleaseStream();
-        Create(_windowSize);
+        Create(FastWindowSize);
     }
 
     public void Init(Stream stream)
@@ -93,16 +95,17 @@ internal partial class OutWindow : IDisposable
     public void Train(Stream stream)
     {
         var len = stream.Length;
-        var size = (len < _windowSize) ? (int)len : _windowSize;
+        var size = (len < FastWindowSize) ? (int)len : FastWindowSize;
         stream.Position = len - size;
         FastTotal = 0;
-        _limit = size;
-        FastPos = _windowSize - size;
+        FastLimit = size;
+        FastPos = FastWindowSize - size;
         CopyStream(stream, size);
-        if (FastPos == _windowSize)
+        if (FastPos == FastWindowSize)
         {
             FastPos = 0;
         }
+
         _streamPos = FastPos;
     }
 
@@ -118,16 +121,19 @@ internal partial class OutWindow : IDisposable
         {
             return;
         }
+
         var size = FastPos - _streamPos;
         if (size == 0)
         {
             return;
         }
-        _stream.Write(_buffer, _streamPos, size);
-        if (FastPos >= _windowSize)
+
+        _stream.Write(FastBuffer, _streamPos, size);
+        if (FastPos >= FastWindowSize)
         {
             FastPos = 0;
         }
+
         _streamPos = FastPos;
     }
 
@@ -137,58 +143,65 @@ internal partial class OutWindow : IDisposable
         {
             return;
         }
+
         var rem = _pendingLen;
-        var pos = (_pendingDist < FastPos ? FastPos : FastPos + _windowSize) - _pendingDist - 1;
+        var pos = (_pendingDist < FastPos ? FastPos : FastPos + FastWindowSize) - _pendingDist - 1;
         while (rem > 0 && HasSpace)
         {
-            if (pos >= _windowSize)
+            if (pos >= FastWindowSize)
             {
                 pos = 0;
             }
-            PutByte(_buffer[pos++]);
+
+            PutByte(FastBuffer[pos++]);
             rem--;
         }
+
         _pendingLen = rem;
     }
 
     public void CopyBlock(int distance, int len)
     {
         var rem = len;
-        var pos = (distance < FastPos ? FastPos : FastPos + _windowSize) - distance - 1;
-        var targetSize = HasSpace ? (int)Math.Min(rem, _limit - FastTotal) : 0;
-        var sizeUntilWindowEnd = Math.Min(_windowSize - FastPos, _windowSize - pos);
+        var pos = (distance < FastPos ? FastPos : FastPos + FastWindowSize) - distance - 1;
+        var targetSize = HasSpace ? (int)Math.Min(rem, FastLimit - FastTotal) : 0;
+        var sizeUntilWindowEnd = Math.Min(FastWindowSize - FastPos, FastWindowSize - pos);
         var sizeUntilOverlap = Math.Abs(pos - FastPos);
         var fastSize = Math.Min(Math.Min(sizeUntilWindowEnd, sizeUntilOverlap), targetSize);
         if (fastSize >= 2)
         {
-            _buffer.AsSpan(pos, fastSize).CopyTo(_buffer.AsSpan(FastPos, fastSize));
+            FastBuffer.AsSpan(pos, fastSize).CopyTo(FastBuffer.AsSpan(FastPos, fastSize));
             FastPos += fastSize;
             pos += fastSize;
             FastTotal += fastSize;
-            if (FastPos >= _windowSize)
+            if (FastPos >= FastWindowSize)
             {
                 Flush();
             }
+
             rem -= fastSize;
         }
+
         while (rem > 0 && HasSpace)
         {
-            if (pos >= _windowSize)
+            if (pos >= FastWindowSize)
             {
                 pos = 0;
             }
-            PutByte(_buffer[pos++]);
+
+            PutByte(FastBuffer[pos++]);
             rem--;
         }
+
         _pendingLen = rem;
         _pendingDist = distance;
     }
 
     public void PutByte(byte b)
     {
-        _buffer[FastPos++] = b;
+        FastBuffer[FastPos++] = b;
         FastTotal++;
-        if (FastPos >= _windowSize)
+        if (FastPos >= FastWindowSize)
         {
             Flush();
         }
@@ -199,47 +212,52 @@ internal partial class OutWindow : IDisposable
         var pos = FastPos - distance - 1;
         if (pos < 0)
         {
-            pos += _windowSize;
+            pos += FastWindowSize;
         }
-        return _buffer[pos];
+
+        return FastBuffer[pos];
     }
 
     public int CopyStream(Stream stream, int len)
     {
         var size = len;
-        while (size > 0 && FastPos < _windowSize && FastTotal < _limit)
+        while (size > 0 && FastPos < FastWindowSize && FastTotal < FastLimit)
         {
-            var curSize = _windowSize - FastPos;
-            if (curSize > _limit - FastTotal)
+            var curSize = FastWindowSize - FastPos;
+            if (curSize > FastLimit - FastTotal)
             {
-                curSize = (int)(_limit - FastTotal);
+                curSize = (int)(FastLimit - FastTotal);
             }
+
             if (curSize > size)
             {
                 curSize = size;
             }
-            var numReadBytes = stream.Read(_buffer, FastPos, curSize);
+
+            var numReadBytes = stream.Read(FastBuffer, FastPos, curSize);
             if (numReadBytes == 0)
             {
                 throw new DataErrorException();
             }
+
             size -= numReadBytes;
             FastPos += numReadBytes;
             FastTotal += numReadBytes;
-            if (FastPos >= _windowSize)
+            if (FastPos >= FastWindowSize)
             {
                 Flush();
             }
         }
+
         return len - size;
     }
 
     public void SetLimit(long size)
     {
-        _limit = FastTotal + size;
+        FastLimit = FastTotal + size;
     }
 
-    public bool HasSpace => FastPos < _windowSize && FastTotal < _limit;
+    public bool HasSpace => FastPos < FastWindowSize && FastTotal < FastLimit;
 
     public bool HasPending => _pendingLen > 0;
 
@@ -255,13 +273,15 @@ internal partial class OutWindow : IDisposable
         {
             size = count;
         }
-        Buffer.BlockCopy(_buffer, _streamPos, buffer, offset, size);
+
+        Buffer.BlockCopy(FastBuffer, _streamPos, buffer, offset, size);
         _streamPos += size;
-        if (_streamPos >= _windowSize)
+        if (_streamPos >= FastWindowSize)
         {
             FastPos = 0;
             _streamPos = 0;
         }
+
         return size;
     }
 
@@ -277,13 +297,15 @@ internal partial class OutWindow : IDisposable
         {
             size = count;
         }
-        _buffer.AsMemory(_streamPos, size).CopyTo(buffer.Slice(offset, size));
+
+        FastBuffer.AsMemory(_streamPos, size).CopyTo(buffer.Slice(offset, size));
         _streamPos += size;
-        if (_streamPos >= _windowSize)
+        if (_streamPos >= FastWindowSize)
         {
             FastPos = 0;
             _streamPos = 0;
         }
+
         return size;
     }
 
@@ -294,10 +316,10 @@ internal partial class OutWindow : IDisposable
             return -1;
         }
 
-        int value = _buffer[_streamPos];
+        int value = FastBuffer[_streamPos];
 
         _streamPos++;
-        if (_streamPos >= _windowSize)
+        if (_streamPos >= FastWindowSize)
         {
             FastPos = 0;
             _streamPos = 0;

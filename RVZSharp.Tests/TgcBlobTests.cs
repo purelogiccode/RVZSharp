@@ -48,8 +48,8 @@ public class TgcBlobTests
 
         using var reader = TgcBlob.Open(new MemoryStream(tgc));
         // Read a range that starts inside the FST replacement and extends past it.
-        var start = 0x100;
-        var length = 0x60;
+        const int start = 0x100;
+        const int length = 0x60;
         var probe = new byte[length];
         reader.ReadAt(start, probe);
         Assert.Equal(iso.AsSpan(start, length).ToArray(), probe);

@@ -90,7 +90,10 @@ public sealed class SectionStream : Stream
         return newPosition;
     }
 
-    public override void Flush() { }
+    public override void Flush()
+    {
+    }
+
     public override void SetLength(long value)
     {
         throw new NotSupportedException();

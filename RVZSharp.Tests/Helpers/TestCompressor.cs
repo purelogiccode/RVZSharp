@@ -14,38 +14,38 @@ public static class TestCompressor
                 return data;
 
             case CompressionType.Zstd:
-            {
-                using var ms = new MemoryStream();
-                using (var cs = new ZstdSharp.CompressionStream(ms, 3, 0, leaveOpen: true))
                 {
-                    cs.Write(data);
-                }
+                    using var ms = new MemoryStream();
+                    using (var cs = new ZstdSharp.CompressionStream(ms, 3, 0, leaveOpen: true))
+                    {
+                        cs.Write(data);
+                    }
 
-                return ms.ToArray();
-            }
+                    return ms.ToArray();
+                }
 
             case CompressionType.Bzip2:
-            {
-                using var ms = new MemoryStream();
-                using (var cs = new BZip2OutputStream(ms) { IsStreamOwner = false })
                 {
-                    cs.Write(data, 0, data.Length);
+                    using var ms = new MemoryStream();
+                    using (var cs = new BZip2OutputStream(ms) { IsStreamOwner = false })
+                    {
+                        cs.Write(data, 0, data.Length);
+                    }
+
+                    return ms.ToArray();
                 }
 
-                return ms.ToArray();
-            }
-
             case CompressionType.Lzma:
-            {
-                // The props live in the disc header; the table holds only the stream.
-                var (_, encoded) = EncodeLzma1(data, endMarker: true);
-                return encoded;
-            }
+                {
+                    // The props live in the disc header; the table holds only the stream.
+                    var (_, encoded) = EncodeLzma1(data, endMarker: true);
+                    return encoded;
+                }
 
             case CompressionType.Lzma2:
-            {
-                return BuildLzma2Stream(data);
-            }
+                {
+                    return BuildLzma2Stream(data);
+                }
 
             case CompressionType.Purge:
                 return CompressPurge(data);

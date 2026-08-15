@@ -156,7 +156,9 @@ public static class RvzWriter
         // and unrecognized volumes get 0.
         var discType = WiiVolume.IsWiiDisc(input)
             ? (uint)DiscType.Wii
-            : ReadBe32(discHeader, 0x18) == WiiVolume.GC_MAGIC ? (uint)DiscType.GameCube : (uint)DiscType.Unknown;
+            : ReadBe32(discHeader, 0x18) == WiiVolume.GC_MAGIC
+                ? (uint)DiscType.GameCube
+                : (uint)DiscType.Unknown;
 
         // Build the data areas in disc order (Dolphin: SetUpDataEntriesForWriting).
         var areas = new List<AreaEntry>();
@@ -193,14 +195,7 @@ public static class RvzWriter
                     (long)(partition.Offset + partition.DataOffset), out var containerKey)
                     ? containerKey
                     : partition.Key;
-                var effective = new Partition
-                {
-                    Offset = partition.Offset,
-                    Type = partition.Type,
-                    DataOffset = partition.DataOffset,
-                    DataSize = partition.DataSize,
-                    Key = key
-                };
+                var effective = partition with { Key = key };
 
                 // Partitions overlapping the data already encoded (e.g. update partitions)
                 // are skipped, exactly like Dolphin (WIABlob.cpp:967-971). Skipping never
@@ -236,15 +231,14 @@ public static class RvzWriter
 
                 var size0 = AlignDown(splitPoint - dataStart, SectorSize);
                 var size1 = AlignDown(dataEnd - splitPoint, SectorSize);
-                if (size0 == 0 && size1 == 0)
+                switch (size0)
                 {
-                    // Nothing to encode as partition data; the region stays raw.
-                    continue;
-                }
-
-                if (size0 > 0)
-                {
-                    areas.Add(new AreaEntry { Offset = dataStart, Size = size0, IsPartition = true, Partition = effective });
+                    case 0 when size1 == 0:
+                        // Nothing to encode as partition data; the region stays raw.
+                        continue;
+                    case > 0:
+                        areas.Add(new AreaEntry { Offset = dataStart, Size = size0, IsPartition = true, Partition = effective });
+                        break;
                 }
 
                 if (size1 > 0)
@@ -356,7 +350,7 @@ public static class RvzWriter
         // Write the file: head + disc struct + tables + group data. The caller owns the
         // output stream, so it is not disposed here.
         var file = output;
-        var partOffset = (ulong)(WiaFileHead.Size + WiaDisc.Size);
+        const ulong partOffset = WiaFileHead.Size + WiaDisc.Size;
         var rawOffset = partOffset + (ulong)partitionTable.Length;
         var groupOffset = rawOffset + (ulong)rawTableStored.Length;
         var rawCount = (uint)areas.Count(a => !a.IsPartition);
@@ -422,8 +416,8 @@ public static class RvzWriter
         // disc struct's disc_header (WIABlob.cpp:902-906), and the reader serves them from
         // there. Only the first Wii raw gap (which starts at 0) is affected; the reader's
         // alignment growth (TableParser) maps the entry back to the same bytes.
-        const ulong SkipSize = WiiVolume.DiscHeaderSize; // 0x80
-        var skip = offset < SkipSize ? Math.Min(SkipSize - offset, size) : 0;
+        const ulong skipSize = WiiVolume.DiscHeaderSize; // 0x80
+        var skip = offset < skipSize ? Math.Min(skipSize - offset, size) : 0;
         offset += skip;
         size -= skip;
 

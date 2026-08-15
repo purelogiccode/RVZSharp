@@ -26,6 +26,7 @@ internal readonly struct BitTreeDecoder
         {
             m = (m << 1) + _models[m].Decode(rangeDecoder);
         }
+
         return m - ((uint)1 << _numBitLevels);
     }
 
@@ -40,6 +41,7 @@ internal readonly struct BitTreeDecoder
             m += bit;
             symbol |= (bit << bitIndex);
         }
+
         return symbol;
     }
 
@@ -59,6 +61,7 @@ internal readonly struct BitTreeDecoder
             m += bit;
             symbol |= (bit << bitIndex);
         }
+
         return symbol;
     }
 }

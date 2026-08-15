@@ -54,6 +54,7 @@ internal readonly struct BitTreeEncoder
             price += _models[m].GetPrice(bit);
             m = (m << 1) + bit;
         }
+
         return price;
     }
 
@@ -68,6 +69,7 @@ internal readonly struct BitTreeEncoder
             price += _models[m].GetPrice(bit);
             m = (m << 1) | bit;
         }
+
         return price;
     }
 
@@ -87,6 +89,7 @@ internal readonly struct BitTreeEncoder
             price += models[startIndex + m].GetPrice(bit);
             m = (m << 1) | bit;
         }
+
         return price;
     }
 

@@ -34,6 +34,7 @@ public sealed class RvzPackingDecoder : Stream
     public override bool CanSeek => false;
     public override bool CanWrite => false;
     public override long Length => throw new NotSupportedException();
+
     public override long Position
     {
         get => throw new NotSupportedException();
@@ -195,7 +196,10 @@ public sealed class RvzPackingDecoder : Stream
         base.Dispose(disposing);
     }
 
-    public override void Flush() { }
+    public override void Flush()
+    {
+    }
+
     public override long Seek(long offset, SeekOrigin origin)
     {
         throw new NotSupportedException();

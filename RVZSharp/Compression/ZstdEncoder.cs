@@ -22,6 +22,7 @@ public sealed class ZstdEncoder : ICompressionEncoder
         {
             zstd.Write(data);
         }
+
         return output.ToArray();
     }
 

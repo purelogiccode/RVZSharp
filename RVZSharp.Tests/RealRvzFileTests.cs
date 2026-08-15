@@ -209,21 +209,21 @@ public class RealRvzDecodeTests
         switch (dir)
         {
             case RealRvzCatalog.GcDir:
-            {
-                foreach (var e in RealRvzCatalog.GameCube)
-                    if (e.File == file)
-                        return e.IsoSize;
+                {
+                    foreach (var e in RealRvzCatalog.GameCube)
+                        if (e.File == file)
+                            return e.IsoSize;
 
-                break;
-            }
+                    break;
+                }
             case RealRvzCatalog.WiiDir:
-            {
-                foreach (var e in RealRvzCatalog.Wii)
-                    if (e.File == file)
-                        return e.IsoSize;
+                {
+                    foreach (var e in RealRvzCatalog.Wii)
+                        if (e.File == file)
+                            return e.IsoSize;
 
-                break;
-            }
+                    break;
+                }
         }
 
         return -1;
@@ -318,6 +318,7 @@ public class RealRvzRegionTests
         foreach (var off in offsets)
         {
             if (off >= full.Length) continue;
+
             var count = (int)Math.Min(4096, full.Length - off);
             var expected = full.AsSpan((int)off, count).ToArray();
             var actual = new byte[count];

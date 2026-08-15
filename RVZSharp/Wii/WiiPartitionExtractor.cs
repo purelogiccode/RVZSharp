@@ -121,10 +121,10 @@ public sealed class WiiPartitionExtractor
         var fields = new (int Offset, int Size)[]
         {
             (0x000, 0x26C), // h0
-            (0x26C, 0x14),  // padding_0
-            (0x280, 0xA0),  // h1
-            (0x320, 0x20),  // padding_1
-            (0x340, 0xA0),  // h2
+            (0x26C, 0x14), // padding_0
+            (0x280, 0xA0), // h1
+            (0x320, 0x20), // padding_1
+            (0x340, 0xA0), // h2
             (0x3E0, 0x20) // padding_2
         };
 

@@ -77,16 +77,14 @@ public sealed class GczBlob : IBlobReader
             throw new RvzFormatException("The GCZ file has zero blocks.");
         }
 
-        if (blockSize == 0)
+        switch (blockSize)
         {
-            throw new RvzFormatException("The GCZ block size is zero.");
-        }
-
-        // Reject sizes that would overflow the int casts used for reads and allocations
-        // (hostile headers only; Dolphin's own converter writes 0x4000-byte blocks).
-        if (blockSize > int.MaxValue)
-        {
-            throw new RvzFormatException($"The GCZ block size {blockSize} is too large.");
+            case 0:
+                throw new RvzFormatException("The GCZ block size is zero.");
+            // Reject sizes that would overflow the int casts used for reads and allocations
+            // (hostile headers only; Dolphin's own converter writes 0x4000-byte blocks).
+            case > int.MaxValue:
+                throw new RvzFormatException($"The GCZ block size {blockSize} is too large.");
         }
 
         // Compare in ulong so a header with the top bit set cannot wrap past the bounds check.

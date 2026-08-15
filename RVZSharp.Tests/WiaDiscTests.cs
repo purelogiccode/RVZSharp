@@ -136,7 +136,7 @@ public class WiaDiscTests
     }
 
     [Theory]
-    [InlineData(0x1000)]  // too small
+    [InlineData(0x1000)] // too small
     [InlineData(0x18000)] // not a power of two and not a multiple of 2 MiB
     [InlineData(0x300000)] // 3 MiB: multiple of 2 MiB? no
     public void Validate_ChunkSizes_Invalid(uint chunkSize)

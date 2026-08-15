@@ -41,6 +41,7 @@ internal struct BitEncoder
             encoder.Range -= newBound;
             _prob -= (_prob) >> KNumMoveBits;
         }
+
         if (encoder.Range < Encoder.KTopValue)
         {
             encoder.Range <<= 8;

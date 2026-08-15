@@ -20,9 +20,9 @@ public static class WiiHashCalculator
     public const int HashSize = 20;
     public const int H0Size = BlocksPerSector * HashSize; // 0x26C
     private const int H0Padding = 0x14;
-    private const int H1Size = 8 * HashSize;                // 0xA0
+    private const int H1Size = 8 * HashSize; // 0xA0
     private const int H1Padding = 0x20;
-    private const int H2Size = 8 * HashSize;                // 0xA0
+    private const int H2Size = 8 * HashSize; // 0xA0
     private const int H2Padding = 0x20;
 
     /// <summary>
@@ -64,20 +64,20 @@ public static class WiiHashCalculator
         for (var i = 0; i < BlocksPerSector; i++)
         {
             SHA1.HashData(sectorData.Slice(i * BlockDataSize, BlockDataSize), hash);
-            hash.CopyTo(hashArea.Slice(i * HashSize));
+            hash.CopyTo(hashArea[(i * HashSize)..]);
         }
 
         // H0 padding (0x26C-0x280) is already zero.
 
         // H1 hash of this sector's h0 array (goes into slot 0 of the group's shared h1).
         SHA1.HashData(hashArea[..H0Size], hash);
-        hash.CopyTo(hashArea.Slice(H0Size + H0Padding));
+        hash.CopyTo(hashArea[(H0Size + H0Padding)..]);
 
         // H1 padding (0x320-0x340) is already zero.
 
         // H2 hash of this sector's h1 array (goes into slot (sector / 8) of the shared h2).
         SHA1.HashData(hashArea.Slice(H0Size + H0Padding, H1Size), hash);
-        hash.CopyTo(hashArea.Slice(H0Size + H0Padding + H1Size + H1Padding));
+        hash.CopyTo(hashArea[(H0Size + H0Padding + H1Size + H1Padding)..]);
 
         // H2 padding (0x3E0-0x400) is already zero.
     }
@@ -103,7 +103,7 @@ public static class WiiHashCalculator
                     $"Hash exception at offset 0x{exception.Offset:X4} is outside the sector hash area.");
             }
 
-            exception.Hash.CopyTo(hashArea.Slice(offsetInBlock));
+            exception.Hash.CopyTo(hashArea[offsetInBlock..]);
         }
     }
 }

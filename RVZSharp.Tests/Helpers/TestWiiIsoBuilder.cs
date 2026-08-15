@@ -60,7 +60,7 @@ public static class TestWiiIsoBuilder
             }
 
             output.Position = 0;
-            output.Read(iso, dataStart, (int)output.Length);
+            output.ReadExactly(iso, dataStart, (int)output.Length);
         }
 
         if (corruptSomeHashes)

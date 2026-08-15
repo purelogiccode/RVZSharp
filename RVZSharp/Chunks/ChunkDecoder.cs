@@ -6,7 +6,6 @@ using RVZSharp.Packing;
 
 namespace RVZSharp.Chunks;
 
-
 /// <summary>The decoded content of one group chunk.</summary>
 public readonly struct ChunkDecodeResult
 {
@@ -19,7 +18,9 @@ public readonly struct ChunkDecodeResult
     /// </summary>
     public HashExceptionEntry[][] ExceptionLists { get; init; } = [];
 
-    public ChunkDecodeResult() { }
+    public ChunkDecodeResult()
+    {
+    }
 }
 
 /// <summary>

@@ -274,8 +274,8 @@ public sealed class RvzReader : IBlobReader
             }
 
             var area = FindArea(position)
-                ?? throw new RvzFormatException(
-                    $"No data covers disc offset 0x{position:X}; the file is not a complete disc image.");
+                       ?? throw new RvzFormatException(
+                           $"No data covers disc offset 0x{position:X}; the file is not a complete disc image.");
 
             // Clamp to the current chunk (raw) or 64-sector region (partition).
             var take = area.Kind == AreaKind.Raw
@@ -333,7 +333,7 @@ public sealed class RvzReader : IBlobReader
 
     private static int ClampToRegion(DataArea area, long position, int requested)
     {
-        var regionBytes = 64L * PartitionRegionBuilder.SectorSize;
+        const long regionBytes = 64L * PartitionRegionBuilder.SectorSize;
         var regionStart = area.Start + (position - area.Start) / regionBytes * regionBytes;
         var regionEnd = Math.Min(area.End, regionStart + regionBytes);
         return (int)Math.Min(requested, regionEnd - position);

@@ -607,12 +607,12 @@ public static class TestRvzBuilder
             case CompressionType.Zstd:
                 return (0, new byte[7]);
             case CompressionType.Lzma:
-            {
-                var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
-                var data = new byte[7];
-                props.CopyTo(data, 0);
-                return ((byte)props.Length, data);
-            }
+                {
+                    var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
+                    var data = new byte[7];
+                    props.CopyTo(data, 0);
+                    return ((byte)props.Length, data);
+                }
             case CompressionType.Lzma2:
                 return (1, [21, 0, 0, 0, 0, 0, 0]);
             case CompressionType.Purge:

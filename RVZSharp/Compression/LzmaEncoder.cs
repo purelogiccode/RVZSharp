@@ -154,7 +154,8 @@ public sealed class LzmaEncoder : ICompressionEncoder
         encoder.SetCoderProperties(
             [
                 CoderPropID.DictionarySize, CoderPropID.PosStateBits,
-                CoderPropID.LitContextBits, CoderPropID.LitPosBits],
+                CoderPropID.LitContextBits, CoderPropID.LitPosBits
+            ],
             [_dictionarySize, 2, 3, 0]);
         using var props = new MemoryStream();
         encoder.WriteCoderProperties(props);

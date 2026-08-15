@@ -4,8 +4,12 @@ namespace RVZSharp;
 public class RvzException : Exception
 {
     public RvzException(string message)
-        : base(message) { }
+        : base(message)
+    {
+    }
 
     public RvzException(string message, Exception inner)
-        : base(message, inner) { }
+        : base(message, inner)
+    {
+    }
 }

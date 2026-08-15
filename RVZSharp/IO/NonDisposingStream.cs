@@ -14,6 +14,7 @@ public sealed class NonDisposingStream : Stream
     public override bool CanSeek => _inner.CanSeek;
     public override bool CanWrite => false;
     public override long Length => _inner.Length;
+
     public override long Position
     {
         get => _inner.Position;

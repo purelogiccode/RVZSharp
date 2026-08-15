@@ -59,8 +59,10 @@ internal class Encoder
                 _stream.WriteByte((byte)(temp + (Low >> 32)));
                 temp = 0xFF;
             } while (--_cacheSize != 0);
+
             _cache = (byte)(((uint)Low) >> 24);
         }
+
         _cacheSize++;
         Low = ((uint)Low) << 8;
     }
@@ -74,6 +76,7 @@ internal class Encoder
             {
                 Low += Range;
             }
+
             if (Range < KTopValue)
             {
                 Range <<= 8;

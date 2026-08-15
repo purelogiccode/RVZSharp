@@ -91,11 +91,6 @@ public class ChunkDecoderTests
             });
     }
 
-    private static byte[] Be32(uint value)
-    {
-        return [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
-    }
-
     private static byte[] Concat(params byte[][] arrays)
     {
         var result = new byte[arrays.Sum(a => a.Length)];

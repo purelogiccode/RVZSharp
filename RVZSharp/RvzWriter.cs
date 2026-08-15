@@ -35,7 +35,6 @@ public static class RvzWriter
 {
     private const ulong SectorSize = WiaDisc.SectorSize;
     private const ulong GroupTotalSize = WiaDisc.GroupSize;
-    private const ulong GroupDataSize = 0x1F0000;
     private const ulong DiscHeaderSize = WiaDisc.DiscHeaderSize; // 0x80
 
     private sealed class AreaEntry
@@ -380,18 +379,14 @@ public static class RvzWriter
             file.Write(new byte[pad]);
         }
 
-        var written = (ulong)(WiaFileHead.Size + WiaDisc.Size + partitionTable.Length +
-                              rawTableStored.Length + groupTableStored.Length + pad);
         for (var i = 0; i < groupData.Count; i++)
         {
             var data = groupData[i];
             file.Write(data);
-            written += (ulong)data.Length;
             var padding = (4 - data.Length % 4) % 4;
             if (padding > 0)
             {
                 file.Write(new byte[padding]);
-                written += (uint)padding;
             }
         }
 
@@ -471,7 +466,7 @@ public static class RvzWriter
             // Read and decrypt one 2 MiB region (or the segment's remaining blocks).
             var regionBlocks = (int)Math.Min(64UL, blocksRemaining);
             var (data, exceptions) = extractor.ExtractRegion(
-                (long)(area.Offset + processedBlocks * SectorSize), regionBlocks, blocksPerChunk);
+                (long)(area.Offset + processedBlocks * SectorSize), regionBlocks);
 
             // Split the region into chunks (one group per chunk, like the reader expects).
             for (var chunk = 0; chunk * blocksPerChunk < regionBlocks; chunk++)

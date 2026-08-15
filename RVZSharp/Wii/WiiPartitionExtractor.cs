@@ -34,20 +34,20 @@ public sealed class WiiPartitionExtractor
     /// converts them to chunk-relative offsets when splitting the region into chunks).
     /// </summary>
     public (byte[] Data, List<HashExceptionEntry> Exceptions) ExtractRegion(
-        long discOffset, int blockCount, int blocksPerChunk)
+        long discOffset, int blockCount)
     {
         try
         {
-            return ExtractRegionCore(discOffset, blockCount, blocksPerChunk);
+            return ExtractRegionCore(discOffset, blockCount);
         }
         catch (Exception e)
         {
-            throw new InvalidOperationException($"ExtractRegion(0x{discOffset:X}, {blockCount}, {blocksPerChunk}): {e}", e);
+            throw new InvalidOperationException($"ExtractRegion(0x{discOffset:X}, {blockCount}): {e}", e);
         }
     }
 
     private (byte[] Data, List<HashExceptionEntry> Exceptions) ExtractRegionCore(
-        long discOffset, int blockCount, int blocksPerChunk)
+        long discOffset, int blockCount)
     {
         var encrypted = new byte[blockCount * PartitionRegionBuilder.SectorSize];
         var read = _input.ReadAt(discOffset, encrypted);

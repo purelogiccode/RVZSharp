@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using RVZSharp.IO;
 
 namespace RVZSharp.Models;
@@ -6,6 +7,7 @@ namespace RVZSharp.Models;
 /// <c>wia_part_data_t</c>: one segment of Wii partition data. Sectors are 32 KiB on the disc
 /// (31 KiB of data excluding hashes).
 /// </summary>
+[StructLayout(LayoutKind.Sequential)]
 public readonly struct WiaPartDataEntry
 {
     public const int Size = 0x10;

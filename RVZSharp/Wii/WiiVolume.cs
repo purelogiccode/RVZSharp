@@ -60,7 +60,7 @@ public static class WiiVolume
     /// 0x40000 (Dolphin: VolumeWii::GetPartitions). Only partitions with a valid ticket and
     /// plausible data ranges are returned.
     /// </summary>
-    public static List<Partition> GetPartitions(IBlobReader disc)
+    public static IReadOnlyList<Partition> GetPartitions(IBlobReader disc)
     {
         var partitions = new List<Partition>();
         var header = new byte[0x80];

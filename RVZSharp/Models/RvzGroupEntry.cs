@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using RVZSharp.IO;
 
 namespace RVZSharp.Models;
@@ -7,6 +8,7 @@ namespace RVZSharp.Models;
 /// bit of <c>data_size</c> selects the compression method and <c>rvz_packed_size</c> tracks
 /// the RVZ packing stage.
 /// </summary>
+[StructLayout(LayoutKind.Sequential)]
 public readonly struct RvzGroupEntry
 {
     public const int Size = 0x0C;

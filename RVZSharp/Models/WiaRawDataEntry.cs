@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using RVZSharp.IO;
 
 namespace RVZSharp.Models;
@@ -6,6 +7,7 @@ namespace RVZSharp.Models;
 /// <c>wia_raw_data_t</c>: disc data that is not part of a Wii partition, stored as is
 /// (other than compression). Offsets are disc-relative.
 /// </summary>
+[StructLayout(LayoutKind.Sequential)]
 public readonly struct WiaRawDataEntry
 {
     public const int Size = 0x18;

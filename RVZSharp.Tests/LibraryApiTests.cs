@@ -142,34 +142,48 @@ public class LibraryApiTests
         var iso = MakeGcIso();
         using var input = new MemoryStream(iso);
         using var output = new MemoryStream();
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-        Assert.Throws<OperationCanceledException>(() =>
-            RvzWriter.Write(PlainBlob.Open(input, leaveOpen: true), output,
-                new RvzWriteOptions { Compression = CompressionType.None },
-                cancellationToken: cts.Token));
+        var cts = new CancellationTokenSource();
+        try
+        {
+            cts.Cancel();
+            Assert.Throws<OperationCanceledException>(() =>
+                RvzWriter.Write(PlainBlob.Open(input, leaveOpen: true), output,
+                    new RvzWriteOptions { Compression = CompressionType.None },
+                    cancellationToken: cts.Token));
+        }
+        finally
+        {
+            cts.Dispose();
+        }
     }
 
     [Fact]
     public void RvzWriter_Cancels_MidConversion()
     {
-        var iso = MakeGcIso();
+var iso = MakeGcIso();
         using var input = new MemoryStream(iso);
         using var output = new MemoryStream();
-        using var cts = new CancellationTokenSource();
-        var cancelOnFirstReport = true;
-        var progress = new SyncProgress<double>(_ =>
+        var cts = new CancellationTokenSource();
+        try
         {
-            if (cancelOnFirstReport)
+            var cancelOnFirstReport = true;
+            var progress = new SyncProgress<double>(_ =>
             {
-                cancelOnFirstReport = false;
-                cts.Cancel(); // deterministic: the next chunk read throws
-            }
-        });
+                if (cancelOnFirstReport)
+                {
+                    cancelOnFirstReport = false;
+                    cts.Cancel();
+                }
+            });
 
-        Assert.ThrowsAny<OperationCanceledException>(() =>
-            RvzWriter.Write(PlainBlob.Open(input, leaveOpen: true), output,
-                new RvzWriteOptions { Compression = CompressionType.None },
-                progress: progress, cancellationToken: cts.Token));
+            Assert.ThrowsAny<OperationCanceledException>(() =>
+                RvzWriter.Write(PlainBlob.Open(input, leaveOpen: true), output,
+                    new RvzWriteOptions { Compression = CompressionType.None },
+                    progress: progress, cancellationToken: cts.Token));
+        }
+        finally
+        {
+            cts.Dispose();
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using RVZSharp.IO;
 
 namespace RVZSharp.Models;
@@ -7,6 +8,7 @@ namespace RVZSharp.Models;
 /// <c>data_size</c> carries no flag: the group is always stored with the disc's compression
 /// method, and there is no packing stage.
 /// </summary>
+[StructLayout(LayoutKind.Sequential)]
 public readonly struct WiaGroupEntry
 {
     public const int Size = 0x08;

@@ -54,7 +54,7 @@ public sealed class PartitionRegionBuilder
 
         if (data.Length != WiiHashCalculator.SectorDataSize)
         {
-            throw new ArgumentException($"Sector data must be {WiiHashCalculator.SectorDataSize} bytes.");
+            throw new ArgumentException($"Sector data must be {WiiHashCalculator.SectorDataSize} bytes.", nameof(data));
         }
 
         var h0Area = new byte[WiiHashCalculator.HashBlockSize];

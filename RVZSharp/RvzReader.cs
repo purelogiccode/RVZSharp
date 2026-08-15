@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using RVZSharp.Interfaces;
 using RVZSharp.Chunks;
 using RVZSharp.Compression;
@@ -37,6 +38,7 @@ public sealed class RvzReader : IBlobReader
         Partition
     }
 
+    [StructLayout(LayoutKind.Sequential)]
     private readonly record struct DataArea(long Start, long End, AreaKind Kind, int Index, int Segment);
 
     private RvzReader(Stream file, bool leaveOpen, WiaRvzFormat format, WiaFileHead fileHead,

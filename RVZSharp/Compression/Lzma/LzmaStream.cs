@@ -88,10 +88,10 @@ public sealed class LzmaStream : Stream
     public static LzmaStream Create(
         byte[] properties,
         Stream inputStream,
-        long inputSize = -1,
-        long outputSize = -1,
-        Stream? presetDictionary = null,
-        bool leaveOpen = false
+        long inputSize,
+        long outputSize,
+        Stream? presetDictionary,
+        bool leaveOpen
     )
     {
         return Create(properties, inputStream, inputSize, outputSize, presetDictionary, properties.Length < 5, leaveOpen);
@@ -104,7 +104,7 @@ public sealed class LzmaStream : Stream
         long outputSize,
         Stream? presetDictionary,
         bool isLzma2,
-        bool leaveOpen = false
+        bool leaveOpen
     )
     {
         var lzma = new LzmaStream(properties, inputStream, inputSize, outputSize, isLzma2, leaveOpen);

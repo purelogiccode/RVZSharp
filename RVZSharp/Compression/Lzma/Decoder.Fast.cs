@@ -475,7 +475,7 @@ public partial class Decoder
         // logical-shift result from a target of 0, so both formulas collapse into one
         // branchless expression selected by the same mask used above.
         int target = (int)(
-            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | (KBitModelOffsetFast & mask)
+            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | ((uint)KBitModelOffsetFast & mask)
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
 
@@ -521,7 +521,7 @@ public partial class Decoder
     private static unsafe void UpdateProbFast(ushort* probSlot, uint prob, uint mask)
     {
         int target = (int)(
-            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | (KBitModelOffsetFast & mask)
+            (RangeCoder.BitDecoder.K_BIT_MODEL_TOTAL & ~mask) | ((uint)KBitModelOffsetFast & mask)
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
     }

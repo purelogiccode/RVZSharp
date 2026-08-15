@@ -125,7 +125,6 @@ public static class TestLegacyBuilders
         map.CopyTo(header, 8);
         output.Write(header);
 
-        var usedIndex = 0;
         for (var block = 0; block < CisoBlob.MapSize; block++)
         {
             if (!present.Contains(block))
@@ -137,7 +136,6 @@ public static class TestLegacyBuilders
             var take = Math.Min(blockSize, iso.Length - start);
             output.Write(iso, start, take);
             output.Write(new byte[blockSize - take]);
-            usedIndex++;
         }
 
         return output.ToArray();

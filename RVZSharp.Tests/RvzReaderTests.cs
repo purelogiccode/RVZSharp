@@ -261,11 +261,6 @@ public class RvzReaderTests
         return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
     }
 
-    private static ulong ReadBe64(byte[] data, int offset)
-    {
-        return ((ulong)ReadBe32(data, offset) << 32) | ReadBe32(data, offset + 4);
-    }
-
     private static void WriteBe32(byte[] data, int offset, uint value)
     {
         data[offset] = (byte)(value >> 24);

@@ -50,6 +50,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
             _highCoder.Init();
         }
 
+#if LEGACY_DOTNET
         public uint Decode(RangeCoder.Decoder rangeDecoder, uint posState)
         {
             if (_choice.Decode(rangeDecoder) == 0)
@@ -70,6 +71,8 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
 
             return symbol;
         }
+#endif
+
     }
 
     private class LiteralDecoder
@@ -93,6 +96,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
                 }
             }
 
+#if LEGACY_DOTNET
             public byte DecodeNormal(RangeCoder.Decoder rangeDecoder)
             {
                 uint symbol = 1;
@@ -128,6 +132,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
 
                 return (byte)symbol;
             }
+#endif
         }
 
         private Decoder2[] _coders;
@@ -169,6 +174,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
             return ((pos & _posMask) << _numPrevBits) + (uint)(prevByte >> (8 - _numPrevBits));
         }
 
+#if LEGACY_DOTNET
         public byte DecodeNormal(RangeCoder.Decoder rangeDecoder, uint pos, byte prevByte)
         {
             return _coders[GetState(pos, prevByte)].DecodeNormal(rangeDecoder);
@@ -183,6 +189,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         {
             return _coders[GetState(pos, prevByte)].DecodeWithMatchByte(rangeDecoder, matchByte);
         }
+#endif
     }
 
     private OutWindow _outWindow;

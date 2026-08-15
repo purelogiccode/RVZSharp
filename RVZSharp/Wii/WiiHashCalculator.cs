@@ -22,8 +22,6 @@ public static class WiiHashCalculator
     private const int H0Padding = 0x14;
     private const int H1Size = 8 * HashSize; // 0xA0
     private const int H1Padding = 0x20;
-    private const int H2Size = 8 * HashSize; // 0xA0
-    private const int H2Padding = 0x20;
 
     /// <summary>
     /// The h0 area (31 × SHA-1 of a 0x400 block) of a sector whose data is all zeroes — what

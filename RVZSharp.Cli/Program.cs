@@ -19,6 +19,12 @@ internal static class Program
     private static int Main(string[] args)
     {
         LogSetup.Initialize();
+
+        // Usage telemetry: fire-and-forget hit at launch so application usage can
+        // be tracked on the ApplicationStats dashboard. Failures are silent.
+        var statsClient = new StatsApiClient();
+        var statsReport = statsClient.ReportUsageAsync();
+
         try
         {
             if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
@@ -46,6 +52,9 @@ internal static class Program
         }
         finally
         {
+            // Best-effort: give the launch hit a moment to reach the API before exiting.
+            statsReport.Wait(TimeSpan.FromSeconds(3));
+            statsClient.Dispose();
             LogSetup.Shutdown();
         }
     }

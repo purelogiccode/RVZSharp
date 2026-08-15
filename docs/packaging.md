@@ -104,8 +104,8 @@ dotnet add package RVZSharp --version 1.0.0
 ## The CLI
 
 The command-line tool (`RVZSharp.Cli`) is **not** packaged as a NuGet tool — it is a
-reference implementation and smoke-test surface for the library. It targets `net8.0` so it
-runs on .NET 8, 9 and 10 runtimes alike:
+reference implementation and smoke-test surface for the library. It targets `net10.0` and
+ships as single-file, self-contained binaries (no runtime required on the target):
 
 ```bash
 dotnet build CSharp_RVZSharp.sln -c Release

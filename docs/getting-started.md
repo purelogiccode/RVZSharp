@@ -3,8 +3,7 @@
 ## Prerequisites
 
 - [.NET SDK 10](https://dotnet.microsoft.com/download) (or newer). The library and the
-  test suite target **`net8.0`, `net9.0` and `net10.0`**; the CLI targets `net8.0` so the
-  built tool runs on all three runtimes.
+  test suite target **`net8.0`, `net9.0` and `net10.0`**; the CLI targets `net10.0`.
 - A disc image to experiment with: a plain `.iso`, or a `.rvz`/`.wia`/`.gcz`/`.ciso`/
   `.wbfs`/`.tgc`/`.nfs` file.
 

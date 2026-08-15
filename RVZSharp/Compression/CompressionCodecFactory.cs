@@ -6,6 +6,12 @@ namespace RVZSharp.Compression;
 /// <summary>Creates <see cref="ICompressionDecoder"/> instances for RVZ compression methods.</summary>
 public static class CompressionCodecFactory
 {
+    /// <summary>
+    /// Creates the decoder for the given RVZ compression method. PURGE is rejected here
+    /// because it is WIA-only.
+    /// </summary>
+    /// <param name="type">The compression method from the disc header.</param>
+    /// <returns>A decoder for <c>type</c>.</returns>
     public static ICompressionDecoder Create(CompressionType type)
     {
         return type switch

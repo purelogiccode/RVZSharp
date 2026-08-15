@@ -84,10 +84,19 @@ public sealed class RvzReader : IBlobReader
         _areas = areas.OrderBy(a => a.Start).ToArray();
     }
 
+    /// <summary>The parsed and validated file head (magic, format version, sizes, hashes).</summary>
     public WiaFileHead FileHead { get; }
+
+    /// <summary>The parsed disc struct (disc type, compression method and level, chunk size, table offsets).</summary>
     public WiaDisc Disc { get; }
+
+    /// <summary>The partition table entries, each with up to two data segments and their group ranges.</summary>
     public WiaPartEntry[] Partitions { get; }
+
+    /// <summary>The raw data table entries, each covering a contiguous byte range of the disc.</summary>
     public WiaRawDataEntry[] RawDataEntries { get; }
+
+    /// <summary>The group table entries in file order, describing every stored chunk.</summary>
     public GroupEntry[] GroupEntries { get; }
 
     /// <summary>True when this reader decodes a WIA file; false for RVZ.</summary>
@@ -549,6 +558,7 @@ public sealed class RvzReader : IBlobReader
         return true;
     }
 
+    /// <summary>Disposes the underlying stream, unless it was opened with leaveOpen set.</summary>
     public void Dispose()
     {
         if (!_leaveOpen)

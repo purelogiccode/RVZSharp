@@ -8,6 +8,7 @@ namespace RVZSharp.Interfaces;
 /// </summary>
 public interface ICompressionDecoder
 {
+    /// <summary>The compression method this decoder handles.</summary>
     CompressionType Type { get; }
 
     /// <summary>
@@ -20,5 +21,6 @@ public interface ICompressionDecoder
     /// <param name="properties">The compressor properties from the disc header (compr_data).</param>
     /// <param name="inputSize">Exact compressed size, or -1 if unknown.</param>
     /// <param name="outputSize">Expected decompressed size, or -1 if unknown (stream until end).</param>
+    /// <returns>A read-only stream of decompressed data; does not dispose the input stream.</returns>
     Stream CreateDecompressor(Stream input, ReadOnlySpan<byte> properties, long inputSize, long outputSize);
 }

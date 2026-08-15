@@ -13,13 +13,28 @@ public sealed class LzmaDecoder : ICompressionDecoder
 {
     private readonly bool _useLzma2;
 
+    /// <summary>
+    /// Creates a decoder for LZMA1 or LZMA2.
+    /// </summary>
+    /// <param name="useLzma2">True for LZMA2, false for LZMA1.</param>
     internal LzmaDecoder(bool useLzma2)
     {
         _useLzma2 = useLzma2;
     }
 
+    /// <summary>Gets the compression method this decoder handles.</summary>
     public CompressionType Type => _useLzma2 ? CompressionType.Lzma2 : CompressionType.Lzma;
 
+    /// <summary>
+    /// Creates an LZMA1 or LZMA2 decompressor over <c>input</c> after validating the
+    /// compressor properties (LZMA1: 5 bytes, lc/lp/pb byte plus 4-byte little-endian
+    /// dictionary size; LZMA2: 1-byte dictionary size property).
+    /// </summary>
+    /// <param name="input">Stream of the LZMA data.</param>
+    /// <param name="properties">The compressor properties from the disc header.</param>
+    /// <param name="inputSize">Exact compressed size, or -1 if unknown.</param>
+    /// <param name="outputSize">Expected decompressed size, or -1 if unknown.</param>
+    /// <returns>A read-only decompressing stream.</returns>
     public Stream CreateDecompressor(Stream input, ReadOnlySpan<byte> properties, long inputSize, long outputSize)
     {
         if (_useLzma2)

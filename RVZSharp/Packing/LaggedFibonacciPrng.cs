@@ -9,15 +9,28 @@ namespace RVZSharp.Packing;
 /// </summary>
 internal sealed class LaggedFibonacciPrng
 {
+    /// <summary>Number of 32-bit words in a seed.</summary>
     public const int SeedWords = 17;
+
+    /// <summary>Seed length in bytes (68).</summary>
     public const int SeedSize = SeedWords * 4;
+
+    /// <summary>The buffer internal state words (the lag k).</summary>
     public const int BufferWords = 521;
+
+    /// <summary>The buffer size in bytes.</summary>
     public const int BufferSize = BufferWords * 4;
+
     private const int J = 32;
 
     private readonly uint[] _buffer = new uint[BufferWords];
     private int _bytePosition;
 
+    /// <summary>
+    /// Seeds the generator from the 68-byte big-endian seed, initializes the remaining words
+    /// and runs the 4 warm-up advances (the RVZ format's seed representation).
+    /// </summary>
+    /// <param name="seed">The 68-byte seed; a shorter seed throws.</param>
     public void SetSeed(ReadOnlySpan<byte> seed)
     {
         if (seed.Length != SeedSize)

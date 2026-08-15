@@ -23,6 +23,13 @@ public sealed class RvzPackingDecoder : Stream
     private bool _isPaddedSegment;
     private uint _segmentRemaining;
 
+    /// <summary>
+    /// Wraps a packed segment stream. <c>dataOffset</c> is the disc-relative offset of the
+    /// packed data, used to position the PRNG state for each segment.
+    /// </summary>
+    /// <param name="input">The packed segment stream (size headers, literals and seeds).</param>
+    /// <param name="dataOffset">Offset of this packed data within its area, used for the PRNG skip.</param>
+    /// <param name="leaveOpen">True to keep <c>input</c> open on dispose.</param>
     public RvzPackingDecoder(Stream input, long dataOffset, bool leaveOpen = false)
     {
         _input = input;
@@ -30,17 +37,33 @@ public sealed class RvzPackingDecoder : Stream
         _leaveOpen = leaveOpen;
     }
 
+    /// <summary>Always true: the stream only supports reading.</summary>
     public override bool CanRead => true;
+
+    /// <summary>Always false: the packed stream is forward-only.</summary>
     public override bool CanSeek => false;
+
+    /// <summary>Always false: the packed stream is read-only.</summary>
     public override bool CanWrite => false;
+
+    /// <summary>The length is unknown until the stream is fully decoded.</summary>
     public override long Length => throw new NotSupportedException();
 
+    /// <summary>Position is not tracked; throws for both accessors.</summary>
     public override long Position
     {
         get => throw new NotSupportedException();
         set => throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// Reads decoded bytes into <c>buffer</c>, decompressing literal and PRNG-padded
+    /// segments on demand.
+    /// </summary>
+    /// <param name="buffer">The buffer to fill.</param>
+    /// <param name="offset">Offset into <c>buffer</c>.</param>
+    /// <param name="count">Maximum number of bytes to read.</param>
+    /// <returns>The number of bytes read; 0 at the clean end of the packed stream.</returns>
     public override int Read(byte[] buffer, int offset, int count)
     {
         var total = 0;
@@ -196,20 +219,31 @@ public sealed class RvzPackingDecoder : Stream
         base.Dispose(disposing);
     }
 
+    /// <summary>No-op: the stream is read-only.</summary>
     public override void Flush()
     {
     }
 
+    /// <summary>Not supported; the packed stream cannot be seeked.</summary>
+    /// <param name="offset">Ignored.</param>
+    /// <param name="origin">Ignored.</param>
+    /// <returns>Never returns.</returns>
     public override long Seek(long offset, SeekOrigin origin)
     {
         throw new NotSupportedException();
     }
 
+    /// <summary>Not supported; the packed stream is read-only.</summary>
+    /// <param name="value">Ignored.</param>
     public override void SetLength(long value)
     {
         throw new NotSupportedException();
     }
 
+    /// <summary>Not supported; the packed stream is read-only.</summary>
+    /// <param name="buffer">Ignored.</param>
+    /// <param name="offset">Ignored.</param>
+    /// <param name="count">Ignored.</param>
     public override void Write(byte[] buffer, int offset, int count)
     {
         throw new NotSupportedException();

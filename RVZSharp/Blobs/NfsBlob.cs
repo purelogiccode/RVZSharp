@@ -40,8 +40,13 @@ public sealed class NfsBlob : IBlobReader
         _aes.Padding = PaddingMode.None;
     }
 
+    /// <summary>The NFS blob type.</summary>
     public BlobType Type => BlobType.Nfs;
+
+    /// <summary>Lower bound of the decoded disc size in bytes (one block past the last used LBA).</summary>
     public long Length { get; }
+
+    /// <summary>Size in bytes of one NFS block (0x8000).</summary>
     public int BlockSize => (int)BlockSizeValue;
 
     /// <summary>
@@ -168,6 +173,14 @@ public sealed class NfsBlob : IBlobReader
             greatestBlockIndex * BlockSizeValue);
     }
 
+    /// <summary>
+    /// Reads up to buffer.Length bytes at position into buffer, AES-decrypting NFS blocks
+    /// (blocks outside the LBA ranges are served as zeroes); returns the number of bytes read,
+    /// 0 at the end of the image.
+    /// </summary>
+    /// <param name="position">Offset in the decoded image to read from.</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <returns>The number of bytes read; 0 when position is at or past the end of the image.</returns>
     public int ReadAt(long position, Span<byte> buffer)
     {
         if (position < 0 || position >= Length || buffer.IsEmpty)
@@ -343,6 +356,10 @@ public sealed class NfsBlob : IBlobReader
         return true;
     }
 
+    /// <summary>
+    /// Disposes the AES state and the continuation files opened internally; the caller's
+    /// stream is disposed unless leaveOpen was set.
+    /// </summary>
     public void Dispose()
     {
         _aes.Dispose();

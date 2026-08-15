@@ -16,6 +16,9 @@ public sealed class WiiPartitionExtractor
     private readonly byte[] _key;
     private readonly Aes _aes;
 
+    /// <summary>Creates an extractor that reads encrypted region data from a blob and decrypts it with the partition key.</summary>
+    /// <param name="input">The underlying blob reader (disc or chunk image).</param>
+    /// <param name="key">The 16-byte AES partition key.</param>
     public WiiPartitionExtractor(Interfaces.IBlobReader input, ReadOnlySpan<byte> key)
     {
         _input = input;
@@ -33,6 +36,9 @@ public sealed class WiiPartitionExtractor
     /// the region's hash area in the form block_index × 0x400 + offset_in_block (the writer
     /// converts them to chunk-relative offsets when splitting the region into chunks).
     /// </summary>
+    /// <param name="discOffset">Disc-relative offset of the region's first sector.</param>
+    /// <param name="blockCount">Number of sectors in this region (64, or fewer for the last region).</param>
+    /// <returns>The decrypted data and the region-relative hash exceptions.</returns>
     public (byte[] Data, List<HashExceptionEntry> Exceptions) ExtractRegion(
         long discOffset, int blockCount)
     {

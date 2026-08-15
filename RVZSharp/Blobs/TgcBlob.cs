@@ -12,6 +12,7 @@ namespace RVZSharp.Blobs;
 /// </summary>
 public sealed class TgcBlob : IBlobReader
 {
+    /// <summary>Size in bytes of the fixed TGC header structure.</summary>
     public const int HeaderStructSize = 56;
 
     private const uint MagicValue = 0xA2380FAE;
@@ -40,8 +41,13 @@ public sealed class TgcBlob : IBlobReader
         Length = file.Length - tgcHeaderSize;
     }
 
+    /// <summary>The TGC blob type.</summary>
     public BlobType Type => BlobType.Tgc;
+
+    /// <summary>Size of the decoded ISO in bytes (file length minus the TGC header).</summary>
     public long Length { get; }
+
+    /// <summary>The image has no block structure; always 0.</summary>
     public int BlockSize => 0;
 
     /// <summary>Parses a TGC file. The stream must be seekable.</summary>
@@ -118,6 +124,14 @@ public sealed class TgcBlob : IBlobReader
             unchecked(fstRealOffset - tgcHeaderSize), patchedFst);
     }
 
+    /// <summary>
+    /// Reads up to buffer.Length bytes at position into buffer, serving the disc data past
+    /// the TGC header and applying the DOL/FST offset relocation patches; returns the number
+    /// of bytes read, 0 at the end of the image.
+    /// </summary>
+    /// <param name="position">Offset in the decoded image to read from.</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <returns>The number of bytes read; 0 when position is at or past the end of the image.</returns>
     public int ReadAt(long position, Span<byte> buffer)
     {
         if (position < 0 || position >= Length || buffer.IsEmpty)
@@ -209,6 +223,7 @@ public sealed class TgcBlob : IBlobReader
         return true;
     }
 
+    /// <summary>Disposes the underlying file stream, unless leaveOpen was set.</summary>
     public void Dispose()
     {
         if (!_leaveOpen)

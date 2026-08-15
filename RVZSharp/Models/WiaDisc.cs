@@ -30,8 +30,13 @@ public readonly struct WiaDisc
     /// <summary>2 MiB group size for Wii partition data.</summary>
     public const uint GroupSize = 0x200000;
 
+    /// <summary>The kind of disc image (GameCube, Wii, ...).</summary>
     public DiscType DiscType { get; }
+
+    /// <summary>The compression method used for the stored group data.</summary>
     public CompressionType Compression { get; }
+
+    /// <summary>The compression level used when the file was written.</summary>
     public int ComprLevel { get; }
 
     /// <summary>Chunk size data is divided into (RVZ: ≥ 32 KiB power of two, or multiple of 2 MiB).</summary>
@@ -40,17 +45,34 @@ public readonly struct WiaDisc
     /// <summary>The first 0x80 bytes of the disc image.</summary>
     public byte[] DiscHeader { get; }
 
+    /// <summary>Number of Wii partitions in the disc.</summary>
     public uint NumPartitions { get; }
+
+    /// <summary>Size of each partition table entry in bytes.</summary>
     public uint PartitionEntrySize { get; }
+
+    /// <summary>File offset of the partition entry table.</summary>
     public ulong PartitionEntriesOffset { get; }
+
+    /// <summary>SHA-1 of the partition entry table.</summary>
     public byte[] PartitionEntriesHash { get; }
 
+    /// <summary>Number of raw (non-partition) data entries.</summary>
     public uint NumRawDataEntries { get; }
+
+    /// <summary>File offset of the raw data entry table.</summary>
     public ulong RawDataEntriesOffset { get; }
+
+    /// <summary>Size of the raw data entry table in bytes.</summary>
     public uint RawDataEntriesSize { get; }
 
+    /// <summary>Number of group (chunk) entries.</summary>
     public uint NumGroups { get; }
+
+    /// <summary>File offset of the group entry table.</summary>
     public ulong GroupEntriesOffset { get; }
+
+    /// <summary>Size of the group entry table in bytes.</summary>
     public uint GroupEntriesSize { get; }
 
     /// <summary>Number of used bytes in <see cref="ComprData"/>.</summary>
@@ -89,6 +111,8 @@ public readonly struct WiaDisc
     /// Decodes the disc struct. Requires at least <see cref="MinSize"/> bytes; compr_data
     /// bytes that are not present are zero-filled (Dolphin zero-fills missing fields the same way).
     /// </summary>
+    /// <param name="data">The raw bytes of the disc struct.</param>
+    /// <returns>The decoded disc struct.</returns>
     public static WiaDisc Parse(ReadOnlySpan<byte> data)
     {
         if (data.Length < MinSize)
@@ -125,6 +149,9 @@ public readonly struct WiaDisc
     }
 
     /// <summary>Validates this disc struct as part of an RVZ file.</summary>
+    /// <param name="discSize">The disc_size value from the file head.</param>
+    /// <param name="rawDisc">The raw disc struct bytes, exactly discSize long.</param>
+    /// <param name="expectedDiscHash">The disc_hash value from the file head.</param>
     public void Validate(uint discSize, ReadOnlySpan<byte> rawDisc, ReadOnlySpan<byte> expectedDiscHash)
     {
         Validate(discSize, rawDisc, expectedDiscHash, WiaRvzFormat.Rvz);

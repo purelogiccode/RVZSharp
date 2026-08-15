@@ -8,9 +8,16 @@ namespace RVZSharp.Packing;
 /// </summary>
 public sealed class LaggedFibonacciGenerator
 {
+    /// <summary>The buffer holds 521 words (the lag k).</summary>
     public const int BufferWords = 521;
+
+    /// <summary>The lag j: 32.</summary>
     public const int J = 32;
+
+    /// <summary>Number of 32-bit words in a seed.</summary>
     public const int SeedWords = 17;
+
+    /// <summary>Seed length in bytes (68).</summary>
     public const int SeedSize = SeedWords * 4;
 
     private readonly uint[] _buffer = new uint[BufferWords];

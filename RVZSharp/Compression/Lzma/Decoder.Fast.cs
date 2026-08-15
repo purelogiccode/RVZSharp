@@ -18,7 +18,11 @@ namespace RVZSharp.Compression.Lzma;
 //
 // This is the decoder's only decode path: the tables live here (_f* arrays below), kept
 // up to date by SetDecoderProperties/Init.
-public partial class Decoder
+/// <summary>
+/// Fast, unsafe LZMA decode core: flat <c>ushort</c> probability tables and a local-variable
+/// decode loop over a buffered range decoder and the out-window circular buffer.
+/// </summary>
+internal partial class Decoder
 {
     private const int KNumMoveBitsFast = 5;
 
@@ -219,6 +223,14 @@ public partial class Decoder
         }
     }
 
+    /// <summary>
+    /// Runs one decode session: produces bytes into <c>outWindow</c> up to its limit using the
+    /// fast table-driven models, returning whether the end-of-stream marker was decoded.
+    /// </summary>
+    /// <param name="dictionarySize">The dictionary (window) size used to validate match distances.</param>
+    /// <param name="outWindow">The output window buffer that receives decoded bytes.</param>
+    /// <param name="rangeDecoder">The range decoder (with its fast input buffer) to consume compressed input from.</param>
+    /// <returns>True when the end-of-stream marker was encountered during this session.</returns>
     internal unsafe bool CodeFast(
         int dictionarySize,
         OutWindow outWindow,

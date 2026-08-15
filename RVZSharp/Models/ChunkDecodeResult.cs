@@ -12,6 +12,7 @@ public readonly struct ChunkDecodeResult
     /// </summary>
     public HashExceptionEntry[][] ExceptionLists { get; init; } = [];
 
+    /// <summary>Creates an empty chunk result; the required payload must be set by the caller.</summary>
     public ChunkDecodeResult()
     {
     }

@@ -10,6 +10,7 @@ namespace RVZSharp.Models;
 /// </summary>
 public readonly struct WiaFileHead
 {
+    /// <summary>Size of the file head struct in bytes.</summary>
     public const int Size = 0x48;
 
     /// <summary>Size of a SHA-1 hash in bytes.</summary>
@@ -18,7 +19,10 @@ public readonly struct WiaFileHead
     /// <summary>Offset of the <c>file_head_hash</c> field; the hash covers everything before it.</summary>
     public const int FileHeadHashOffset = Size - HashSize; // 0x34
 
+    /// <summary>The 4 magic bytes "RVZ" plus 0x01 that identify an RVZ file.</summary>
     public static ReadOnlySpan<byte> RvzMagic => "RVZ\x01"u8;
+
+    /// <summary>The 4 magic bytes "WIA" plus 0x01 that identify a WIA file.</summary>
     public static ReadOnlySpan<byte> WiaMagic => "WIA\x01"u8;
 
     /// <summary>Version this library implements for both formats (Dolphin: RVZ_VERSION / WIA_VERSION).</summary>
@@ -33,7 +37,10 @@ public readonly struct WiaFileHead
     /// <summary>The 4 magic bytes ("RVZ\x01" for RVZ, "WIA\x01" for WIA).</summary>
     public byte[] Magic { get; }
 
+    /// <summary>Version of the format the file was written with.</summary>
     public uint Version { get; }
+
+    /// <summary>The lowest format version that can read this file.</summary>
     public uint VersionCompatible { get; }
 
     /// <summary>Size of the <c>wia_disc_t</c> struct that follows this header.</summary>
@@ -51,7 +58,10 @@ public readonly struct WiaFileHead
     /// <summary>SHA-1 of this struct up to (but not including) this field.</summary>
     public byte[] FileHeadHash { get; }
 
+    /// <summary>True if the magic bytes identify an RVZ file.</summary>
     public bool IsRvz => Magic.AsSpan().SequenceEqual(RvzMagic);
+
+    /// <summary>True if the magic bytes identify a WIA file.</summary>
     public bool IsWia => Magic.AsSpan().SequenceEqual(WiaMagic);
 
     private WiaFileHead(
@@ -69,6 +79,8 @@ public readonly struct WiaFileHead
     }
 
     /// <summary>Decodes the file head from the first <see cref="Size"/> bytes of the file.</summary>
+    /// <param name="data">The first bytes of the file; must be at least Size long.</param>
+    /// <returns>The decoded file head.</returns>
     /// <exception cref="RvzFormatException">The input is shorter than <see cref="Size"/> bytes.</exception>
     public static WiaFileHead Parse(ReadOnlySpan<byte> data)
     {
@@ -93,6 +105,8 @@ public readonly struct WiaFileHead
     }
 
     /// <summary>Validates this header as an RVZ file head.</summary>
+    /// <param name="rawHeader">The raw header bytes of the file.</param>
+    /// <param name="actualFileSize">Length of the underlying stream.</param>
     public void Validate(ReadOnlySpan<byte> rawHeader, long actualFileSize)
     {
         Validate(rawHeader, actualFileSize, WiaRvzFormat.Rvz);
@@ -153,6 +167,8 @@ public readonly struct WiaFileHead
     /// Formats a version like Dolphin's VersionToString (WIABlob.cpp:618-629):
     /// major.minor.revision, plus a .beta suffix when the fourth byte is neither 0 nor 0xff.
     /// </summary>
+    /// <param name="version">The raw 32-bit version value.</param>
+    /// <returns>The formatted version string.</returns>
     public static string FormatVersion(uint version)
     {
         var a = version >> 24;

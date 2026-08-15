@@ -12,7 +12,7 @@ namespace RVZSharp.Compression.Lzma;
 /// Supports unknown output size: LZMA1 streams must be terminated by an end-of-stream marker,
 /// LZMA2 streams by the 0x00 control byte (both are what RVZ/Dolphin writers produce).
 /// </summary>
-public sealed class LzmaStream : Stream
+internal sealed class LzmaStream : Stream
 {
     private readonly Stream? _inputStream;
     private readonly long _inputSize;
@@ -97,6 +97,17 @@ public sealed class LzmaStream : Stream
         return Create(properties, inputStream, inputSize, outputSize, presetDictionary, properties.Length < 5, leaveOpen);
     }
 
+    /// <summary>
+    /// Creates a decoder for an LZMA1 or LZMA2 stream, selecting the format explicitly.
+    /// </summary>
+    /// <param name="properties">The compressor properties: 5 bytes for LZMA1, 1 byte for LZMA2.</param>
+    /// <param name="inputStream">Stream of the compressed data.</param>
+    /// <param name="inputSize">Exact compressed size, or -1 if unknown.</param>
+    /// <param name="outputSize">Expected decompressed size, or -1 if unknown.</param>
+    /// <param name="presetDictionary">Optional preset dictionary (not used by RVZ).</param>
+    /// <param name="isLzma2">True when the properties are the 1-byte LZMA2 format.</param>
+    /// <param name="leaveOpen">Whether to leave the input stream open on dispose.</param>
+    /// <returns>The configured LZMA decoder stream.</returns>
     public static LzmaStream Create(
         byte[] properties,
         Stream inputStream,
@@ -132,16 +143,22 @@ public sealed class LzmaStream : Stream
         return lzma;
     }
 
+    /// <summary>Always true; the stream only supports reading.</summary>
     public override bool CanRead => true;
 
+    /// <summary>Always false; the stream is sequential only.</summary>
     public override bool CanSeek => false;
 
+    /// <summary>Always false; the stream does not support writing.</summary>
     public override bool CanWrite => false;
 
+    /// <summary>Degenerate no-op required by the Stream contract; nothing to flush.</summary>
     public override void Flush()
     {
     }
 
+    /// <summary>Releases the underlying input stream (unless left open) and the output window.</summary>
+    /// <param name="disposing">Whether managed resources should be released.</param>
     protected override void Dispose(bool disposing)
     {
         if (_isDisposed)
@@ -163,14 +180,24 @@ public sealed class LzmaStream : Stream
         base.Dispose(disposing);
     }
 
+    /// <summary>The total number of bytes that will be produced (decoded so far plus remaining).</summary>
     public override long Length => _position + _availableBytes;
 
+    /// <summary>Gets the number of decoded bytes read so far; setting is not supported.</summary>
     public override long Position
     {
         get => _position;
         set => throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// Decodes and copies up to <c>count</c> bytes into <c>buffer</c>, starting a new LZMA2
+    /// chunk or finishing the stream when needed.
+    /// </summary>
+    /// <param name="buffer">The byte array that receives the decoded data.</param>
+    /// <param name="offset">Zero-based offset in <c>buffer</c> at which to begin storing bytes.</param>
+    /// <param name="count">Maximum number of bytes to read.</param>
+    /// <returns>The number of bytes read, or 0 at the end of the stream.</returns>
     public override int Read(byte[] buffer, int offset, int count)
     {
         if (_endReached)
@@ -263,6 +290,8 @@ public sealed class LzmaStream : Stream
         return total;
     }
 
+    /// <summary>Decodes a single byte from the stream.</summary>
+    /// <returns>The decoded byte, or -1 at the end of the stream.</returns>
     public override int ReadByte()
     {
         if (_endReached)
@@ -431,22 +460,34 @@ public sealed class LzmaStream : Stream
         }
     }
 
+    /// <summary>Not supported; the stream is sequential only.</summary>
+    /// <param name="offset">Unused.</param>
+    /// <param name="origin">Unused.</param>
+    /// <returns>Always throws.</returns>
     public override long Seek(long offset, SeekOrigin origin)
     {
         throw new NotSupportedException();
     }
 
+    /// <summary>Not supported; the stream is read-only.</summary>
+    /// <param name="value">Unused.</param>
     public override void SetLength(long value)
     {
         throw new NotSupportedException();
     }
 
+    /// <summary>Not supported; the stream is read-only.</summary>
+    /// <param name="buffer">Unused.</param>
+    /// <param name="offset">Unused.</param>
+    /// <param name="count">Unused.</param>
     public override void Write(byte[] buffer, int offset, int count)
     {
         throw new NotSupportedException();
     }
 
+    /// <summary>The compressor properties (5 bytes for LZMA1, 1 byte for LZMA2).</summary>
     public byte[] Properties { get; }
 
+    /// <summary>Number of compressed bytes consumed from the input stream so far (including LZMA2 chunk headers).</summary>
     internal long CompressedBytesRead { get; private set; }
 }

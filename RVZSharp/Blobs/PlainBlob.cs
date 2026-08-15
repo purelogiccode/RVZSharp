@@ -16,6 +16,7 @@ public sealed class PlainBlob : IBlobReader
         Length = file.Length;
     }
 
+    /// <summary>Opens a plain uncompressed disc image. The stream must be seekable.</summary>
     public static PlainBlob Open(Stream stream, bool leaveOpen = false)
     {
         if (!stream.CanSeek)
@@ -26,10 +27,22 @@ public sealed class PlainBlob : IBlobReader
         return new PlainBlob(stream, leaveOpen);
     }
 
+    /// <summary>The plain (uncompressed ISO) blob type.</summary>
     public BlobType Type => BlobType.Plain;
+
+    /// <summary>Size of the file in bytes; the decoded image is the file itself.</summary>
     public long Length { get; }
+
+    /// <summary>The image has no block structure; always 0.</summary>
     public int BlockSize => 0;
 
+    /// <summary>
+    /// Reads up to buffer.Length bytes at position directly from the file into buffer;
+    /// returns the number of bytes read, 0 at the end of the image.
+    /// </summary>
+    /// <param name="position">Offset in the image to read from.</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <returns>The number of bytes read; 0 when position is at or past the end of the image.</returns>
     public int ReadAt(long position, Span<byte> buffer)
     {
         if (position < 0 || position >= Length || buffer.IsEmpty)
@@ -63,6 +76,7 @@ public sealed class PlainBlob : IBlobReader
         return true;
     }
 
+    /// <summary>Disposes the underlying file stream, unless leaveOpen was set.</summary>
     public void Dispose()
     {
         if (!_leaveOpen)

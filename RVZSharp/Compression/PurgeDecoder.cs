@@ -11,7 +11,9 @@ namespace RVZSharp.Compression;
 /// </summary>
 public static class PurgeDecoder
 {
+    /// <summary>Length in bytes of the SHA-1 trailer appended to PURGE streams.</summary>
     public const int TrailerSize = 20;
+
     private const int SegmentSize = 8;
 
     /// <summary>

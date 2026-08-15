@@ -8,6 +8,7 @@ namespace RVZSharp.Models;
 /// </summary>
 public readonly struct HashExceptionEntry
 {
+    /// <summary>Size of one on-disk entry in bytes (2-byte offset plus 20-byte hash).</summary>
     public const int Size = 0x16;
 
     /// <summary>
@@ -19,6 +20,9 @@ public readonly struct HashExceptionEntry
     /// <summary>The hash that replaces the automatically generated one at <see cref="Offset"/>.</summary>
     public byte[] Hash { get; } // 20 bytes
 
+    /// <summary>Creates a hash exception entry with a replacement hash.</summary>
+    /// <param name="offset">Offset among the hashes; restarts at 0 for each exception list.</param>
+    /// <param name="hash">The replacement hash, exactly 20 bytes long.</param>
     public HashExceptionEntry(ushort offset, byte[] hash)
     {
         // The on-disk entry is a fixed 22 bytes (2 + 20): a shorter hash would desync every
@@ -33,6 +37,9 @@ public readonly struct HashExceptionEntry
         Hash = hash;
     }
 
+    /// <summary>Parses one fixed 22-byte entry from raw bytes.</summary>
+    /// <param name="data">The raw bytes of the entry.</param>
+    /// <returns>The parsed hash exception entry.</returns>
     public static HashExceptionEntry Parse(ReadOnlySpan<byte> data)
     {
         var reader = new SpanReader(data);

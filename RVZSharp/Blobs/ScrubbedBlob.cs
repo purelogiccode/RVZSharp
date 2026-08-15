@@ -59,10 +59,23 @@ public sealed class ScrubbedBlob : IBlobReader
         return blob;
     }
 
+    /// <summary>The blob type of the wrapped disc image.</summary>
     public BlobType Type => _inner.Type;
+
+    /// <summary>Length of the underlying disc image; scrubbing preserves the size.</summary>
     public long Length => _inner.Length;
+
+    /// <summary>The block size of the wrapped blob.</summary>
     public int BlockSize => _inner.BlockSize;
 
+    /// <summary>
+    /// Reads up to buffer.Length bytes at position into buffer, forwarding non-game
+    /// partitions as zeroes and everything else from the wrapped disc image; returns the
+    /// number of bytes read, 0 at the end of the image.
+    /// </summary>
+    /// <param name="position">Offset in the decoded image to read from.</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <returns>The number of bytes read; 0 when position is at or past the end of the image.</returns>
     public int ReadAt(long position, Span<byte> buffer)
     {
         if (position < 0 || position >= Length || buffer.IsEmpty)
@@ -103,6 +116,7 @@ public sealed class ScrubbedBlob : IBlobReader
         return total;
     }
 
+    /// <summary>Disposes the wrapped disc image reader.</summary>
     public void Dispose()
     {
         _inner.Dispose();

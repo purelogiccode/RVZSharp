@@ -43,8 +43,13 @@ public sealed class GczBlob : IBlobReader
     /// <summary>Number of blocks in the file.</summary>
     public long NumBlocks => _blockOffsets.Length;
 
+    /// <summary>The GCZ blob type.</summary>
     public BlobType Type => BlobType.Gcz;
+
+    /// <summary>Size in bytes of the decoded disc image, stored in the GCZ header.</summary>
     public long Length { get; }
+
+    /// <summary>Size in bytes of one GCZ block (16 KiB for Dolphin-made files).</summary>
     public int BlockSize { get; }
 
     /// <summary>Parses and validates a GCZ file. The stream must be seekable.</summary>
@@ -156,6 +161,14 @@ public sealed class GczBlob : IBlobReader
             compressed, hashes, (int)blockSize, (long)discSize);
     }
 
+    /// <summary>
+    /// Reads up to buffer.Length bytes at position into buffer, decompressing and
+    /// hash-checking GCZ blocks on demand; returns the number of bytes read, 0 at the end of
+    /// the image.
+    /// </summary>
+    /// <param name="position">Offset in the decoded image to read from.</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <returns>The number of bytes read; 0 when position is at or past the end of the image.</returns>
     public int ReadAt(long position, Span<byte> buffer)
     {
         if (position < 0 || position >= Length || buffer.IsEmpty)
@@ -272,6 +285,7 @@ public sealed class GczBlob : IBlobReader
         return true;
     }
 
+    /// <summary>Disposes the underlying file stream, unless leaveOpen was set.</summary>
     public void Dispose()
     {
         if (!_leaveOpen)

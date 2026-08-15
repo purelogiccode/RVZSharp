@@ -7,10 +7,16 @@ using RVZSharp.Interfaces;
 
 namespace RVZSharp.Compression.Lzma;
 
-public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
+/// <summary>
+/// LZMA decoder core: owns the probability models, the state machine and the output
+/// window, and drives the range decoder to produce decompressed bytes.
+/// </summary>
+internal partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
 {
+    /// <summary>Whether the decoder has reached the end-of-stream marker (match distance 0xFFFFFFFF).</summary>
     internal bool HasEndMarker => _rep0 == uint.MaxValue;
 
+    /// <summary>Releases the internal output window buffer.</summary>
     public void Dispose()
     {
         _outWindow?.Dispose();
@@ -149,6 +155,7 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         _rep2,
         _rep3;
 
+    /// <summary>Creates a decoder; the models and properties are initialized by a later SetDecoderProperties call.</summary>
     public Decoder()
     {
         _dictionarySize = -1;
@@ -235,6 +242,15 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         _rep3 = 0;
     }
 
+    /// <summary>
+    /// Decodes a whole stream: allocates the output window and a fresh range decoder, decodes
+    /// with its own Code overload and flushes the output window to the destination stream.
+    /// </summary>
+    /// <param name="inStream">The compressed input stream.</param>
+    /// <param name="outStream">The stream receiving the decompressed bytes.</param>
+    /// <param name="inSize">Exact compressed size, or -1 if unknown.</param>
+    /// <param name="outSize">Expected decompressed size, or -1 if unknown.</param>
+    /// <param name="progress">Optional progress callback (unused by this port).</param>
     public void Code(
         Stream inStream,
         Stream outStream,
@@ -270,16 +286,31 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         _outWindow = null;
     }
 
+    /// <summary>
+    /// Runs a buffered decode session against a caller-provided window and range decoder,
+    /// producing bytes until the window limit is met or the end-of-stream marker is decoded.
+    /// </summary>
+    /// <param name="dictionarySize">The dictionary (window) size used to validate match distances.</param>
+    /// <param name="outWindow">The output window that receives decoded bytes.</param>
+    /// <param name="rangeDecoder">The range decoder consuming the compressed input.</param>
+    /// <returns>True when the end-of-stream marker was encountered.</returns>
     internal bool Code(int dictionarySize, OutWindow outWindow, RangeCoder.Decoder rangeDecoder)
     {
         return CodeFast(dictionarySize, outWindow, rangeDecoder);
     }
 
+    /// <summary>
+    /// Applies the LZMA properties (lc/lp/pb and, when present, the 4-byte dictionary size)
+    /// and (re)initializes all probability models so decoding can begin.
+    /// </summary>
+    /// <param name="properties">1-byte or 5-byte property block from the stream header.</param>
     public void SetDecoderProperties(byte[] properties)
     {
         SetDecoderProperties(properties.AsSpan());
     }
 
+    /// <summary>Span-based variant of SetDecoderProperties.</summary>
+    /// <param name="properties">The property bytes; the first byte holds lc/lp/pb, bytes 1-4 the dictionary size.</param>
     internal void SetDecoderProperties(ReadOnlySpan<byte> properties)
     {
         if (properties.Length < 1)
@@ -311,6 +342,8 @@ public partial class Decoder : ICoder, ISetDecoderProperties, IDisposable
         }
     }
 
+    /// <summary>Loads the trailing bytes of a stream into the window as a preset dictionary.</summary>
+    /// <param name="stream">The stream whose final bytes become the preset dictionary.</param>
     public void Train(Stream stream)
     {
         if (_outWindow is null)

@@ -15,11 +15,19 @@ public sealed class PurgeEncoder : ICompressionEncoder
 
     private readonly List<byte[]> _preceding = [];
 
+    /// <summary>Records <c>data</c> (the exception lists) for inclusion in the SHA-1 trailer.</summary>
+    /// <param name="data">Bytes preceding the compressed stream in the group.</param>
     public void AddPrecedingData(ReadOnlySpan<byte> data)
     {
         _preceding.Add(data.ToArray());
     }
 
+    /// <summary>
+    /// Compresses by emitting non-zero run descriptors and bytes; appends the 20-byte SHA-1
+    /// of the preceded exception lists plus the segments as trailer.
+    /// </summary>
+    /// <param name="data">The raw data to compress.</param>
+    /// <returns>The PURGE stream (segments plus SHA-1 trailer).</returns>
     public byte[] Compress(ReadOnlySpan<byte> data)
     {
         using var segments = new MemoryStream();

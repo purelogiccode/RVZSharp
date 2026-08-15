@@ -13,6 +13,13 @@ public sealed class LzmaEncoder : ICompressionEncoder
     private readonly bool _lzma2;
     private readonly int _dictionarySize;
 
+    /// <summary>
+    /// Creates an LZMA1 or LZMA2 encoder. The level selects the dictionary size exactly like
+    /// liblzma's lzma_lzma_preset used by Dolphin: 0→64 KiB, 1→1 MiB, 2→2 MiB, 3→4 MiB,
+    /// 4→4 MiB, 5→8 MiB, 6→8 MiB, 7→16 MiB, 8→32 MiB, 9→64 MiB.
+    /// </summary>
+    /// <param name="lzma2">True for LZMA2, false for LZMA1.</param>
+    /// <param name="level">Compression level 0-9, default 3.</param>
     public LzmaEncoder(bool lzma2, int level = 3)
     {
         _lzma2 = lzma2;
@@ -69,11 +76,16 @@ public sealed class LzmaEncoder : ICompressionEncoder
         }
     }
 
+    /// <summary>Compresses <c>data</c> with the configured method.</summary>
+    /// <param name="data">The data to compress.</param>
+    /// <returns>The LZMA1 stream (with end-of-stream marker) or raw LZMA2 stream.</returns>
     public byte[] Compress(ReadOnlySpan<byte> data)
     {
         return _lzma2 ? EncodeLzma2(data) : EncodeLzma1(data);
     }
 
+    /// <summary>No-op: LZMA compression has no preceding data to cover.</summary>
+    /// <param name="data">Ignored.</param>
     public void AddPrecedingData(ReadOnlySpan<byte> data)
     {
     }

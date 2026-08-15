@@ -10,6 +10,7 @@ namespace RVZSharp.Blobs;
 /// </summary>
 public sealed class CisoBlob : IBlobReader
 {
+    /// <summary>Size in bytes of the CISO header, including the block presence map.</summary>
     public const int HeaderSize = 0x8000;
 
     /// <summary>Number of map entries (and thus of blocks in the decoded image).</summary>
@@ -30,8 +31,13 @@ public sealed class CisoBlob : IBlobReader
         Length = (long)MapSize * blockSize;
     }
 
+    /// <summary>The CISO blob type.</summary>
     public BlobType Type => BlobType.Ciso;
+
+    /// <summary>Size in bytes of the decoded disc image (map size times block size).</summary>
     public long Length { get; }
+
+    /// <summary>Size in bytes of one CISO block, read from the file header.</summary>
     public int BlockSize { get; }
 
     /// <summary>Parses a CISO file. The stream must be seekable.</summary>
@@ -79,6 +85,14 @@ public sealed class CisoBlob : IBlobReader
         return new CisoBlob(stream, leaveOpen, blockSize, map);
     }
 
+    /// <summary>
+    /// Reads up to buffer.Length bytes at position into buffer, decoding CISO blocks from the
+    /// file (absent blocks are served as zeroes); returns the number of bytes read, 0 at the
+    /// end of the image.
+    /// </summary>
+    /// <param name="position">Offset in the decoded image to read from.</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <returns>The number of bytes read; 0 when position is at or past the end of the image.</returns>
     public int ReadAt(long position, Span<byte> buffer)
     {
         if (position < 0 || position >= Length || buffer.IsEmpty)
@@ -142,6 +156,7 @@ public sealed class CisoBlob : IBlobReader
         return true;
     }
 
+    /// <summary>Disposes the underlying file stream, unless leaveOpen was set.</summary>
     public void Dispose()
     {
         if (!_leaveOpen)

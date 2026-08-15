@@ -38,8 +38,13 @@ public sealed class WbfsBlob : IBlobReader
         Length = WiiDataSize;
     }
 
+    /// <summary>The WBFS blob type.</summary>
     public BlobType Type => BlobType.Wbfs;
+
+    /// <summary>Fixed decoded size of a Wii disc (upper bound): 143432 × 2 sectors of 32 KiB.</summary>
     public long Length { get; }
+
+    /// <summary>Size in bytes of one WBFS cluster, read from the file header.</summary>
     public int BlockSize => (int)_clusterSize;
 
     /// <summary>
@@ -145,6 +150,13 @@ public sealed class WbfsBlob : IBlobReader
         return new WbfsBlob(file, leaveOpen, hdSectorSize, clusterSize, table, blocksPerDisc);
     }
 
+    /// <summary>
+    /// Reads up to buffer.Length bytes at position into buffer, mapping disc clusters through
+    /// the volume cluster table; returns the number of bytes read, 0 at the end of the image.
+    /// </summary>
+    /// <param name="position">Offset in the decoded image to read from.</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <returns>The number of bytes read; 0 when position is at or past the end of the image.</returns>
     public int ReadAt(long position, Span<byte> buffer)
     {
         if (position < 0 || position >= Length || buffer.IsEmpty)
@@ -223,6 +235,10 @@ public sealed class WbfsBlob : IBlobReader
         return true;
     }
 
+    /// <summary>
+    /// Disposes the underlying stream, or the split-part wrapper that owns the continuation
+    /// files; the caller's stream is disposed unless leaveOpen was set.
+    /// </summary>
     public void Dispose()
     {
         if (_file is MultiPartStream split)

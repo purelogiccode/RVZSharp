@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using RVZSharp.Blobs;
 using RVZSharp.Models;
 
-namespace RVZSharp.Tests;
+namespace RVZSharp.Slow.Tests;
 
 /// <summary>
 /// Byte-exact validation of the decoder and writer against REAL RVZ files on disk.
@@ -127,7 +127,6 @@ public static class RealRvzOnly
 /// SHA-1 and the expected ISO size. This is the strongest real-world proof the reader
 /// reproduces actual game images exactly.
 /// </summary>
-[Trait(TestCategories.Category, TestCategories.Slow)]
 public class RealRvzDecodeTests
 {
     public static TheoryData<string, string, string> Files()
@@ -236,7 +235,6 @@ public class RealRvzDecodeTests
 /// self-consistent (RVZ magic, current version, declared physical file size, a valid RVZ
 /// compression method, a legal chunk size, and a populated group table).
 /// </summary>
-[Trait(TestCategories.Category, TestCategories.Slow)]
 public class RealRvzStructureTests
 {
     public static TheoryData<string, string> GcFiles()
@@ -289,7 +287,6 @@ public class RealRvzStructureTests
 /// Category 3 — random access: <c>ReadAt</c> across chunk boundaries matches the streaming
 /// full read, and out-of-range reads are clamped. Runs on a couple of representative files.
 /// </summary>
-[Trait(TestCategories.Category, TestCategories.Slow)]
 public class RealRvzRegionTests
 {
     [Fact]
@@ -351,7 +348,6 @@ public class RealRvzRegionTests
 /// exercises the writer + reader on real disc data (raw data, decrypted Wii partitions,
 /// hash trees, packing) end-to-end.
 /// </summary>
-[Trait(TestCategories.Category, TestCategories.Slow)]
 public class RealRvzWriteRoundTripTests
 {
     [Fact]

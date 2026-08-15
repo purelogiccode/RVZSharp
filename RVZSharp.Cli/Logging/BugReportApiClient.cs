@@ -5,6 +5,11 @@ using Serilog;
 
 namespace RVZSharp.Cli.Logging;
 
+/// <summary>
+/// Posts error details to the RVZSharp bug-report API, capturing environment and
+/// exception information with bounded message and stack-trace lengths. Submission
+/// failures are logged but never thrown.
+/// </summary>
 internal sealed class BugReportApiClient : IDisposable
 {
     private const string ApiUrl = "https://www.purelogiccode.com/bugreport/api/send-bug-report";
@@ -22,6 +27,10 @@ internal sealed class BugReportApiClient : IDisposable
         WriteIndented = false
     };
 
+    /// <summary>
+    /// Creates a client with a 15-second HTTP timeout, the API key header, and the
+    /// calling assembly's name and version for the report.
+    /// </summary>
     public BugReportApiClient()
     {
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
@@ -31,6 +40,13 @@ internal sealed class BugReportApiClient : IDisposable
         _version = assembly.Version?.ToString(3) ?? "0.0.0";
     }
 
+    /// <summary>
+    /// Asynchronously submits a bug report to the API. Best-effort: network failures and
+    /// non-success responses are logged via ReportFailure and are never thrown to the caller.
+    /// </summary>
+    /// <param name="errorMessage">The rendered error message to report.</param>
+    /// <param name="exception">The exception whose details and stack trace to include, or null.</param>
+    /// <returns>A task that completes when the report request has been handled.</returns>
     public async Task SendBugReportAsync(string errorMessage, Exception? exception)
     {
         try
@@ -59,6 +75,7 @@ internal sealed class BugReportApiClient : IDisposable
         }
     }
 
+    /// <summary>Releases the underlying HttpClient.</summary>
     public void Dispose()
     {
         _httpClient?.Dispose();

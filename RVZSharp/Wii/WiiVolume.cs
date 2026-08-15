@@ -9,14 +9,27 @@ namespace RVZSharp.Wii;
 /// </summary>
 public static class WiiVolume
 {
+    /// <summary>Size of the disc header (0x80 bytes).</summary>
     public const ulong DiscHeaderSize = 0x80;
+
+    /// <summary>Offset of the partition table on disc (0x40000).</summary>
     public const ulong PartitionTableAddress = 0x40000;
+
+    /// <summary>Size of a partition header, including its ticket (0x400 bytes).</summary>
     public const ulong PartitionHeaderSize = 0x400;
+
+    /// <summary>Wii disc magic number.</summary>
     public const uint WII_MAGIC = 0x5D1C9EA3;
+
+    /// <summary>GameCube disc magic number.</summary>
     public const uint GC_MAGIC = 0xC2339F3D;
+
+    /// <summary>Partition table entry value meaning "no partition".</summary>
     public const uint PARTITION_NONE = 0xFFFFFFFF;
 
     /// <summary>True for a Wii disc whose partition data has hash trees (disc header 0x60).</summary>
+    /// <param name="disc">The disc image to inspect.</param>
+    /// <returns>True when the disc stores hash trees.</returns>
     public static bool HasWiiHashes(IBlobReader disc)
     {
         Span<byte> header = stackalloc byte[0x80];
@@ -25,6 +38,8 @@ public static class WiiVolume
     }
 
     /// <summary>True for a Wii disc whose partition data is encrypted (disc header 0x61).</summary>
+    /// <param name="disc">The disc image to inspect.</param>
+    /// <returns>True when the disc stores encrypted partitions.</returns>
     public static bool HasWiiEncryption(IBlobReader disc)
     {
         Span<byte> header = stackalloc byte[0x80];
@@ -33,6 +48,8 @@ public static class WiiVolume
     }
 
     /// <summary>Reads the disc type from the DVD/Wii magic in the disc header.</summary>
+    /// <param name="disc">The disc image to inspect.</param>
+    /// <returns>True when the disc magic is the Wii magic.</returns>
     public static bool IsWiiDisc(IBlobReader disc)
     {
         Span<byte> header = stackalloc byte[0x80];
@@ -45,6 +62,8 @@ public static class WiiVolume
     /// 0x40000 (Dolphin: VolumeWii::GetPartitions). Only partitions with a valid ticket and
     /// plausible data ranges are returned.
     /// </summary>
+    /// <param name="disc">The disc image to inspect.</param>
+    /// <returns>The sorted, de-duplicated list of valid partitions.</returns>
     public static IReadOnlyList<Partition> GetPartitions(IBlobReader disc)
     {
         var partitions = new List<Partition>();
@@ -125,24 +144,36 @@ public static class WiiVolume
     }
 
     /// <summary>The FST offset within the partition (partition header 0x424, shifted).</summary>
+    /// <param name="disc">The disc image.</param>
+    /// <param name="partition">The partition whose FST offset is requested.</param>
+    /// <returns>The FST offset, or null when it cannot be read.</returns>
     public static ulong? GetFstOffset(IBlobReader disc, Partition partition)
     {
         return ReadSwappedAndShifted(disc, partition.Offset + 0x424);
     }
 
     /// <summary>The FST size (partition header 0x428, shifted).</summary>
+    /// <param name="disc">The disc image.</param>
+    /// <param name="partition">The partition whose FST size is requested.</param>
+    /// <returns>The FST size, or null when it cannot be read.</returns>
     public static ulong? GetFstSize(IBlobReader disc, Partition partition)
     {
         return ReadSwappedAndShifted(disc, partition.Offset + 0x428);
     }
 
     /// <summary>Maps a partition-data-relative offset to a disc-relative offset.</summary>
+    /// <param name="offset">The offset inside the partition data area.</param>
+    /// <param name="partition">The partition holding the offset.</param>
+    /// <returns>The corresponding raw disc offset.</returns>
     public static ulong PartitionOffsetToRawOffset(ulong offset, Partition partition)
     {
         return partition.Offset + partition.DataOffset + offset;
     }
 
     /// <summary>Reads a big-endian u32 at <paramref name="offset"/>.</summary>
+    /// <param name="disc">The disc image.</param>
+    /// <param name="offset">The disc offset to read.</param>
+    /// <returns>The value read, or 0 when the read fails.</returns>
     public static uint ReadSwapped(IBlobReader disc, ulong offset)
     {
         Span<byte> bytes = stackalloc byte[4];
@@ -150,6 +181,9 @@ public static class WiiVolume
     }
 
     /// <summary>Reads a big-endian u32 and shifts it left by 2 (Dolphin: ReadSwappedAndShifted).</summary>
+    /// <param name="disc">The disc image.</param>
+    /// <param name="offset">The byte offset to read.</param>
+    /// <returns>The shifted value, or null when the read fails.</returns>
     public static ulong? ReadSwappedAndShifted(IBlobReader disc, ulong offset)
     {
         Span<byte> bytes = stackalloc byte[4];

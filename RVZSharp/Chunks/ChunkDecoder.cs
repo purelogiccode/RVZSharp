@@ -24,6 +24,16 @@ public static class ChunkDecoder
     private const int PartitionGroupDataSize = 0x1F0000; // 0x7C00 * 64 (2 MiB minus hashes)
     private const int GroupTotalSize = 0x200000; // one 2 MiB Wii group, incl. hashes
 
+    /// <summary>
+    /// Decodes one group chunk: reads the stored bytes, decompresses them with the disc codec
+    /// (or NONE), strips the hash exception lists (partition chunks), decodes the RVZ packing,
+    /// and returns the payload. Truncated or corrupt chunks surface as an RvzFormatException.
+    /// </summary>
+    /// <param name="file">The RVZ file to read the chunk from.</param>
+    /// <param name="disc">The disc descriptor (chunk size, compression method, compression data).</param>
+    /// <param name="codec">The decompressor codec matching the disc's compression method.</param>
+    /// <param name="request">Which group chunk to decode and its expected payload size.</param>
+    /// <returns>The decoded payload and, for partition chunks, the parsed hash exception lists.</returns>
     public static ChunkDecodeResult DecodeChunk(Stream file, WiaDisc disc, ICompressionDecoder codec,
         ChunkDecodeRequest request)
     {

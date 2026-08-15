@@ -3,7 +3,10 @@
 
 namespace RVZSharp.Interfaces;
 
+/// <summary>Allows setting the LZMA decoder properties (LZMA SDK convention).</summary>
 internal interface ISetDecoderProperties
 {
+    /// <summary>Sets the decoder properties (props bytes and dictionary size).</summary>
+    /// <param name="properties">The properties bytes from the compressor.</param>
     void SetDecoderProperties(byte[] properties);
 }

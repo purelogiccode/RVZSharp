@@ -10,8 +10,12 @@ namespace RVZSharp.Packing;
 /// </summary>
 public static class RvzPackingEncoder
 {
+    /// <summary>Length in bytes of a packed seed (68).</summary>
     public const int SeedSize = LaggedFibonacciGenerator.SeedSize;
+
+    /// <summary>Size of one PRNG data block (32 KiB); the LFG is aligned to it.</summary>
     public const int BlockSize = 0x8000;
+
     private const int JunkReuseThreshold = SeedSize;
 
     /// <summary>

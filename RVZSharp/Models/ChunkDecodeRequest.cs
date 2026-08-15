@@ -6,6 +6,7 @@ namespace RVZSharp.Models;
 [StructLayout(LayoutKind.Auto)]
 public readonly struct ChunkDecodeRequest
 {
+    /// <summary>The group entry describing where and how this chunk is stored.</summary>
     public required GroupEntry Group { get; init; }
 
     /// <summary>True for Wii partition chunks (they start with hash exception lists).</summary>

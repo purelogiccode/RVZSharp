@@ -11,6 +11,7 @@ namespace RVZSharp.Models;
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct WiaGroupEntry
 {
+    /// <summary>Size of the raw on-disk entry in bytes.</summary>
     public const int Size = 0x08;
 
     /// <summary>Offset in the file where the compressed data is stored, divided by 4.</summary>
@@ -22,6 +23,9 @@ public readonly struct WiaGroupEntry
     /// <summary>Size of the stored data; always used as-is (no compression flag bit).</summary>
     public uint StoredSize => DataSize;
 
+    /// <summary>Creates a group entry from the raw wia_group_t fields.</summary>
+    /// <param name="dataOff4">File offset of the stored data, divided by 4.</param>
+    /// <param name="dataSize">Size of the stored data.</param>
     public WiaGroupEntry(uint dataOff4, uint dataSize)
     {
         DataOff4 = dataOff4;
@@ -31,6 +35,9 @@ public readonly struct WiaGroupEntry
     /// <summary>Offset of the group data in the file.</summary>
     public ulong FileOffset => (ulong)DataOff4 << 2;
 
+    /// <summary>Parses one fixed 8-byte wia_group_t entry from raw bytes.</summary>
+    /// <param name="data">The raw bytes of the entry.</param>
+    /// <returns>The parsed group entry.</returns>
     public static WiaGroupEntry Parse(ReadOnlySpan<byte> data)
     {
         var reader = new SpanReader(data);

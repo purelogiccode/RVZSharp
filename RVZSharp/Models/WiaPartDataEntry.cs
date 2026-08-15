@@ -10,6 +10,7 @@ namespace RVZSharp.Models;
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct WiaPartDataEntry
 {
+    /// <summary>Size of the raw on-disk entry in bytes.</summary>
     public const int Size = 0x10;
 
     /// <summary>The sector on the disc at which this data starts.</summary>
@@ -24,6 +25,11 @@ public readonly struct WiaPartDataEntry
     /// <summary>The number of group entries used for this data.</summary>
     public uint NumGroups { get; }
 
+    /// <summary>Creates a partition data entry from its raw fields.</summary>
+    /// <param name="firstSector">The disc sector at which the data starts.</param>
+    /// <param name="numSectors">The number of sectors covered by this entry.</param>
+    /// <param name="groupIndex">Index of the first group entry.</param>
+    /// <param name="numGroups">The number of group entries used for this data.</param>
     public WiaPartDataEntry(uint firstSector, uint numSectors, uint groupIndex, uint numGroups)
     {
         FirstSector = firstSector;
@@ -32,6 +38,9 @@ public readonly struct WiaPartDataEntry
         NumGroups = numGroups;
     }
 
+    /// <summary>Parses one fixed 16-byte wia_part_data_t entry from raw bytes.</summary>
+    /// <param name="data">The raw bytes of the entry.</param>
+    /// <returns>The parsed partition data entry.</returns>
     public static WiaPartDataEntry Parse(ReadOnlySpan<byte> data)
     {
         var reader = new SpanReader(data);

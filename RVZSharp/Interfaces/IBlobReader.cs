@@ -21,6 +21,9 @@ public interface IBlobReader : IDisposable
     /// Reads <paramref name="buffer.Length"/> bytes of the decoded disc image at
     /// <paramref name="position"/>. Returns fewer bytes at the end of the image.
     /// </summary>
+    /// <param name="position">Offset into the decoded disc image.</param>
+    /// <param name="buffer">The buffer to fill; its length is the number of bytes to read.</param>
+    /// <returns>The number of bytes read (fewer at the end of the image).</returns>
     int ReadAt(long position, Span<byte> buffer);
 
     /// <summary>

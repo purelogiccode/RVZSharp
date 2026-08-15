@@ -25,6 +25,10 @@ internal sealed class StatsApiClient : IDisposable
         WriteIndented = false
     };
 
+    /// <summary>
+    /// Creates a client with a 10-second HTTP timeout, a bearer API key, and the calling
+    /// assembly's name and version for the usage hit.
+    /// </summary>
     public StatsApiClient()
     {
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
@@ -35,6 +39,11 @@ internal sealed class StatsApiClient : IDisposable
         _version = assembly.Version?.ToString(3) ?? "0.0.0";
     }
 
+    /// <summary>
+    /// Asynchronously POSTs a usage hit to the stats endpoint. Best-effort: network failures
+    /// and non-429 responses are logged at debug level and are never thrown to the caller.
+    /// </summary>
+    /// <returns>A task that completes when the usage hit has been handled.</returns>
     public async Task ReportUsageAsync()
     {
         try
@@ -54,6 +63,7 @@ internal sealed class StatsApiClient : IDisposable
         }
     }
 
+    /// <summary>Releases the underlying HttpClient.</summary>
     public void Dispose()
     {
         _httpClient?.Dispose();

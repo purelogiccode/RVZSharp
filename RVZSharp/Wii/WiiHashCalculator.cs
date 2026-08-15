@@ -13,12 +13,24 @@ namespace RVZSharp.Wii;
 /// </summary>
 public static class WiiHashCalculator
 {
+    /// <summary>Size of one data block (0x400 bytes).</summary>
     public const int BlockDataSize = 0x400;
+
+    /// <summary>Number of data blocks (and h0 hashes) per sector.</summary>
     public const int BlocksPerSector = 31;
+
+    /// <summary>Size of a sector's data area (31 data blocks).</summary>
     public const int SectorDataSize = BlocksPerSector * BlockDataSize; // 0x7C00
+
+    /// <summary>Size of a sector's hash area (0x400 bytes).</summary>
     public const int HashBlockSize = 0x400;
+
+    /// <summary>Size of one SHA-1 hash (20 bytes).</summary>
     public const int HashSize = 20;
+
+    /// <summary>Size of the h0 area (31 hashes).</summary>
     public const int H0Size = BlocksPerSector * HashSize; // 0x26C
+
     private const int H0Padding = 0x14;
     private const int H1Size = 8 * HashSize; // 0xA0
     private const int H1Padding = 0x20;
@@ -43,6 +55,8 @@ public static class WiiHashCalculator
     /// Computes the 0x400-byte hash area for one sector (before applying hash exceptions).
     /// <paramref name="hashArea"/> must be exactly <see cref="HashBlockSize"/> bytes.
     /// </summary>
+    /// <param name="sectorData">The decrypted sector data (0x7C00 bytes).</param>
+    /// <param name="hashArea">The hash area buffer (exactly 0x400 bytes) to fill.</param>
     public static void BuildHashArea(ReadOnlySpan<byte> sectorData, Span<byte> hashArea)
     {
         if (sectorData.Length != SectorDataSize)
@@ -85,6 +99,9 @@ public static class WiiHashCalculator
     /// the exception offset of the first byte of this hash area within the chunk's data
     /// (usually 0; used when a chunk covers multiple 2 MiB exception regions).
     /// </summary>
+    /// <param name="exceptions">The hash exceptions to apply.</param>
+    /// <param name="hashArea">The hash area to patch in place.</param>
+    /// <param name="chunkBaseOffset">Chunk-relative offset of this hash area's first byte.</param>
     public static void ApplyHashExceptions(ReadOnlySpan<HashExceptionEntry> exceptions,
         Span<byte> hashArea, int chunkBaseOffset = 0)
     {

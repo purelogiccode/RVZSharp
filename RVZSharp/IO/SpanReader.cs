@@ -10,6 +10,8 @@ public ref struct SpanReader
 {
     private readonly ReadOnlySpan<byte> _data;
 
+    /// <summary>Creates a big-endian reader over the given data, starting at position 0.</summary>
+    /// <param name="data">The bytes to read from.</param>
     public SpanReader(ReadOnlySpan<byte> data)
     {
         _data = data;
@@ -22,6 +24,11 @@ public ref struct SpanReader
     /// <summary>Number of bytes that can still be read.</summary>
     public readonly int Remaining => _data.Length - Position;
 
+    /// <summary>
+    /// Reads a big-endian ushort and advances the position by 2. Throws an RvzFormatException
+    /// when fewer than 2 bytes remain.
+    /// </summary>
+    /// <returns>The value read.</returns>
     public ushort ReadUInt16()
     {
         Ensure(2);
@@ -30,6 +37,11 @@ public ref struct SpanReader
         return value;
     }
 
+    /// <summary>
+    /// Reads a big-endian uint and advances the position by 4. Throws an RvzFormatException
+    /// when fewer than 4 bytes remain.
+    /// </summary>
+    /// <returns>The value read.</returns>
     public uint ReadUInt32()
     {
         Ensure(4);
@@ -38,6 +50,11 @@ public ref struct SpanReader
         return value;
     }
 
+    /// <summary>
+    /// Reads a big-endian int and advances the position by 4. Throws an RvzFormatException
+    /// when fewer than 4 bytes remain.
+    /// </summary>
+    /// <returns>The value read.</returns>
     public int ReadInt32()
     {
         Ensure(4);
@@ -46,6 +63,11 @@ public ref struct SpanReader
         return value;
     }
 
+    /// <summary>
+    /// Reads a big-endian ulong and advances the position by 8. Throws an RvzFormatException
+    /// when fewer than 8 bytes remain.
+    /// </summary>
+    /// <returns>The value read.</returns>
     public ulong ReadUInt64()
     {
         Ensure(8);
@@ -54,6 +76,12 @@ public ref struct SpanReader
         return value;
     }
 
+    /// <summary>
+    /// Reads count bytes and advances the position by count. Throws an RvzFormatException
+    /// when fewer than count bytes remain.
+    /// </summary>
+    /// <param name="count">Number of bytes to read.</param>
+    /// <returns>The bytes read.</returns>
     public ReadOnlySpan<byte> ReadBytes(int count)
     {
         Ensure(count);
@@ -62,6 +90,11 @@ public ref struct SpanReader
         return value;
     }
 
+    /// <summary>
+    /// Reads a single byte and advances the position by 1. Throws an RvzFormatException
+    /// when no bytes remain.
+    /// </summary>
+    /// <returns>The byte read.</returns>
     public byte ReadByte()
     {
         Ensure(1);

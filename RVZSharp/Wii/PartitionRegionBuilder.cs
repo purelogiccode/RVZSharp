@@ -14,8 +14,13 @@ namespace RVZSharp.Wii;
 /// </summary>
 public sealed class PartitionRegionBuilder
 {
+    /// <summary>Number of sectors per 2 MiB region (64).</summary>
     public const int SectorsPerRegion = 64;
+
+    /// <summary>Size of one encrypted sector (0x8000 bytes).</summary>
     public const int SectorSize = 0x8000;
+
+    /// <summary>Offset of the AES-IV inside the hash area; the same ciphertext serves as IV for the data area.</summary>
     public const int IvOffset = 0x3D0;
 
     private readonly byte[] _key;
@@ -23,6 +28,8 @@ public sealed class PartitionRegionBuilder
     private readonly byte[][] _sectorData = new byte[SectorsPerRegion][];
     private readonly List<HashExceptionEntry>[] _exceptions = new List<HashExceptionEntry>[SectorsPerRegion];
 
+    /// <summary>Creates a region builder that (re)encrypts with the given partition key.</summary>
+    /// <param name="key">The 16-byte AES partition key.</param>
     public PartitionRegionBuilder(ReadOnlySpan<byte> key)
     {
         if (key.Length != 16)
@@ -45,6 +52,8 @@ public sealed class PartitionRegionBuilder
     /// exceptions that apply to it. Exception offsets must be relative to the start of this
     /// 2 MiB region.
     /// </summary>
+    /// <param name="data">The decrypted partition data (0x7C00 bytes).</param>
+    /// <param name="exceptions">The hash exceptions applicable to this sector.</param>
     public void AddSector(ReadOnlySpan<byte> data, ReadOnlySpan<HashExceptionEntry> exceptions)
     {
         if (SectorCount >= SectorsPerRegion)
@@ -69,6 +78,7 @@ public sealed class PartitionRegionBuilder
     /// Produces the encrypted region sectors (<see cref="SectorCount"/> × 0x8000 bytes).
     /// Missing sectors are zero-filled for hash computation (Dolphin semantics).
     /// </summary>
+    /// <returns>The encrypted sectors concatenated (one 0x8000-byte block per added sector).</returns>
     public byte[] Finish()
     {
         if (SectorCount == 0)

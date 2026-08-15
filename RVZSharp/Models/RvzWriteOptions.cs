@@ -3,6 +3,7 @@ namespace RVZSharp.Models;
 /// <summary>Options for <see cref="RvzWriter.Write"/>.</summary>
 public sealed record RvzWriteOptions
 {
+    /// <summary>The default options: Zstandard, level 3, 2 MiB chunks, packing enabled.</summary>
     public static readonly RvzWriteOptions Default = new();
 
     /// <summary>Compression method (Dolphin's default: Zstandard).</summary>

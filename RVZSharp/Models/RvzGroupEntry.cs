@@ -11,6 +11,7 @@ namespace RVZSharp.Models;
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct RvzGroupEntry
 {
+    /// <summary>Size of the raw on-disk entry in bytes.</summary>
     public const int Size = 0x0C;
 
     /// <summary>Flag: the group is stored with the disc's compression method (else NONE).</summary>
@@ -29,6 +30,10 @@ public readonly struct RvzGroupEntry
     /// </summary>
     public uint RvzPackedSize { get; }
 
+    /// <summary>Creates a group entry from the raw rvz_group_t fields.</summary>
+    /// <param name="dataOff4">File offset of the stored data, divided by 4.</param>
+    /// <param name="dataSize">Raw data_size field, including the compression flag bit.</param>
+    /// <param name="rvzPackedSize">Size after decompressing but before decoding the RVZ packing; 0 for none.</param>
     public RvzGroupEntry(uint dataOff4, uint dataSize, uint rvzPackedSize)
     {
         DataOff4 = dataOff4;
@@ -48,6 +53,9 @@ public readonly struct RvzGroupEntry
     /// </summary>
     public uint StoredSize => DataSize & SizeMask;
 
+    /// <summary>Parses one fixed 12-byte rvz_group_t entry from raw bytes.</summary>
+    /// <param name="data">The raw bytes of the entry.</param>
+    /// <returns>The parsed group entry.</returns>
     public static RvzGroupEntry Parse(ReadOnlySpan<byte> data)
     {
         var reader = new SpanReader(data);

@@ -3,7 +3,8 @@
 
 namespace RVZSharp.Interfaces;
 
-public interface ICodeProgress
+/// <summary>Callback progress interface for the LZMA range decoder (LZMA SDK convention).</summary>
+internal interface ICodeProgress
 {
     /// <summary>Callback progress.</summary>
     /// <param name="inSize">input size. -1 if unknown.</param>

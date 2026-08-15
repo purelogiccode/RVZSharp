@@ -296,14 +296,12 @@ internal static class Program
                     switch (format)
                     {
                         case "rvz":
-                            Console.Error.WriteLine(
-                                "Warning: Scrubbing an RVZ container does not offer significant space "
-                                + "advantages. Continuing anyway.");
+                            Log.Warning(
+                                "Scrubbing an RVZ container does not offer significant space advantages. Continuing anyway.");
                             break;
                         case "iso":
-                            Console.Error.WriteLine(
-                                "Warning: Scrubbing does not save space when converting to ISO unless "
-                                + "using external compression. Continuing anyway.");
+                            Log.Warning(
+                                "Scrubbing does not save space when converting to ISO unless using external compression. Continuing anyway.");
                             break;
                     }
                 }
@@ -326,8 +324,7 @@ internal static class Program
 
                     if (blockSize is < 0x8000 or > 0x200000)
                     {
-                        Console.Error.WriteLine(
-                            "Warning: Block size is not ideal for performance. Continuing anyway.");
+                        Log.Warning("Block size is not ideal for performance. Continuing anyway.");
                     }
                 }
 
@@ -1354,6 +1351,7 @@ internal static class Program
                 Console.WriteLine($"sha1: {actual}");
                 if (!string.Equals(actual, expectedSha1.Trim().ToLowerInvariant(), StringComparison.Ordinal))
                 {
+                    Log.Warning("SHA-1 mismatch: expected {Expected}, got {Actual}", expectedSha1, actual);
                     Console.Error.WriteLine($"error: SHA-1 mismatch (expected {expectedSha1}).");
                     return 1;
                 }

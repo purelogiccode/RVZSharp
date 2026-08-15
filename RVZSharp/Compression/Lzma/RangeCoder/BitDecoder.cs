@@ -23,6 +23,7 @@ internal struct BitDecoder
             rangeDecoder.Normalize2();
             return 0;
         }
+
         rangeDecoder.Range -= newBound;
         rangeDecoder.Code -= newBound;
         _prob -= (_prob) >> KNumMoveBits;

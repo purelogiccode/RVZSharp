@@ -62,7 +62,7 @@ public static class ChunkDecoder
             throw;
         }
         catch (Exception e) when (e is IOException or InvalidDataException or ZstdSharp.ZstdException
-                                 or ICSharpCode.SharpZipLib.SharpZipBaseException)
+                                      or ICSharpCode.SharpZipLib.SharpZipBaseException)
         {
             throw new RvzFormatException($"Failed to decode a group chunk: {e.Message}", e);
         }

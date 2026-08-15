@@ -358,56 +358,56 @@ public sealed class LzmaStream : Stream
                 _outWindow.Reset();
                 break;
             default:
+            {
+                if (_needDictReset)
                 {
-                    if (_needDictReset)
-                    {
-                        throw new DataErrorException();
-                    }
-
-                    break;
+                    throw new DataErrorException();
                 }
+
+                break;
+            }
         }
 
         switch (control)
         {
             case >= 0x80:
+            {
+                _uncompressedChunk = false;
+
+                _availableBytes = (control & 0x1F) << 16;
+                _availableBytes += (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
+                CompressedBytesRead += 2;
+
+                _rangeDecoderLimit = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
+                CompressedBytesRead += 2;
+
+                if (control >= 0xC0)
                 {
-                    _uncompressedChunk = false;
+                    _needProps = false;
+                    Properties[0] = (byte)_inputStream.ReadByte();
+                    CompressedBytesRead++;
 
-                    _availableBytes = (control & 0x1F) << 16;
-                    _availableBytes += (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-                    CompressedBytesRead += 2;
-
-                    _rangeDecoderLimit = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-                    CompressedBytesRead += 2;
-
-                    if (control >= 0xC0)
-                    {
-                        _needProps = false;
-                        Properties[0] = (byte)_inputStream.ReadByte();
-                        CompressedBytesRead++;
-
-                        _decoder = new Decoder();
-                        _decoder.SetDecoderProperties(Properties);
-                    }
-                    else if (_needProps)
-                    {
-                        throw new DataErrorException();
-                    }
-                    else if (control >= 0xA0)
-                    {
-                        _decoder = new Decoder();
-                        _decoder.SetDecoderProperties(Properties);
-                    }
-
-                    _rangeDecoder.Init(_inputStream);
-                    // LZMA2 chunks share one underlying stream with the raw chunk-header bytes read
-                    // above/below, so the buffered fast-read path must never physically read past this
-                    // chunk's compressed size, or it would desynchronize the stream position for the
-                    // next chunk header.
-                    _rangeDecoder.SetFastLimit(_rangeDecoderLimit);
-                    break;
+                    _decoder = new Decoder();
+                    _decoder.SetDecoderProperties(Properties);
                 }
+                else if (_needProps)
+                {
+                    throw new DataErrorException();
+                }
+                else if (control >= 0xA0)
+                {
+                    _decoder = new Decoder();
+                    _decoder.SetDecoderProperties(Properties);
+                }
+
+                _rangeDecoder.Init(_inputStream);
+                // LZMA2 chunks share one underlying stream with the raw chunk-header bytes read
+                // above/below, so the buffered fast-read path must never physically read past this
+                // chunk's compressed size, or it would desynchronize the stream position for the
+                // next chunk header.
+                _rangeDecoder.SetFastLimit(_rangeDecoderLimit);
+                break;
+            }
             case > 0x02:
                 throw new DataErrorException();
             default:

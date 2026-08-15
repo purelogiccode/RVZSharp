@@ -383,7 +383,7 @@ public sealed class RvzReader : IBlobReader
 
     private void ReadPartitionArea(DataArea area, long position, Span<byte> buffer)
     {
-        var regionBytes = 64L * PartitionRegionBuilder.SectorSize;
+        const long regionBytes = 64L * PartitionRegionBuilder.SectorSize;
         var offsetInArea = position - area.Start;
         var regionIndex = offsetInArea / regionBytes;
         var offsetInRegion = (int)(offsetInArea % regionBytes);
@@ -476,7 +476,7 @@ public sealed class RvzReader : IBlobReader
         // The writer stores exception offsets relative to the chunk; the chunk's position
         // within its 2 MiB region shifts them to region-relative (Dolphin: additional_offset).
         var additionalOffset = (int)((chunkIndex * PartitionChunkPayloadSize % RegionDataSize) /
-                                     WiiHashCalculator.SectorDataSize * WiiHashCalculator.HashBlockSize);
+            WiiHashCalculator.SectorDataSize * WiiHashCalculator.HashBlockSize);
 
         // Each entry names a sector (offset >> 10) and a position within its hash area.
         // Out-of-range entries are rejected, not silently dropped (Dolphin:

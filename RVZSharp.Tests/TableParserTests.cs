@@ -90,12 +90,12 @@ public class TableParserTests
                 disc.ComprDataLen = 0;
                 break;
             case CompressionType.Lzma:
-                {
-                    var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
-                    props.CopyTo(disc.ComprData, 0);
-                    disc.ComprDataLen = (byte)props.Length;
-                    break;
-                }
+            {
+                var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
+                props.CopyTo(disc.ComprData, 0);
+                disc.ComprDataLen = (byte)props.Length;
+                break;
+            }
             case CompressionType.Lzma2:
                 disc.ComprData[0] = 21;
                 disc.ComprDataLen = 1;

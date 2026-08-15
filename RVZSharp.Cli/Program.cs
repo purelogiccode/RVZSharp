@@ -337,46 +337,46 @@ internal static class Program
                 switch (format)
                 {
                     case "rvz":
+                    {
+                        var compressionName = options.Get("compression");
+                        if (compressionName is null)
                         {
-                            var compressionName = options.Get("compression");
-                            if (compressionName is null)
-                            {
-                                return Fail("Compression method must be set for WIA or RVZ");
-                            }
-
-                            compression = ParseCompression(compressionName);
-                            switch (compression)
-                            {
-                                case CompressionType.Purge:
-                                    return Fail("Compression type is not supported for the container format");
-                                case CompressionType.None:
-                                    level = 0;
-                                    break;
-                                default:
-                                    {
-                                        if (!options.IsSet("compression_level") ||
-                                            !int.TryParse(options.Get("compression_level"), out level))
-                                        {
-                                            return Fail("Compression level must be set when compression type is not 'none'");
-                                        }
-
-                                        var (min, max) = GetAllowedCompressionLevels(compression);
-                                        if (level < min || level > max)
-                                        {
-                                            return Fail("Compression level not in acceptable range");
-                                        }
-
-                                        break;
-                                    }
-                            }
-
-                            if (options.IsSet("no-packing"))
-                            {
-                                packing = false;
-                            }
-
-                            break;
+                            return Fail("Compression method must be set for WIA or RVZ");
                         }
+
+                        compression = ParseCompression(compressionName);
+                        switch (compression)
+                        {
+                            case CompressionType.Purge:
+                                return Fail("Compression type is not supported for the container format");
+                            case CompressionType.None:
+                                level = 0;
+                                break;
+                            default:
+                            {
+                                if (!options.IsSet("compression_level") ||
+                                    !int.TryParse(options.Get("compression_level"), out level))
+                                {
+                                    return Fail("Compression level must be set when compression type is not 'none'");
+                                }
+
+                                var (min, max) = GetAllowedCompressionLevels(compression);
+                                if (level < min || level > max)
+                                {
+                                    return Fail("Compression level not in acceptable range");
+                                }
+
+                                break;
+                            }
+                        }
+
+                        if (options.IsSet("no-packing"))
+                        {
+                            packing = false;
+                        }
+
+                        break;
+                    }
                     case "iso":
                         return DecodeBlob(input, outputPath, expectedSha1: null);
                 }
@@ -1242,52 +1242,52 @@ internal static class Program
             switch (reader)
             {
                 case RvzReader rvz:
+                {
+                    Console.WriteLine($"version:         {WiaFileHead.FormatVersion(rvz.FileHead.Version)}");
+                    Console.WriteLine($"disc type:       {rvz.Disc.DiscType} ({(uint)rvz.Disc.DiscType})");
+                    Console.WriteLine($"compression:     {rvz.Disc.Compression} (level {rvz.Disc.ComprLevel})");
+                    Console.WriteLine($"chunk size:      0x{rvz.Disc.ChunkSize:X}");
+                    Console.WriteLine($"partitions:      {rvz.Partitions.Length}");
+                    Console.WriteLine($"raw data areas:  {rvz.RawDataEntries.Length}");
+                    Console.WriteLine($"groups:          {rvz.GroupEntries.Length}");
+
+                    foreach (var part in rvz.Partitions)
                     {
-                        Console.WriteLine($"version:         {WiaFileHead.FormatVersion(rvz.FileHead.Version)}");
-                        Console.WriteLine($"disc type:       {rvz.Disc.DiscType} ({(uint)rvz.Disc.DiscType})");
-                        Console.WriteLine($"compression:     {rvz.Disc.Compression} (level {rvz.Disc.ComprLevel})");
-                        Console.WriteLine($"chunk size:      0x{rvz.Disc.ChunkSize:X}");
-                        Console.WriteLine($"partitions:      {rvz.Partitions.Length}");
-                        Console.WriteLine($"raw data areas:  {rvz.RawDataEntries.Length}");
-                        Console.WriteLine($"groups:          {rvz.GroupEntries.Length}");
-
-                        foreach (var part in rvz.Partitions)
+                        for (var s = 0; s < 2; s++)
                         {
-                            for (var s = 0; s < 2; s++)
+                            var pd = part.Data[s];
+                            if (pd.NumSectors == 0)
                             {
-                                var pd = part.Data[s];
-                                if (pd.NumSectors == 0)
-                                {
-                                    continue;
-                                }
-
-                                Console.WriteLine($"  partition @ sector {pd.FirstSector}: {pd.NumSectors} sectors, "
-                                                  + $"{pd.NumGroups} groups (key {Convert.ToHexString(part.Key)})");
+                                continue;
                             }
-                        }
 
-                        foreach (var raw in rvz.RawDataEntries)
-                        {
-                            Console.WriteLine($"  raw data @ 0x{raw.RawDataOffset:X}: 0x{raw.RawDataSize:X} bytes, "
-                                              + $"{raw.NumGroups} groups");
+                            Console.WriteLine($"  partition @ sector {pd.FirstSector}: {pd.NumSectors} sectors, "
+                                              + $"{pd.NumGroups} groups (key {Convert.ToHexString(part.Key)})");
                         }
-
-                        break;
                     }
+
+                    foreach (var raw in rvz.RawDataEntries)
+                    {
+                        Console.WriteLine($"  raw data @ 0x{raw.RawDataOffset:X}: 0x{raw.RawDataSize:X} bytes, "
+                                          + $"{raw.NumGroups} groups");
+                    }
+
+                    break;
+                }
                 case GczBlob gcz:
                     Console.WriteLine($"block size:      0x{gcz.BlockSize:X}");
                     Console.WriteLine($"blocks:          {gcz.NumBlocks}");
                     Console.WriteLine("compression:     Deflate");
                     break;
                 default:
+                {
+                    if (reader.BlockSize != 0)
                     {
-                        if (reader.BlockSize != 0)
-                        {
-                            Console.WriteLine($"block size:      0x{reader.BlockSize:X}");
-                        }
-
-                        break;
+                        Console.WriteLine($"block size:      0x{reader.BlockSize:X}");
                     }
+
+                    break;
+                }
             }
 
             return 0;

@@ -74,6 +74,7 @@ internal abstract class Base
         {
             return len;
         }
+
         return K_NUM_LEN_TO_POS_STATES - 1;
     }
 

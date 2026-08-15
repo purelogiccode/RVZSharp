@@ -52,12 +52,12 @@ public class ChunkDecoderTests
         switch (compression)
         {
             case CompressionType.Lzma:
-                {
-                    var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
-                    props.CopyTo(builder.ComprData, 0);
-                    builder.ComprDataLen = (byte)props.Length;
-                    break;
-                }
+            {
+                var (props, _) = TestCompressor.EncodeLzma1([1], endMarker: true);
+                props.CopyTo(builder.ComprData, 0);
+                builder.ComprDataLen = (byte)props.Length;
+                break;
+            }
             case CompressionType.Lzma2:
                 builder.ComprData[0] = 21;
                 builder.ComprDataLen = 1;

@@ -160,7 +160,7 @@ public class LibraryApiTests
     [Fact]
     public void RvzWriter_Cancels_MidConversion()
     {
-var iso = MakeGcIso();
+        var iso = MakeGcIso();
         using var input = new MemoryStream(iso);
         using var output = new MemoryStream();
         var cts = new CancellationTokenSource();

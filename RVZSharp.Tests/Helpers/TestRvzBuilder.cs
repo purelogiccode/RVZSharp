@@ -133,7 +133,7 @@ public static class TestRvzBuilder
                 pos += p.Length;
             }
 
-            partitionEncrypted = EncryptPartition(spec, partition, decrypted);
+            partitionEncrypted = EncryptPartition(partition, decrypted);
         }
 
         // --- Assemble the original ISO from the payloads -----------------------------
@@ -224,7 +224,6 @@ public static class TestRvzBuilder
         List<byte[]> payloads, List<(int EntryIndex, int ChunkCount)> rawEntryChunkCounts,
         PartitionSpec? partition, long partitionOffset)
     {
-        var compression = spec.Compression;
         var chunkSize = (long)spec.ChunkSize;
         var sectorsPerChunk = chunkSize / 0x8000;
         var partitionPayloadPerChunk = sectorsPerChunk * 0x7C00;
@@ -423,7 +422,7 @@ public static class TestRvzBuilder
     }
 
     private static byte[] BuildRawTable(RvzSpec spec, PartitionSpec? partition, long partitionOffset,
-        long chunkSize, int[] rawEntryChunkStart, CompressionType compression)
+        int[] rawEntryChunkStart, CompressionType compression)
     {
         var rawEntries = new List<(ulong Off, ulong Size, uint GroupIndex, uint NumGroups)>();
         var firstEntrySize = partition == null ? spec.RawSize : (int)(partitionOffset - 0x80);
@@ -460,7 +459,7 @@ public static class TestRvzBuilder
 
         // Build the partition and raw tables first (their content is fixed).
         var partTable = BuildPartTable(spec, partition, partitionChunkStart, chunkSize);
-        var rawTableStored = BuildRawTable(spec, partition, partitionOffset, chunkSize,
+        var rawTableStored = BuildRawTable(spec, partition, partitionOffset,
             rawEntryChunkStart, compression);
 
         // The group entries' data_off4 depend on the group table's (compressed) length —
@@ -622,7 +621,7 @@ public static class TestRvzBuilder
         }
     }
 
-    private static byte[] EncryptPartition(RvzSpec spec, PartitionSpec partition, byte[] decrypted)
+    private static byte[] EncryptPartition(PartitionSpec partition, byte[] decrypted)
     {
         // One region builder per 64 sectors (regions hash zero-filled tails independently).
         var output = new MemoryStream();

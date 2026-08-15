@@ -184,7 +184,7 @@ public static class TestRvzBuilder
                 {
                     payload[i] = chunkDiscOffset + i < 0x80 && chunkDiscOffset == 0
                         ? discHeader[(int)(chunkDiscOffset + i)]
-                        : RandomByte(rng, chunkDiscOffset + i, spec.Seed);
+                        : RandomByte(chunkDiscOffset + i, spec.Seed);
                 }
 
                 junk.CopyTo(payload, split);
@@ -196,7 +196,7 @@ public static class TestRvzBuilder
                     var discOffset = chunkDiscOffset + i;
                     payload[i] = discOffset < 0x80 && chunkDiscOffset == 0
                         ? discHeader[discOffset]
-                        : RandomByte(rng, discOffset, spec.Seed);
+                        : RandomByte(discOffset, spec.Seed);
                 }
             }
 
@@ -661,7 +661,7 @@ public static class TestRvzBuilder
         return seedBytes;
     }
 
-    private static byte RandomByte(Random rng, long discOffset, int seed)
+    private static byte RandomByte(long discOffset, int seed)
     {
         unchecked
         {

@@ -55,6 +55,86 @@ public class BlobDetectionTests
         Assert.Throws<ArgumentException>(() => Blob.Open(new NonSeekableStream()));
     }
 
+    [Theory]
+    [InlineData("RVZ\x01")]
+    [InlineData("WIA\x01")]
+    [InlineData("WBFS")]
+    public void CorruptContainer_WithRealMagic_ThrowsFormatException(string magic)
+    {
+        // A file that starts with a recognized container magic must be parsed as that
+        // container — a parse failure is a format error, never a silent PlainBlob fallback
+        // (the fallback is only for files with no recognizable magic).
+        var content = new byte[350_000];
+        new Random(42).NextBytes(content);
+        System.Text.Encoding.ASCII.GetBytes(magic).CopyTo(content, 0);
+
+        Assert.ThrowsAny<RvzException>(() => Blob.Open(new MemoryStream(content), leaveOpen: true));
+    }
+
+    [Fact]
+    public void CorruptCiso_OpensButWriterRejectsDecodedGarbage()
+    {
+        // CISO is validated lazily (like Dolphin): a header with a plausible block size
+        // opens even though the payload is garbage — the block map says every block is
+        // absent, so the decoded bytes are zeroes. The writer's disc-header validation is
+        // what stops such garbage from being wrapped into an RVZ.
+        var content = new byte[350_000];
+        new Random(42).NextBytes(content);
+        System.Text.Encoding.ASCII.GetBytes("CISO").CopyTo(content, 0);
+        content[4] = 0x00; // block size 0x8000, little endian
+        content[5] = 0x00;
+        content[6] = 0x80;
+        content[7] = 0x00;
+
+        using var blob = Blob.Open(new MemoryStream(content), leaveOpen: true);
+        Assert.Equal(BlobType.Ciso, blob.Type);
+        Assert.Throws<RvzFormatException>(() =>
+        {
+            using var output = new MemoryStream();
+            RvzWriter.Write(blob, output, RvzWriteOptions.Default);
+        });
+    }
+
+    [Fact]
+    public void CorruptGcz_WithRealMagic_ThrowsFormatException()
+    {
+        // The real GCZ magic is 0xB10BC001 little endian (Dolphin: GCZ_MAGIC) — NOT the
+        // ASCII "GCZ\0" the name suggests.
+        var content = new byte[350_000];
+        new Random(42).NextBytes(content);
+        new byte[] { 0x01, 0xC0, 0x0B, 0xB1 }.CopyTo(content, 0);
+
+        Assert.Throws<RvzFormatException>(() => Blob.Open(new MemoryStream(content), leaveOpen: true));
+    }
+
+    [Fact]
+    public void CorruptTgc_WithRealMagic_ThrowsFormatException()
+    {
+        // TGC's magic (0xA2380FAE) is the one little-endian field in the header.
+        var content = new byte[350_000];
+        new Random(42).NextBytes(content);
+        new byte[] { 0xAE, 0x0F, 0x38, 0xA2 }.CopyTo(content, 0);
+
+        Assert.Throws<RvzFormatException>(() => Blob.Open(new MemoryStream(content), leaveOpen: true));
+    }
+
+    [Theory]
+    [InlineData("GCZ\0")]
+    [InlineData("RVZ\0")]
+    [InlineData("WIA\0")]
+    public void FakeContainerMagic_FallsBackToPlainBlob(string magic)
+    {
+        // Only the REAL magics select a container; an ASCII look-alike ("GCZ\0", "RVZ\0")
+        // is just arbitrary bytes and falls back to PlainBlob like any other unrecognized
+        // file. The writer's disc-header validation is what rejects such inputs.
+        var content = new byte[350_000];
+        new Random(42).NextBytes(content);
+        System.Text.Encoding.ASCII.GetBytes(magic).CopyTo(content, 0);
+
+        using var reader = Blob.Open(new MemoryStream(content), leaveOpen: true);
+        Assert.Equal(BlobType.Plain, reader.Type);
+    }
+
     private sealed class NonSeekableStream : Stream
     {
         public override bool CanRead => true;

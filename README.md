@@ -113,6 +113,21 @@ catch (RvzHashMismatchException) { /* a SHA-1 failed (corrupt container) */ }
 catch (RvzFormatException)       { /* structural damage / unsupported feature */ }
 ```
 
+**What `Blob.Open` accepts and rejects:** a file that starts with a recognized container
+magic (RVZ/WIA/CISO/GCZ/WBFS/TGC/NFS) is always parsed as that container — a parse failure
+throws an `RvzException` (`RvzFormatException`, `RvzHashMismatchException`, or
+`RvzUnsupportedException` for newer container versions), never a silent fallback. Only
+files with **no recognizable magic** are treated as a plain ISO. CISO is validated lazily
+like Dolphin (a plausible block size opens, absent blocks decode to zeroes); `RvzWriter`
+handles the rest.
+
+**`RvzWriter` validates the input:** the decoded bytes must carry the GameCube/Wii disc
+header magic (Wii `5D 1C 9E A3` at offset `0x18`, GameCube `C2 33 9F 3D` at offset `0x1C`,
+like Dolphin's `TryCreateDisc`). Any other input throws `RvzFormatException` before a
+single byte is written — arbitrary data can never be wrapped into an unusable RVZ, so
+`Blob.Open` + `RvzWriter.Write` is a complete "is this a real disc?" pipeline for every
+input format.
+
 ### CLI
 
 ```
@@ -152,7 +167,7 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
 - `RVZSharp.Cli` — the `header`/`verify`/`convert` tool (DolphinTool-compatible surface,
   plus the legacy `info`/`decode` commands).
-- `RVZSharp.Tests` — 313 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 324 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
   packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), package-facing API tests (path

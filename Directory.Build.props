@@ -12,7 +12,7 @@
     <!-- Embedded PDBs: no .pdb sidecar files (important for single-file publishes). -->
     <DebugType>embedded</DebugType>
     <DebugSymbols>true</DebugSymbols>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>Peterson Fernandes; Pure Logic Code</Authors>
     <Product>RVZSharp</Product>
   </PropertyGroup>

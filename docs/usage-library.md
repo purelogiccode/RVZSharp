@@ -91,6 +91,17 @@ Notes:
   `game.wbf1…` parts are opened like Dolphin; the declared size is checked against the sum
   of the parts). NFS files must be named `hif_000000.nfs` and live in a directory named
   `content`; use the key overload to bypass the on-disk lookup.
+- `leaveOpen` controls whether disposing the reader also disposes the stream.
+- **What `Blob.Open` accepts and rejects:** a file that starts with a *recognized*
+  container magic is always parsed as that container; a parse failure throws an
+  `RvzException` subclass (`RvzFormatException` for structural damage,
+  `RvzUnsupportedException` for newer versions, `RvzHashMismatchException` for failed
+  integrity checks). Only files with **no recognizable magic** fall back to `PlainBlob`
+  (an arbitrary file then opens successfully and `ReadAt` serves its bytes — whether it
+  is a real disc is a separate question the writer answers). CISO is validated lazily
+  like Dolphin: a header with a plausible block size opens even if the payload is
+  garbage (absent blocks decode to zeroes); the disc-header validation in
+  `RvzWriter.Write` is what keeps such garbage from being wrapped into an RVZ.
 
 ### Scrubbing
 
@@ -98,9 +109,6 @@ Notes:
 partition (update/channel) — the safe subset of Dolphin's `DiscScrubber` that needs no
 filesystem (FST) parser. It returns `null` for discs that cannot be scrubbed (non-Wii, or
 no game partition). The CLI's `convert -s/--scrub` uses it.
-- `leaveOpen` controls whether disposing the reader also disposes the stream.
-- Any file that is not a recognized container is opened as a **plain ISO** — opening
-  arbitrary files succeeds, reads just serve the file bytes.
 
 ### Lifetime
 
@@ -205,6 +213,12 @@ RvzWriter.Write(IBlobReader input, Stream output, RvzWriteOptions? options = nul
 
 The writer mirrors Dolphin's converter:
 
+- **Input validation:** the input must actually be a GameCube or Wii disc image — the
+  decoded bytes must carry the disc header magic (Wii `5D 1C 9E A3` at offset `0x18`,
+  GameCube `C2 33 9F 3D` at offset `0x1C`, matching Dolphin's `TryCreateDisc`). Anything
+  else throws `RvzFormatException` before a single byte is written, so arbitrary data can
+  never be wrapped into an unusable RVZ. This also means `Blob.Open` + `RvzWriter.Write`
+  is a complete "is this a real disc?" pipeline for any input format.
 - **Wii discs** (disc header magic + hash/encryption flags set) are stored with the
   partition optimization: partition data is written *decrypted* with SHA-1 hash exceptions,
   split at the FST end — this is what makes RVZ small.

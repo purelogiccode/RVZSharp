@@ -76,7 +76,7 @@ public static class RvzWriter
     /// <summary>
     /// Writes <paramref name="input"/> as an RVZ file to <paramref name="output"/>.
     /// </summary>
-    /// <param name="input">Any decoded disc image (plain ISO or a legacy container).</param>
+    /// <param name="input">A GameCube or Wii disc image (plain ISO or a legacy container).</param>
     /// <param name="output">Destination stream (not disposed by this method).</param>
     /// <param name="options">Writer options; <see cref="RvzWriteOptions.Default"/> when null.</param>
     /// <param name="progress">
@@ -84,6 +84,9 @@ public static class RvzWriter
     /// </param>
     /// <param name="cancellationToken">Cancellation is observed between group reads.</param>
     /// <exception cref="ArgumentException">Invalid chunk size or input too small.</exception>
+    /// <exception cref="RvzFormatException">
+    /// The input is not a GameCube or Wii disc image (no disc header magic at 0x18/0x1C).
+    /// </exception>
     /// <exception cref="RvzUnsupportedException">PURGE compression requested (WIA-only method).</exception>
     /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
     public static void Write(IBlobReader input, Stream output, RvzWriteOptions? options = null,
@@ -129,17 +132,20 @@ public static class RvzWriter
         var discHeader = new byte[DiscHeaderSize];
         input.ReadAt(0, discHeader);
 
+        // The input must actually be a GameCube/Wii disc: a plain ISO carries the disc magic
+        // in its header (Wii at 0x18, GameCube at 0x1C), and every legacy container decodes
+        // to such bytes. Wrapping anything else would produce a structurally valid RVZ that
+        // no emulator can use, so it is rejected here (Dolphin refuses the same way:
+        // CreateDisc fails for images without a recognized magic, Volume.cpp TryCreateDisc).
+        var discType = WiiVolume.GetDiscType(input);
+        if (discType == DiscType.Unknown)
+        {
+            throw new RvzFormatException(
+                "The input is not a GameCube or Wii disc image (no disc header magic at 0x18/0x1C).");
+        }
+
         var isWii = WiiVolume.IsWiiDisc(input) && WiiVolume.HasWiiHashes(input) &&
                     WiiVolume.HasWiiEncryption(input);
-
-        // disc_type describes the volume, independent of how the data is encoded (Dolphin:
-        // WIABlob.cpp:1989-1996): an unhashed/unencrypted Wii disc is still a Wii disc (2),
-        // and unrecognized volumes get 0.
-        var discType = WiiVolume.IsWiiDisc(input)
-            ? (uint)DiscType.Wii
-            : ReadBe32(discHeader, 0x18) == WiiVolume.GC_MAGIC
-                ? (uint)DiscType.GameCube
-                : (uint)DiscType.Unknown;
 
         // Build the data areas in disc order (Dolphin: SetUpDataEntriesForWriting).
         var areas = new List<AreaEntry>();
@@ -338,7 +344,7 @@ public static class RvzWriter
         var partitionCount = (uint)areas.Where(a => a.IsPartition)
             .Select(a => a.Partition.Offset).Distinct().Count();
 
-        var discStruct = BuildDiscStruct(discType, options, props, discHeader,
+        var discStruct = BuildDiscStruct((uint)discType, options, props, discHeader,
             partitionCount, rawCount, partOffset, rawOffset,
             rawTableStored.Length, groupOffset, groupTableStored.Length, groupEntries.Count);
         SHA1.HashData(partitionTable).CopyTo(discStruct, 0xA0);
@@ -738,10 +744,5 @@ public static class RvzWriter
     {
         WriteBe32(data, offset, (uint)(value >> 32));
         WriteBe32(data, offset + 4, (uint)value);
-    }
-
-    private static uint ReadBe32(ReadOnlySpan<byte> data, int offset)
-    {
-        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
     }
 }

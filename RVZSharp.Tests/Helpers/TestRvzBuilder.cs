@@ -58,6 +58,18 @@ public static class TestRvzBuilder
         var discHeader = new byte[0x80];
         rng.NextBytes(discHeader);
 
+        // Stamp the real disc magic (Wii at 0x18, GameCube at 0x1C) so the synthetic ISO
+        // looks like a genuine disc: the writer rejects images without either magic.
+        switch (spec.DiscType)
+        {
+            case DiscType.Wii:
+                WriteBe32(discHeader, 0x18, WiiVolume.WII_MAGIC);
+                break;
+            case DiscType.GameCube:
+                WriteBe32(discHeader, 0x1C, WiiVolume.GC_MAGIC);
+                break;
+        }
+
         var chunkSize = (long)spec.ChunkSize;
         var sectorsPerChunk = chunkSize / 0x8000;
         var partitionPayloadPerChunk = sectorsPerChunk * 0x7C00;

@@ -58,6 +58,34 @@ public static class WiiVolume
     }
 
     /// <summary>
+    /// Detects the disc type from the header magic (Dolphin: TryCreateDisc, Volume.cpp): the
+    /// Wii magic lives at 0x18 and the GameCube magic at 0x1C of the 0x80-byte disc header.
+    /// </summary>
+    /// <param name="disc">The disc image to inspect.</param>
+    /// <returns><see cref="DiscType.Wii"/>, <see cref="DiscType.GameCube"/> or
+    /// <see cref="DiscType.Unknown"/> when the image carries neither magic.</returns>
+    public static DiscType GetDiscType(IBlobReader disc)
+    {
+        Span<byte> header = stackalloc byte[0x20];
+        if (!TryReadAt(disc, 0, header))
+        {
+            return DiscType.Unknown;
+        }
+
+        if (ReadBe32(header, 0x18) == WII_MAGIC)
+        {
+            return DiscType.Wii;
+        }
+
+        if (ReadBe32(header, 0x1C) == GC_MAGIC)
+        {
+            return DiscType.GameCube;
+        }
+
+        return DiscType.Unknown;
+    }
+
+    /// <summary>
     /// Returns the partitions of a Wii disc, read from the four partition table groups at
     /// 0x40000 (Dolphin: VolumeWii::GetPartitions). Only partitions with a valid ticket and
     /// plausible data ranges are returned.

@@ -5,8 +5,11 @@ namespace RVZSharp.Blobs;
 
 /// <summary>
 /// Opens any supported disc image format by sniffing the first bytes (Dolphin:
-/// CreateBlobReader). Every supported container starts with a 4-byte magic; anything else is
-/// treated as a plain ISO.
+/// CreateBlobReader). Every supported container starts with a 4-byte magic; a file that
+/// starts with a recognized magic is always parsed as that container (a parse failure
+/// throws an <see cref="RvzException"/>), and only files with no recognizable magic are
+/// treated as a plain ISO. Whether the bytes are a real GameCube/Wii disc is answered by
+/// <see cref="RvzWriter.Write"/>'s disc-header validation.
 /// </summary>
 public static class Blob
 {
@@ -20,6 +23,14 @@ public static class Blob
     /// <c>hif_00000X.nfs</c> continuation files.
     /// </param>
     /// <param name="leaveOpen">Whether disposing the reader leaves <paramref name="stream"/> open.</param>
+    /// <exception cref="RvzFormatException">
+    /// The file is too short to contain a magic number, or it starts with a recognized
+    /// container magic whose header is corrupt (a corrupt container never falls back to
+    /// being treated as a plain ISO).
+    /// </exception>
+    /// <exception cref="RvzUnsupportedException">
+    /// The file is an RVZ/WIA container with a version newer than this library supports.
+    /// </exception>
     public static IBlobReader Open(Stream stream, string? filePath = null, bool leaveOpen = false)
     {
         if (!stream.CanSeek)
@@ -80,7 +91,14 @@ public static class Blob
     /// </summary>
     /// <param name="path">Path of the disc image file (RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS or a plain ISO).</param>
     /// <exception cref="IOException">The file cannot be opened.</exception>
-    /// <exception cref="RvzFormatException">The file is not a recognized disc image.</exception>
+    /// <exception cref="RvzFormatException">
+    /// The file is too short to contain a magic number, or it starts with a recognized
+    /// container magic whose header is corrupt (a corrupt container never falls back to
+    /// being treated as a plain ISO).
+    /// </exception>
+    /// <exception cref="RvzUnsupportedException">
+    /// The file is an RVZ/WIA container with a version newer than this library supports.
+    /// </exception>
     public static IBlobReader Open(string path)
     {
         var stream = File.OpenRead(path);

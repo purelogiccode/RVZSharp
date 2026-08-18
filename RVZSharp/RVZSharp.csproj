@@ -5,8 +5,8 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Company>PureLogicCode.com</Company>
-    <AssemblyVersion>1.0.0</AssemblyVersion>
-    <FileVersion>1.0.0</FileVersion>
+    <AssemblyVersion>1.0.1</AssemblyVersion>
+    <FileVersion>1.0.1</FileVersion>
     <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
 
@@ -26,8 +26,11 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReleaseNotes>
-      1.0.0 release: fully documented API (XML docs), RVZ/WIA reader, legacy format
-      decoders, RVZ writer with packing and hash exceptions, real-game validation suite.
+      1.0.1: RvzWriter now validates the input's GameCube/Wii disc header magic (Wii at
+      0x18, GameCube at 0x1C) and rejects anything else with RvzFormatException, so
+      arbitrary data can never be wrapped into an unusable RVZ; corrupt containers with a
+      recognized magic are documented to fail loudly (no PlainBlob fallback). Also fixes
+      GameCube disc_type classification (the GC magic is at 0x1C, not 0x18).
     </PackageReleaseNotes>
     <RepositoryUrl>https://github.com/purelogiccode/RVZSharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

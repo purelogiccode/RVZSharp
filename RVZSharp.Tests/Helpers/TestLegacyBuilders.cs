@@ -309,6 +309,11 @@ public static class TestLegacyBuilders
         WriteBe32(tgc, 36, fileAreaReal);
         WriteBe32(tgc, 52, fileAreaVirtual);
 
+        // Stamp the GameCube disc magic into the disc header area (iso offset 0x1C) so the
+        // decoded ISO looks like a genuine disc: the writer rejects images without either
+        // the GC magic at 0x1C or the Wii magic at 0x18.
+        WriteBe32(tgc, (int)tgcHeaderSize + 0x1C, 0xC2339F3D);
+
         // Copy the DOL first so an overlapping FST (dol_real inside the FST area) wins.
         dol.CopyTo(tgc, (int)dolReal);
         fst.CopyTo(tgc, (int)fstReal);
@@ -377,6 +382,10 @@ public static class TestLegacyBuilders
         }
 
         decoded[0x61] = 1; // re-apply after the fill
+
+        // Stamp the Wii disc magic so the decoded image looks like a genuine disc (the
+        // writer validates the disc header magic before encoding).
+        WriteBe32(decoded, 0x18, 0x5D1C9EA3);
 
         // Aes-128-CBC, IV = 8 zero bytes + big-endian block index (mirrors the reader).
         using var aes = Aes.Create();

@@ -24,8 +24,8 @@
     <!-- Icon embedded in the built rvzsharp executable (Windows explorer). -->
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>
     <Company>PureLogicCode.com</Company>
-    <AssemblyVersion>1.0.0</AssemblyVersion>
-    <FileVersion>1.0.0</FileVersion>
+    <AssemblyVersion>1.0.1</AssemblyVersion>
+    <FileVersion>1.0.1</FileVersion>
     <NeutralLanguage>en</NeutralLanguage>
     <!-- No XML docs for the CLI: the publish output ships the single binary only. -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>

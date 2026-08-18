@@ -148,17 +148,47 @@ public class RvzWriterTests
     }
 
     [Fact]
-    public void DiscType_UnrecognizedDisc_IsUnknown()
+    public void DiscWithoutMagic_IsRejected()
     {
-        // No GC or Wii magic: Dolphin writes disc_type 0, and the reader accepts it.
+        // Random bytes with no GameCube/Wii disc magic are not a disc image: the writer
+        // must refuse to wrap them (the resulting RVZ would decode back to bytes no
+        // emulator accepts).
         var iso = new byte[0x200000];
         new Random(42).NextBytes(iso);
 
+        using var ms = new MemoryStream();
+        Assert.Throws<RvzFormatException>(() => RvzWriter.Write(
+            PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
+            {
+                Compression = CompressionType.Zstd,
+                Packing = true
+            }));
+        Assert.Equal(0, ms.Length); // nothing was written
+    }
+
+    [Fact]
+    public void AllZeroInput_WithoutMagic_IsRejected()
+    {
+        var iso = new byte[0x200000];
+
+        using var ms = new MemoryStream();
+        Assert.Throws<RvzFormatException>(() => RvzWriter.Write(
+            PlainBlob.Open(new MemoryStream(iso)), ms, RvzWriteOptions.Default));
+        Assert.Equal(0, ms.Length);
+    }
+
+    [Fact]
+    public void GameCubeIso_WithMagicAt0x1C_IsWrittenAsGameCube()
+    {
+        // The GameCube magic lives at 0x1C of the disc header (Dolphin: TryCreateDisc,
+        // Volume.cpp), not 0x18 — the writer must classify a genuine GC disc as GameCube.
+        var iso = BuildGcIso();
+        Array.Clear(iso, 0x18, 4); // only the 0x1C magic is present
+
         var rvz = Convert(iso, CompressionType.Zstd, packing: true);
-        Assert.Equal(iso, Decode(rvz));
         using var ms = new MemoryStream(rvz);
         using var reader = RvzReader.Open(ms, leaveOpen: true);
-        Assert.Equal(DiscType.Unknown, reader.Disc.DiscType);
+        Assert.Equal(DiscType.GameCube, reader.Disc.DiscType);
     }
 
     [Fact]
@@ -253,6 +283,10 @@ public class RvzWriterTests
     public void AllZeroIso_ProducesTinyFile()
     {
         var iso = new byte[0x200000 * 3];
+        iso[0x1C] = 0xC2; // GC DVD magic (0xC2339F3D) so the writer accepts the disc
+        iso[0x1D] = 0x33;
+        iso[0x1E] = 0x9F;
+        iso[0x1F] = 0x3D;
         var rvz = Convert(iso, CompressionType.Zstd, packing: true);
         // The zero chunks become zero groups; only the tables/headers remain.
         Assert.True(rvz.Length < 0x1000, $"expected a tiny RVZ, got {rvz.Length} bytes");
@@ -265,9 +299,15 @@ public class RvzWriterTests
         var seed = new byte[68];
         new Random(3).NextBytes(seed);
         var iso = new byte[0x200000];
-        // One junk region (matching the format's skip semantics) at an unaligned offset.
-        var junk = ReferencePrng.Generate(seed, 0x1234, iso.Length - 0x1234);
-        junk.CopyTo(iso, 0x1234);
+        iso[0x1C] = 0xC2; // GC DVD magic (0xC2339F3D) so the writer accepts the disc
+        iso[0x1D] = 0x33;
+        iso[0x1E] = 0x9F;
+        iso[0x1F] = 0x3D;
+        // One junk region at an aligned offset: the encoder's scan visits the end of zero
+        // runs and 32 KiB-aligned positions, so a region at an aligned offset (skip 0) is
+        // what it can recover here.
+        var junk = ReferencePrng.Generate(seed, 0x20000, iso.Length - 0x20000);
+        junk.CopyTo(iso, 0x20000);
 
         var rvz = Convert(iso, CompressionType.Zstd, packing: true);
         Assert.Equal(iso, Decode(rvz));

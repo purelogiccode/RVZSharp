@@ -2,7 +2,7 @@
 
 The test suite is split into **two projects**, so the default run is always the fast one:
 
-- **`RVZSharp.Tests`** — **313 synthetic tests** (unit + end-to-end round trips), ~30
+- **`RVZSharp.Tests`** — **356 synthetic tests** (unit + end-to-end round trips), ~30
   seconds per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
 - **`RVZSharp.Slow.Tests`** — **97 real-file tests** (full decode, structural checks,
   writer round trips against real game images), ~12 minutes when the games are mounted.
@@ -36,7 +36,7 @@ byte-for-byte against their official No-Intro SHA-1s:
 3. **Format semantics** were validated against Dolphin's C++ (`References/dolphin-master`)
    and the Go reader (`References/rvz-1.0.3`) — including a Python prototype used during
    development to pin down the PRNG seed-recovery algorithm before the C# port.
-4. **Reference-alignment regressions** (2025 audit, see TODO.md): every finding from the
+4. **Reference-alignment regressions** (2025 audit): every finding from the
    comparison against Dolphin/Go is pinned by a test — LZMA1 end markers, raw-table group
    counts, TGC/WBFS magic offsets, >2 MiB chunk exception lists, zero-fill hash trees,
    overlapping-window hash exceptions, overlap/ordering validation, empty-table hashes,

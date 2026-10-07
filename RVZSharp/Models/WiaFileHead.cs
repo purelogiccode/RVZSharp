@@ -34,6 +34,12 @@ public readonly struct WiaFileHead
     /// <summary>Lowest file version this library can read (Dolphin: WIA_VERSION_READ_COMPATIBLE).</summary>
     public const uint WiaVersionReadCompatible = 0x00080000;
 
+    /// <summary>version_compatible written into new RVZ files (Dolphin: RVZ_VERSION_WRITE_COMPATIBLE).</summary>
+    public const uint RvzVersionWriteCompatible = 0x00030000;
+
+    /// <summary>version_compatible written into new WIA files (Dolphin: WIA_VERSION_WRITE_COMPATIBLE).</summary>
+    public const uint WiaVersionWriteCompatible = 0x01000000;
+
     /// <summary>The 4 magic bytes ("RVZ\x01" for RVZ, "WIA\x01" for WIA).</summary>
     public byte[] Magic { get; }
 

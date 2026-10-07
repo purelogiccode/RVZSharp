@@ -10,7 +10,7 @@
 │                         Library (RVZSharp)                         │
 │                                                                     │
 │  Blobs ── RvzReader ── Chunks/Compression/Packing/Wii  (read path)  │
-│  Blobs ── RvzWriter ── Packing/Compression/Wii          (write path)│
+│  Blobs ── RvzWriter/WiaWriter ── WiaRvzWriter core      (write path) │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -19,8 +19,8 @@
 | Module | Files | Responsibility |
 |---|---|---|
 | `Blobs/` | `Blob`, `BlobType`, `IBlobReader`, `PlainBlob`, `GczBlob`, `CisoBlob`, `WbfsBlob`, `TgcBlob`, `NfsBlob` | Format detection and per-format random-access decoding to ISO bytes |
-| `Models/` | `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `WiaRawDataEntry`, `GroupEntry`, `WiaRvzFormat`, `CompressionType` | Container structs (RVZ/WIA) |
-| `Chunks/` | `ChunkDecoder`, `HashExceptionEntry`, `TableParser` | Group decompression, exception-list parsing, table loading |
+| `Models/` | `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `WiaRawDataEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`, `WiaRvzFormat`, `CompressionType` | Container structs (RVZ/WIA) |
+| `Chunks/` | `ChunkDecoder`, `TableParser` | Group decompression, exception-list parsing, table loading |
 | `Compression/` | `CompressionCodecFactory`, `CompressionEncoderFactory`, `ICompressionDecoder`, `ICompressionEncoder`, codecs, `Lzma/` (vendored 7-Zip decoder) | Read-side decompression and write-side compression |
 | `Packing/` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator`, `LaggedFibonacciPrng` | RVZ junk packing: segment streams and PRNG seed recovery |
 | `Wii/` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor` | Wii partition encryption, hash tree, exceptions |
@@ -63,7 +63,7 @@ Key points:
 ## Write path
 
 ```
-IBlobReader (any format)                    Stream (RVZ out)
+IBlobReader (any format)                    Stream (RVZ/WIA out)
         │                                        ▲
         ▼                                        │
 WiiVolume detection ──► data areas in disc order │
@@ -73,18 +73,21 @@ WiiVolume detection ──► data areas in disc order │
         │              │                         │
         │              ▼                         │
         │        RvzPackingEncoder (junk scan,   │
-        │        GetSeed, segment stream)        │
+        │        GetSeed, segment stream; RVZ)   │
         │              │                         │
         ├─ partition area ─► WiiPartitionExtractor
         │   (decrypt region, diff hash tree ──► exceptions,
-        │    split into chunks for chunk_size < 2 MiB)
+        │    split/merge into chunks; one exception list
+        │    per 2 MiB region a chunk covers)
         │              │
         │              ▼
-        │        pack + compress each group
-        │        (zero group when all-zero and no exceptions)
+        │        pack (RVZ) + compress each group
+        │        (zero group when all-zero and no exceptions;
+        │         WIA always stores the codec output)
         │              │
         ▼              ▼
-tables (partition = plain, raw + group = compressed)
+tables (partition = plain, raw + group = compressed;
+        RVZ 12-byte / WIA 8-byte group entries)
 layout iteration until the group-table size converges
         │
         ▼
@@ -117,7 +120,7 @@ Key points:
 | Writer stores partitions decrypted + exceptions | the defining RVZ space optimization; identical to Dolphin |
 | Junk packing is best-effort | `GetSeed` fails cleanly on non-PRNG data and the writer falls back to literal bytes — output stays valid |
 | Chunk sizes per Dolphin | powers of two from 32 KiB to 2 MiB, or multiples of 2 MiB above that |
-| PURGE rejected for RVZ output | PURGE is a WIA-only method; RVZ readers reject it |
+| PURGE only in WIA output | PURGE is a WIA-only method (`WiaWriter`); RVZ output rejects it and RVZ readers reject PURGE containers |
 
 ## Format-version handling
 

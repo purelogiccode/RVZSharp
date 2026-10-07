@@ -16,7 +16,7 @@ CSharp_RVZSharp.sln        solution file (fast test suite runs solution-wide)
 Directory.Build.props       net10.0, Nullable, ImplicitUsings, TreatWarningsAsErrors
 RVZSharp/                   the library
 RVZSharp.Cli/               the header/verify/convert tool
-RVZSharp.Tests/             fast unit + end-to-end tests (313, ×3 frameworks)
+RVZSharp.Tests/             fast unit + end-to-end tests (356, ×3 frameworks)
 RVZSharp.Slow.Tests/        real-file tests (97) — kept out of the solution; run explicitly
 References/dolphin-master/  Dolphin source (C++) — format reference
 References/rvz-1.0.3/       Go RVZ reader — cross-check reference
@@ -37,7 +37,7 @@ The build treats warnings as errors, so a clean build means zero warnings.
 dotnet test CSharp_RVZSharp.sln -c Release
 ```
 
-Expected result: `Passed: 313, Failed: 0` on **each** of `net8.0`, `net9.0` and `net10.0`
+Expected result: `Passed: 356, Failed: 0` on **each** of `net8.0`, `net9.0` and `net10.0`
 (the suite runs once per target framework). The real-file suite is not part of the solution
 and runs only when requested:
 
@@ -61,11 +61,12 @@ dotnet run --project RVZSharp.Cli -c Release -- header -i game.iso
 dotnet run --project RVZSharp.Cli -c Release -- header -i game.rvz
 dotnet run --project RVZSharp.Cli -c Release -- verify -i game.rvz -a sha1
 dotnet run --project RVZSharp.Cli -c Release -- convert -i game.wia -o game.rvz -f rvz -c zstd -l 5 -b 131072
+dotnet run --project RVZSharp.Cli -c Release -- convert -i game.iso -o game.wia -f wia -c lzma2 -l 5 -b 2097152
 dotnet run --project RVZSharp.Cli -c Release -- convert -i game.rvz -o game.iso -f iso
 ```
 
 `convert` accepts **any** supported input (plain ISO or any legacy format) and writes a
-fully self-contained RVZ file (`-f iso` decodes back to a plain ISO). See the
+fully self-contained RVZ or WIA file (`-f iso` decodes back to a plain ISO). See the
 [CLI reference](usage-cli.md) for all options.
 
 ## Notes for contributors

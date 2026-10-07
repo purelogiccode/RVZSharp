@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using RVZSharp.Blobs;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
@@ -208,6 +209,45 @@ public class LibraryApiTests
 
         Assert.Equal(iso.Length, copied);
         Assert.Equal(iso, destination.ToArray());
+    }
+
+    [Fact]
+    public void DiscHasher_ComputesKnownVectors()
+    {
+        // Standard test vectors for "123456789": CRC-32 = 0xCBF43926.
+        var data = "123456789"u8.ToArray();
+        using IBlobReader blob = PlainBlob.Open(new MemoryStream(data), leaveOpen: true);
+        var hashes = DiscHasher.Compute(blob);
+
+        Assert.Equal(0xCBF43926u, hashes.Crc32);
+        Assert.Equal("25f9e794323b453885f5181f1b624d0b", Convert.ToHexString(hashes.Md5).ToLowerInvariant());
+        Assert.Equal("f7c3bc1d808e04732adf679965ccc34ca7ae3441",
+            Convert.ToHexString(hashes.Sha1).ToLowerInvariant());
+    }
+
+    [Fact]
+    public void DiscHasher_MatchesFrameworkHashes_AndReportsProgress()
+    {
+        var iso = MakeGcIso(0x10000);
+        using IBlobReader blob = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+        var progress = new List<double>();
+        var hashes = DiscHasher.Compute(blob, new SyncProgress<double>(progress.Add));
+
+        Assert.Equal(SHA1.HashData(iso), hashes.Sha1);
+        Assert.Equal(MD5.HashData(iso), hashes.Md5);
+        Assert.NotEmpty(progress);
+        Assert.Equal(1.0, progress[^1]);
+    }
+
+    [Fact]
+    public void DiscHasher_ObservesCancellation()
+    {
+        var iso = MakeGcIso();
+        using IBlobReader blob = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        Assert.Throws<OperationCanceledException>(() =>
+            DiscHasher.Compute(blob, cancellationToken: cts.Token));
     }
 
     [Fact]

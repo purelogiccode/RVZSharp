@@ -415,10 +415,10 @@ internal static class Program
             using (blob)
             {
                 var input = blob;
-                if (format is "gcz" or "wia")
+                if (format == "gcz")
                 {
                     return Fail(
-                        $"Converting to {format.ToUpperInvariant()} is not supported by this implementation (supported: iso, rvz).");
+                        "Converting to GCZ is not supported by this implementation (supported: iso, rvz, wia).");
                 }
 
                 if (options.HasFlag("scrub"))
@@ -471,6 +471,7 @@ internal static class Program
                 switch (format)
                 {
                     case "rvz":
+                    case "wia":
                     {
                         var compressionName = options.Get("compression");
                         if (compressionName is null)
@@ -479,28 +480,28 @@ internal static class Program
                         }
 
                         compression = ParseCompression(compressionName);
-                        switch (compression)
+                        if ((format == "rvz" && compression == CompressionType.Purge) ||
+                            (format == "wia" && compression == CompressionType.Zstd))
                         {
-                            case CompressionType.Purge:
-                                return Fail("Compression type is not supported for the container format");
-                            case CompressionType.None:
-                                level = 0;
-                                break;
-                            default:
+                            return Fail("Compression type is not supported for the container format");
+                        }
+
+                        if (compression == CompressionType.None)
+                        {
+                            level = 0;
+                        }
+                        else
+                        {
+                            if (!options.IsSet("compression_level") ||
+                                !int.TryParse(options.Get("compression_level"), out level))
                             {
-                                if (!options.IsSet("compression_level") ||
-                                    !int.TryParse(options.Get("compression_level"), out level))
-                                {
-                                    return Fail("Compression level must be set when compression type is not 'none'");
-                                }
+                                return Fail("Compression level must be set when compression type is not 'none'");
+                            }
 
-                                var (min, max) = GetAllowedCompressionLevels(compression);
-                                if (level < min || level > max)
-                                {
-                                    return Fail("Compression level not in acceptable range");
-                                }
-
-                                break;
+                            var (min, max) = GetAllowedCompressionLevels(compression);
+                            if (level < min || level > max)
+                            {
+                                return Fail("Compression level not in acceptable range");
                             }
                         }
 
@@ -527,7 +528,14 @@ internal static class Program
                 var progress = new ConsoleProgress("Encoding ");
                 try
                 {
-                    RvzWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                    if (format == "wia")
+                    {
+                        WiaWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                    }
+                    else
+                    {
+                        RvzWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -918,72 +926,29 @@ internal static class Program
 
             using (blob)
             {
-                Span<byte> discHeader = stackalloc byte[0x80];
-                if (blob.ReadAt(0, discHeader) != discHeader.Length)
+                if (!Blob.IsDisc(blob))
                 {
                     return Fail("The input file is not a GC/Wii disc.");
                 }
 
-                var wiiMagic = (uint)((discHeader[0x18] << 24) | (discHeader[0x19] << 16) |
-                                      (discHeader[0x1A] << 8) | discHeader[0x1B]);
-                var gcMagic = (uint)((discHeader[0x1C] << 24) | (discHeader[0x1D] << 16) |
-                                     (discHeader[0x1E] << 8) | discHeader[0x1F]);
-                if (wiiMagic != WiiVolume.WII_MAGIC && gcMagic != WiiVolume.GC_MAGIC)
-                {
-                    return Fail("The input file is not a GC/Wii disc.");
-                }
-
-                var wantCrc32 = algorithm is null or "crc32";
-                var wantMd5 = algorithm is null or "md5";
-                var wantSha1 = algorithm is null or "sha1";
-
-                uint crc = 0xFFFFFFFF;
-                var md5 = wantMd5 ? MD5.Create() : null;
-                var sha1 = wantSha1 ? SHA1.Create() : null;
-
-                var buffer = new byte[1 << 20];
                 var progress = new ConsoleProgress("Verifying ");
-                var position = 0L;
-                while (position < blob.Length)
-                {
-                    Cancellation.Token.ThrowIfCancellationRequested();
-                    var read = blob.ReadAt(position, buffer);
-                    if (read <= 0)
-                    {
-                        return Fail($"Verification stopped at offset 0x{position:X}.");
-                    }
-
-                    if (wantCrc32)
-                    {
-                        crc = Crc32.Update(crc, buffer.AsSpan(0, read));
-                    }
-
-                    md5?.TransformBlock(buffer, 0, read, null, 0);
-                    sha1?.TransformBlock(buffer, 0, read, null, 0);
-                    position += read;
-                    progress.Report((double)position / blob.Length);
-                }
-
+                var hashes = DiscHasher.Compute(blob, progress, Cancellation.Token);
                 ConsoleProgress.Clear();
-
-                md5?.TransformFinalBlock([], 0, 0);
-                sha1?.TransformFinalBlock([], 0, 0);
-                crc ^= 0xFFFFFFFF;
 
                 if (algorithm is not null)
                 {
                     Console.WriteLine(algorithm switch
                     {
-                        "crc32" => crc.ToString("x8"),
-                        "md5" => ToLowerHex(md5!.Hash!),
-                        _ => ToLowerHex(sha1!.Hash!)
+                        "crc32" => hashes.Crc32.ToString("x8"),
+                        "md5" => ToLowerHex(hashes.Md5),
+                        _ => ToLowerHex(hashes.Sha1)
                     });
                     return 0;
                 }
 
-                Console.WriteLine($"CRC32: {crc:x8}");
-                Console.WriteLine($"MD5: {ToLowerHex(md5!.Hash!)}");
-                Console.WriteLine($"SHA1: {ToLowerHex(sha1!.Hash!)}");
+                Console.WriteLine($"CRC32: {hashes.Crc32:x8}");
+                Console.WriteLine($"MD5: {ToLowerHex(hashes.Md5)}");
+                Console.WriteLine($"SHA1: {ToLowerHex(hashes.Sha1)}");
                 return 0;
             }
         }
@@ -1003,39 +968,6 @@ internal static class Program
     private static string ToLowerHex(byte[] bytes)
     {
         return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
-
-    /// <summary>IEEE CRC-32 (as used by zlib / Dolphin's CRC32 hashes).</summary>
-    private static class Crc32
-    {
-        private static readonly uint[] Table = BuildTable();
-
-        private static uint[] BuildTable()
-        {
-            var table = new uint[256];
-            for (uint n = 0; n < table.Length; n++)
-            {
-                var c = n;
-                for (var k = 0; k < 8; k++)
-                {
-                    c = (c & 1) != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
-                }
-
-                table[n] = c;
-            }
-
-            return table;
-        }
-
-        public static uint Update(uint crc, ReadOnlySpan<byte> data)
-        {
-            foreach (var b in data)
-            {
-                crc = Table[(crc ^ b) & 0xFF] ^ (crc >> 8);
-            }
-
-            return crc;
-        }
     }
 
     // ------------------------------------------------------------------

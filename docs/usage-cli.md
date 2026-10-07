@@ -54,7 +54,7 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
 | `-u`, `--user` | user folder path; accepted for DolphinTool compatibility (RVZSharp needs no user directory). |
 | `-f`, `--format` | container format: `iso`, `gcz`, `wia`, `rvz`. Required. |
 | `-b`, `--block_size` | block size in **bytes**. Required for GCZ/WIA/RVZ. |
-| `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd`, `bzip2`, `lzma`, `lzma2`. Required for WIA/RVZ. |
+| `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`. Required for WIA/RVZ. |
 | `-l`, `--compression_level` | compression level. Required unless `-c none`. |
 | `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso` a warning notes that scrubbing gains little. |
 
@@ -78,8 +78,12 @@ Notes:
 - **`-f rvz`** uses the RVZ writer: Wii partitions stored decrypted with hash exceptions,
   PRNG junk packing, fully checksummed tables. `-b` becomes the chunk size; below 2 MiB it
   must be a power of two, at/above 2 MiB a multiple of 2 MiB (Dolphin's rule).
-- **`-f gcz` / `-f wia`** are not implemented yet — the command fails with a clear error
-  (only `iso` and `rvz` output exist).
+- **`-f wia`** uses the WIA writer: Wii partitions stored decrypted with hash exceptions,
+  fully checksummed tables. `-b` must be a multiple of 2 MiB; `zstd` is rejected (WIA
+  supports `none`, `bzip2`, `lzma` and `lzma2`; the library's `WiaWriter` also supports
+  `CompressionType.Purge`, which DolphinTool's CLI does not expose).
+- **`-f gcz`** is not implemented yet — the command fails with a clear error (output
+  formats are `iso`, `rvz` and `wia`).
 - `-s` (scrub) requires a Wii disc with a game partition; other inputs fail with
   Dolphin's "Unable to process disc image. Try again without --scrub."
 

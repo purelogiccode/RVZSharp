@@ -50,7 +50,7 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
    `PackageValidationBaselineVersion` to diff the public API against the previous release
    (API-compat analysis) — see the roadmap.
 3. **Tests on every framework** — `dotnet test CSharp_RVZSharp.sln -c Release` runs the
-   fast suite (313 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
+   fast suite (356 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
    (`dotnet test RVZSharp.Slow.Tests -c Release`) runs on machines with the games mounted.
 4. **Consumer smoke test** — before publishing, a fresh project consuming only the nupkg
    (from a local feed) must compile and run on .NET 8 and .NET 10, converting and decoding

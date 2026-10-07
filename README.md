@@ -6,15 +6,17 @@
 # RVZSharp
 
 A pure managed C# library and CLI (**.NET 8 / 9 / 10**) for decoding and encoding **Dolphin
-RVZ** disc images (GameCube/Wii). RVZ is the successor of the WIA format; RVZSharp decodes
-RVZ files back to the original disc image (`.iso`) **byte-for-byte**, including:
+RVZ/WIA** disc images (GameCube/Wii) and decoding the legacy formats (GCZ, CISO/WBI, WBFS,
+TGC, NFS). RVZSharp decodes RVZ/WIA files back to the original disc image (`.iso`)
+**byte-for-byte**, including:
 
 ```
 dotnet add package RVZSharp
 ```
 
-- all five compression methods: NONE, BZIP2, LZMA, LZMA2, Zstandard (100% managed codecs —
-  ZstdSharp.Port, SharpZipLib, and a vendored 7-Zip LZMA/LZMA2 decoder, see THIRD-PARTY-NOTICES.md);
+- all six compression methods: NONE, PURGE (WIA), BZIP2, LZMA, LZMA2, Zstandard (100% managed
+  codecs — ZstdSharp.Port, SharpZipLib, and a vendored 7-Zip LZMA/LZMA2 decoder, see
+  THIRD-PARTY-NOTICES.md);
 - the RVZ packing scheme (Lagged Fibonacci PRNG padding reconstruction);
 - Wii partition reconstruction: SHA-1 hash trees (h0/h1/h2), hash exceptions, and
   AES-128-CBC re-encryption with the partition key — the output is identical to the
@@ -95,7 +97,15 @@ Wii partitions are stored decrypted with hash exceptions, exactly like Dolphin p
 `options` defaults to the Dolphin-compatible settings (Zstd / level 5 / 2 MiB chunks,
 packing on). To get a plain ISO back, use the CLI's `convert -f iso` (or a reader + copy).
 
-**4. Progress and cancellation** for long conversions:
+**4. Write WIA** (`WiaWriter`, sharing the same writer core; PURGE supported, no packing,
+chunk size a multiple of 2 MiB):
+
+```csharp
+using var wia = File.Create(@"C:\games\game.wia");
+WiaWriter.Write(input, wia, new RvzWriteOptions { Compression = CompressionType.Lzma2 });
+```
+
+**5. Progress and cancellation** for long conversions (encode *and* decode):
 
 ```csharp
 using var cts = new CancellationTokenSource();
@@ -103,9 +113,20 @@ var progress = new Progress<double>(f => Console.Error.Write($"\r{f,6:P1}"));
 
 RvzWriter.Write(input: input, output: output, options: options,
     progress: progress, cancellationToken: cts.Token);
+
+// Decode/stream instead: any size, no 2 GiB limit.
+blob.CopyTo(isoStream, progress, cts.Token);
 ```
 
-**5. Handling errors** — every format problem raises `RvzException` subclasses:
+**6. Verify a decode** without materializing the ISO — `DiscHasher.Compute(blob)` returns
+the CRC-32, MD5 and SHA-1 in one streaming pass (the digests Dolphin's verifier reports):
+
+```csharp
+var hashes = DiscHasher.Compute(blob);
+Console.WriteLine(Convert.ToHexString(hashes.Sha1));
+```
+
+**7. Handling errors** — every format problem raises `RvzException` subclasses:
 
 ```csharp
 try
@@ -139,18 +160,18 @@ container magic).
 ```
 dotnet run --project RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
 dotnet run --project RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1]
-dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz \
+dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz|wia \
     [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>] [-s]
 ```
 
 The CLI accepts the same command arguments as Dolphin's `dolphin-tool` (`convert`,
 `verify`, `header`; `extract` is recognized but not implemented). `convert` accepts
 **any** readable blob (a plain ISO or one of the legacy formats, including **split WBFS**
-`.wbfs`+`.wbf1…` parts) and writes an RVZ file, mirroring Dolphin's converter: Wii
+`.wbfs`+`.wbf1…` parts) and writes an RVZ or WIA file, mirroring Dolphin's converter: Wii
 partitions are stored decrypted with hash exceptions, raw data as-is, PRNG junk is packed
-with a recovered seed (Lagged Fibonacci `GetSeed`), and the tables carry all SHA-1
-checksums. `--scrub` zeroes the data of non-game Wii partitions (update/channel) before
-converting. `-f iso` decodes back to a plain ISO.
+with a recovered seed (Lagged Fibonacci `GetSeed`, RVZ only), and the tables carry all
+SHA-1 checksums. `--scrub` zeroes the data of non-game Wii partitions (update/channel)
+before converting. `-f iso` decodes back to a plain ISO.
 
 ## Documentation
 
@@ -173,7 +194,7 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
 - `RVZSharp.Cli` — the `header`/`verify`/`convert` tool (DolphinTool-compatible surface,
   plus the legacy `info`/`decode` commands).
-- `RVZSharp.Tests` — 330 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 356 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
   packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), package-facing API tests (path
@@ -206,10 +227,12 @@ the games. The real Wii round-trip exposed and pinned a writer bug (see Status b
 
 RVZ **and** the legacy disc formats (WIA, GCZ, CISO/WBI, WBFS incl. split files, TGC, NFS)
 are decoded byte-for-byte and covered by tests; the CLI `info`/`decode` commands accept any
-of them (auto-detected by magic). The RVZ writer (`rvzsharp convert`) encodes any of them
-back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules — including negative
-Zstd "fast" levels — optional packing, chunks of 32 KiB–2 MiB powers of two or multiples of
-2 MiB), with the same SHA-1s Dolphin produces. The codebase was audited against the
+of them (auto-detected by magic). The writers (`rvzsharp convert -f rvz|wia`) encode any of
+them back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules — including
+negative Zstd "fast" levels — optional packing, chunks of 32 KiB–2 MiB powers of two or
+multiples of 2 MiB) or WIA (None/PURGE/Bzip2/LZMA1/LZMA2, chunks that are multiples of
+2 MiB), with the same SHA-1s Dolphin produces. Decode supports progress/cancellation and
+`DiscHasher` computes CRC-32/MD5/SHA-1 in one pass. The codebase was audited against the
 reference implementations (Dolphin `WIABlob`/`WIACompression` and the Go `rvz-1.0.3` tool)
 and every finding was fixed or explicitly documented.
 

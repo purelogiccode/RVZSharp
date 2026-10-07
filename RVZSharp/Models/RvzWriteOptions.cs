@@ -1,10 +1,16 @@
 namespace RVZSharp.Models;
 
-/// <summary>Options for <see cref="RvzWriter.Write"/>.</summary>
+/// <summary>Options for <see cref="RvzWriter.Write"/> and <see cref="WiaWriter.Write"/>.</summary>
 public sealed record RvzWriteOptions
 {
     /// <summary>The default options: Zstandard, level 3, 2 MiB chunks, packing enabled.</summary>
     public static readonly RvzWriteOptions Default = new();
+
+    /// <summary>
+    /// The default options for <see cref="WiaWriter"/>: LZMA2, level 3, 2 MiB chunks
+    /// (WIA does not support Zstandard or packing).
+    /// </summary>
+    public static readonly RvzWriteOptions WiaDefault = new() { Compression = CompressionType.Lzma2 };
 
     /// <summary>Compression method (Dolphin's default: Zstandard).</summary>
     public CompressionType Compression { get; init; } = CompressionType.Zstd;

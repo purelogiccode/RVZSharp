@@ -1,7 +1,7 @@
 # Library usage guide
 
 `RVZSharp` is a pure managed library (no native code) for **.NET 8, .NET 9 and .NET 10**.
-It reads and writes Dolphin **RVZ** disc images, reads **WIA** and the legacy GameCube/Wii
+It reads and writes Dolphin **RVZ** and **WIA** disc images, reads the legacy GameCube/Wii
 formats (**GCZ, CISO/WBI, WBFS, TGC, NFS**), and exposes every format through one interface
 that serves the original disc bytes.
 
@@ -15,9 +15,9 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 | Namespace | Contents |
 |---|---|
 | `RVZSharp.Blobs` | `IBlobReader`, `Blob` (factory), `BlobType`, per-format readers |
-| `RVZSharp` | `RvzReader`, `RvzWriter`, `RvzWriteOptions` |
-| `RVZSharp.Models` | container structs: `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `CompressionType` |
-| `RVZSharp.Chunks` | `ChunkDecoder`, `HashExceptionEntry`, `ExceptionListParser` |
+| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `DiscHasher`, `RvzWriteOptions` |
+| `RVZSharp.Models` | container structs: `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`, `CompressionType` |
+| `RVZSharp.Chunks` | `ChunkDecoder`, `ExceptionListParser` |
 | `RVZSharp.Compression` | codec factories: `CompressionCodecFactory`, `CompressionEncoderFactory` (the vendored 7-Zip LZMA port is internal) |
 | `RVZSharp.IO` | `Adler32`, `SpanReader`, `SectionStream`, `NonDisposingStream` |
 | `RVZSharp.Packing` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator` |
@@ -253,7 +253,7 @@ The writer mirrors Dolphin's converter:
 
 | Member | Default | Notes |
 |---|---|---|
-| `Compression` | `Zstd` | `None`, `Bzip2`, `Lzma`, `Lzma2`, `Zstd`. `Purge` throws `RvzUnsupportedException` (WIA-only). |
+| `Compression` | `Zstd` | `None`, `Bzip2`, `Lzma`, `Lzma2`, `Zstd`. `Purge` throws `RvzUnsupportedException` (use `WiaWriter` for PURGE). |
 | `CompressionLevel` | `3` | `Bzip2`/`Lzma`/`Lzma2`: 1–9. `Zstd`: −131072..22 (negative levels = fast modes, 0 = default). |
 | `ChunkSize` | `0x200000` | Power of two between 0x8000 (32 KiB) and 0x200000 (2 MiB), or a multiple of 0x200000 above that (Dolphin's rule). |
 | `Packing` | `true` | Set `false` to store junk literally (larger file, no packing overhead). |
@@ -302,13 +302,49 @@ catch (OperationCanceledException)
 
 ### Verifying your output
 
-Re-open what you wrote and compare hashes:
+`DiscHasher` computes the CRC-32, MD5 and SHA-1 of the decoded image in one streaming pass
+(the same digests Dolphin's volume verifier reports):
 
 ```csharp
 using var check = Blob.Open(outputPath);
-using var sha1 = System.Security.Cryptography.SHA1.Create();
-// stream check.ReadAt(...) through sha1 and compare with the source image's hash
+DiscHashes hashes = DiscHasher.Compute(check, progress);
+
+// Compare with the source image's hashes:
+using var source = Blob.Open(inputPath);
+var expected = DiscHasher.Compute(source);
+if (!hashes.Sha1.AsSpan().SequenceEqual(expected.Sha1))
+    throw new InvalidDataException("round-trip mismatch");
 ```
+
+For RVZ/WIA the container's own integrity (all SHA-1s, structure rules) is already
+validated by `RvzReader.Open` / `RvzReader.OpenWia`, so `DiscHasher` only needs to hash the
+decoded bytes.
+
+---
+
+## Writing WIA
+
+`WiaWriter` shares the writer core with `RvzWriter` (Dolphin: `ConvertToWIAOrRVZ`):
+
+```csharp
+using var input = Blob.Open(@"C:\games\game.iso");
+using var output = File.Create(@"C:\games\game.wia");
+
+WiaWriter.Write(input, output, new RvzWriteOptions
+{
+    Compression = CompressionType.Lzma2,   // None, Purge, Bzip2, Lzma, Lzma2
+    CompressionLevel = 5,
+    ChunkSize = 0x200000,                  // multiple of 2 MiB
+});
+```
+
+- `CompressionType.Zstd` is rejected (`RvzUnsupportedException`) — WIA predates it.
+- `CompressionType.Purge` is WIA-only and fully supported by the library (the CLI mirrors
+  DolphinTool, whose `-c` choices do not include it).
+- `RvzWriteOptions.Packing` is RVZ-only and ignored for WIA.
+- The chunk size must be a multiple of 2 MiB (Dolphin's `IsDiscImageBlockSizeValid`).
+- `options` defaults to `RvzWriteOptions.WiaDefault` (LZMA2, level 3, 2 MiB chunks).
+- Input validation, progress and cancellation behave exactly like `RvzWriter.Write`.
 
 ---
 
@@ -332,7 +368,7 @@ byte[] compressed = encoder.Compress(payload);
   (LZMA/LZMA2 dictionary settings; empty for the others).
 - `ICompressionEncoder.AddPrecedingData(...)` is PURGE-specific (the exception lists that
   precede the compressed stream and are covered by its SHA-1 trailer).
-- Supported methods: `None`, `Purge` (decode only, WIA), `Bzip2`, `LZMA`, `LZMA2`, `Zstd`.
+- Supported methods: `None`, `Purge` (WIA), `Bzip2`, `LZMA`, `LZMA2`, `Zstd` (RVZ).
 
 ---
 

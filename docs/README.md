@@ -12,9 +12,9 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 313 fast (every framework, ~30 s) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 356 fast (every framework, ~30 s) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
-| Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing) |
+| Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing) and WIA (None, PURGE, Bzip2, LZMA1, LZMA2) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
 
 ## Documentation map
@@ -24,7 +24,7 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
 | [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
 | [CLI reference](usage-cli.md) | `info`, `decode`, `convert` — options and examples |
-| [Library API](usage-library.md) | `Blob`, `RvzReader`, `RvzWriter`, codecs, packing API |
+| [Library API](usage-library.md) | `Blob`, `RvzReader`, `RvzWriter`, `WiaWriter`, `DiscHasher`, codecs, packing API |
 | [Architecture](architecture.md) | Module map, read/write pipelines, design decisions |
 | [RVZ container format](format/rvz.md) | File head, disc struct, tables, groups, chunking |
 | [Compression & packing](format/compression-packing.md) | Codec details and the Lagged-Fibonacci junk packing |
@@ -49,10 +49,11 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
   `decode` and `convert` accept any supported file.
 - **Canonical ISO view** — all readers expose the decoded disc as a random-access stream of
   ISO bytes, so a GCZ, a WIA and an RVZ of the same disc are interchangeable inputs.
-- **RVZ writing** — the writer stores Wii partition data *decrypted* with hash exceptions
+- **RVZ/WIA writing** — the writer stores Wii partition data *decrypted* with hash exceptions
   (the same space-saving trick Dolphin uses), detects and packs PRNG junk with a recovered
-  seed, and emits fully checksummed tables (SHA-1 everywhere Dolphin puts them).
+  seed (RVZ), and emits fully checksummed tables (SHA-1 everywhere Dolphin puts them).
 - **Verifiable** — every conversion is byte-exact: the test suite round-trips synthetic
   discs through every codec, packing setting and chunk size, decodes **30 real GameCube/Wii
   RVZ files** byte-for-byte against their official No-Intro SHA-1s, re-encodes real GC/Wii
-  images back to RVZ, and the CLI can verify decoded output with `--sha1`.
+  images back to RVZ, and `DiscHasher`/the CLI can verify decoded output (`--sha1`,
+  `verify`).

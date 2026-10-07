@@ -350,6 +350,24 @@ public class RvzWriterTests
     }
 
     [Fact]
+    public void WiiIso_6MiBChunks_RoundTrips()
+    {
+        // Regression: chunks above 2 MiB span whole hash regions and must carry one exception
+        // list per region (Dolphin: exception_lists_per_chunk = max(1, chunk_size / 2 MiB)).
+        // The writer used to emit a single list per chunk, corrupting multi-region chunks.
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 130, TestWiiIsoBuilder.RandomData(130),
+            corruptSomeHashes: true);
+        using var ms = new MemoryStream();
+        RvzWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
+        {
+            Compression = CompressionType.Zstd,
+            ChunkSize = 0x600000
+        });
+        Assert.Equal(iso, Decode(ms.ToArray()));
+    }
+
+    [Fact]
     public void InvalidChunkSize_Throws()
     {
         using var ms = new MemoryStream();

@@ -11,7 +11,7 @@ decode byte-exactly to the original disc.
 **What is the difference between RVZ and WIA?**
 WIA is the older container (Purge/Bzip2/LZMA/LZMA2, no Zstd, no junk packing, version
 compatible 0x00080000). RVZ adds Zstd, chunk packing and the `rvz_packed_size` field, and
-drops Purge. RVZSharp reads both; writes RVZ.
+drops Purge. RVZSharp reads both and writes both (`RvzWriter` / `WiaWriter`).
 
 **Can Dolphin open files created by RVZSharp?**
 The writer mirrors Dolphin's `ConvertToWIAOrRVZ` byte-for-byte at the container level

@@ -3,7 +3,7 @@
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │                          CLI (RVZSharp.Cli)                        │
-│            info │ decode │ convert  —  Blob.Open autodetection     │
+│            header │ verify │ convert │ extract  —  Blob.Open     │
 └───────────────┬────────────────────────────────────────────────────┘
                 │ IBlobReader
 ┌───────────────▼────────────────────────────────────────────────────┐
@@ -24,7 +24,8 @@
 | `Chunks/` | `ChunkDecoder`, `TableParser` | Group decompression, exception-list parsing, table loading |
 | `Compression/` | `CompressionCodecFactory`, `CompressionEncoderFactory`, `ICompressionDecoder`, `ICompressionEncoder`, codecs, `Lzma/` (vendored 7-Zip decoder) | Read-side decompression and write-side compression |
 | `Packing/` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator`, `LaggedFibonacciPrng` | RVZ junk packing: segment streams and PRNG seed recovery |
-| `Wii/` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor` | Wii partition encryption, hash tree, exceptions |
+| `Wii/` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor`, `PartitionReader` | Wii partition encryption, hash tree, exceptions, decrypted partition views |
+| `Files/` | `DiscFileSystem`, `DiscFileInfo` | GameCube/Wii FST parsing, case-insensitive lookup, file data streaming |
 
 ## Read path
 
@@ -120,6 +121,8 @@ Key points:
 | Dolphin C++ is the layout truth | `References/dolphin-master/` — the RVZ/WIA formats were invented there; the Go reader and `docs/WiaAndRvz.md` are cross-checks |
 | Canonical ISO view for all formats | one consumer (CLI, writer) works for every container |
 | GCZ uses BCL `ZLibStream` (read) and SharpZipLib `Deflater` (write) | GCZ is deflate; SharpZipLib is already a dependency for bzip2, and `Deflater` can be reset per block like Dolphin's `deflateReset` |
+| Parallel decode serializes only file reads | RVZ/WIA chunks and partition regions are independent; workers read stored bytes under a lock (short I/O) and decompress from memory in parallel, then write in disc order — byte-identical output, near-linear speedup for LZMA/LZMA2 |
+| FST offsets are read from the decrypted view | Dolphin's `GetFSTOffset` is a partition-relative (decrypted) read; `PartitionReader` provides that view for the parser, the writer's split point and `extract` |
 | LZMA decoder is vendored 7-Zip | compact, self-contained, no external native code |
 | LZMA-SDK for encoding | pure-managed public-domain encoder (runtime dependency, version 22.1.1) |
 | Writer stores partitions decrypted + exceptions | the defining RVZ space optimization; identical to Dolphin |

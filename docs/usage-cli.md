@@ -55,7 +55,7 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
 | `-u`, `--user` | user folder path; accepted for DolphinTool compatibility (RVZSharp needs no user directory). |
 | `-f`, `--format` | container format: `iso`, `gcz`, `wia`, `rvz`. Required. |
 | `-b`, `--block_size` | block size in **bytes**. Required for GCZ/WIA/RVZ. |
-| `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`. Required for WIA/RVZ; ignored for GCZ (always zlib deflate). |
+| `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`, and `purge` (WIA only, RVZSharp extension). Required for WIA/RVZ; ignored for GCZ (always zlib deflate). |
 | `-l`, `--compression_level` | compression level. Required unless `-c none`. |
 | `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso`/`-f gcz` a warning notes that scrubbing gains little. |
 | `--threads` | compression threads (RVZSharp extension). `0` (default) uses the processor count; the output is byte-identical for any value. |
@@ -83,17 +83,19 @@ Notes:
   must be a power of two, at/above 2 MiB a multiple of 2 MiB (Dolphin's rule).
 - **`-f wia`** uses the WIA writer: Wii partitions stored decrypted with hash exceptions,
   fully checksummed tables. `-b` must be a multiple of 2 MiB; `zstd` is rejected (WIA
-  supports `none`, `bzip2`, `lzma` and `lzma2`; the library's `WiaWriter` also supports
-  `CompressionType.Purge`, which DolphinTool's CLI does not expose).
+  supports `none`, `bzip2`, `lzma` and `lzma2`). `-c purge` (RVZSharp extension) stores the
+  hash exceptions plus a raw stream instead of compressing; DolphinTool's CLI does not
+  expose it.
 - **`-f gcz`** uses the GCZ writer: blocks of `-b` bytes (any power of two; 16 KiB is the
   classic size, Dolphin's GUI defaults to 128 KiB), each block deflated at level 9 and stored
   raw when compression saves fewer than 10 bytes, with a per-block Adler-32 of the stored
   bytes. `-c`/`-l` are ignored (GCZ is always zlib). Converting a Wii disc without `-s`
   prints Dolphin's "may not offer space advantages over ISO" warning.
 - **`--threads`** (RVZSharp extension) controls the writer's compression pool (RVZ/WIA
-  group compression and packing, GCZ block deflate). The default `0` uses the processor
-  count; results are appended in disc order, so the output file is byte-identical for any
-  thread count.
+  group compression and packing, GCZ block deflate) and the decoder's chunk pool for
+  `-f iso`/`decode`. The default `0` uses the processor count; results are appended in disc
+  order, so the output file is byte-identical for any thread count. `--threads 1` forces
+  sequential processing.
 - **`--verify`** (RVZSharp extension) hashes the input before writing and re-decodes the
   written file afterwards, comparing CRC-32, MD5 and SHA-1. It works for every `-f` value.
 - `-s` (scrub) requires a Wii disc with a game partition; other inputs fail with
@@ -174,16 +176,62 @@ SHA1: 2fe83205d928407f049be5d2181cfb6e5ca44465
 
 ## `extract`
 
-DolphinTool-compatible option surface (`-i`, `-o`, `-p`, `-s`, `-l`, `-q`, `-g`), but the
-command is **not implemented** (no disc filesystem support yet) — it validates the input
-and fails with a clear error.
+Extracts files from the disc's file system table (FST) or lists them, with the
+DolphinTool-compatible option surface:
+
+```
+extract -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l] [-q] [-g]
+```
+
+| Option | Meaning |
+|---|---|
+| `-i`, `--input` | path to the input disc image (any supported format). Required. |
+| `-o`, `--output` | output directory (without `--list`) or output **file** for the listing (with `--list`). Required unless `--list` prints to stdout only. |
+| `-p`, `--partition` | only this partition, by Dolphin name: `DATA`, `UPDATE`, `CHANNEL`, `P-XXXX` (case-insensitive). |
+| `-s`, `--single` | only this file/directory (FST path, e.g. `files/maps/foo.dat`); with `--list`, list this path instead of `/`. |
+| `-l`, `--list` | list the files (recursively) instead of extracting them; printed to stdout and to `-o` when given. |
+| `-q`, `--quiet` | suppress per-file progress messages (extraction) — with `--list` and no `-o`, this is an error (nothing would be printed). |
+| `-g`, `--gameonly` | shorthand for `-p DATA` (the game partition). |
+
+Layout (DolphinTool-compatible): each partition lands in `<out>/<PARTITION>/`, with the FST
+tree under `files/` and the system data next to it:
+
+```
+<out>/<PARTITION>/files/...        the FST tree (GameCube: <out>/files/...)
+<out>/<PARTITION>/sys/boot.bin     decrypted disc/boot header (0x440)
+<out>/<PARTITION>/sys/bi2.bin      BI2 (0x2000)
+<out>/<PARTITION>/sys/apploader.img
+<out>/<PARTITION>/sys/main.dol     when the disc has a DOL
+<out>/<PARTITION>/sys/fst.bin      the raw file system table
+<out>/<PARTITION>/disc/header.bin  Wii non-partition header (0x100)
+<out>/<PARTITION>/disc/region.bin  Wii region data (0x20)
+<out>/<PARTITION>/ticket.bin       Wii partition ticket (0x2A4)
+<out>/<PARTITION>/tmd.bin          Wii TMD
+<out>/<PARTITION>/cert.bin         Wii certificate chain
+<out>/<PARTITION>/h3.bin           Wii H3 hash table (0x18000)
+```
+
+- Wii partitions are read through the **decrypted** partition view, so FST offsets and file
+  data match Dolphin's partition-relative semantics (AES-128-CBC, IV = ciphertext at 0x3D0).
+- Partitions without a usable file system are skipped with a warning; their system data is
+  still exported (Dolphin behavior).
+- Extraction exits 1 when nothing was extracted (`-s` matched nothing or no partition
+  matched `-p`).
+
+```bash
+rvzsharp extract -i game.rvz -o extracted            # whole disc
+rvzsharp extract -i game.rvz -o extracted -g         # game partition only
+rvzsharp extract -i game.rvz -l -o listing.txt       # list to a file
+rvzsharp extract -i game.rvz -s files/maps/foo.dat -o extracted
+```
 
 ## Legacy commands
 
 - `info <FILE>` — alias of `header` with the older RVZSharp layout (container version,
   disc type, partitions, raw areas, groups).
-- `decode <FILE> <OUT> [--sha1 <hex>]` — decode any blob to a plain ISO; `--sha1` verifies
-  the output hash while writing (the `convert -f iso` equivalent with verification).
+- `decode <FILE> <OUT> [--sha1 <hex>] [--threads <n>]` — decode any blob to a plain ISO;
+  `--sha1` verifies the output hash while writing (the `convert -f iso` equivalent with
+  verification); `--threads` enables parallel RVZ/WIA decoding (0 = processor count).
 
 ## Exit codes
 

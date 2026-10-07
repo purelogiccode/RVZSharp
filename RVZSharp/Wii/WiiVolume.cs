@@ -177,7 +177,8 @@ public static class WiiVolume
     /// <returns>The FST offset, or null when it cannot be read.</returns>
     public static ulong? GetFstOffset(IBlobReader disc, Partition partition)
     {
-        return ReadSwappedAndShifted(disc, partition.Offset + 0x424);
+        using var view = new PartitionReader(disc, partition);
+        return ReadSwappedAndShifted(view, 0x424);
     }
 
     /// <summary>The FST size (partition header 0x428, shifted).</summary>
@@ -186,7 +187,77 @@ public static class WiiVolume
     /// <returns>The FST size, or null when it cannot be read.</returns>
     public static ulong? GetFstSize(IBlobReader disc, Partition partition)
     {
-        return ReadSwappedAndShifted(disc, partition.Offset + 0x428);
+        using var view = new PartitionReader(disc, partition);
+        return ReadSwappedAndShifted(view, 0x428);
+    }
+
+    /// <summary>
+    /// The apploader size for a decrypted partition view (Dolphin: GetApploaderSize):
+    /// 0x20-byte header plus the size and trailer size stored at 0x2454/0x2458.
+    /// </summary>
+    /// <param name="view">A decrypted partition view (or a GameCube disc).</param>
+    /// <returns>The apploader size, or null when it cannot be read.</returns>
+    public static ulong? GetApploaderSize(IBlobReader view)
+    {
+        if (!TryReadSwapped(view, 0x2440 + 0x14, out var size) ||
+            !TryReadSwapped(view, 0x2440 + 0x18, out var trailer))
+        {
+            return null;
+        }
+
+        return 0x20UL + size + trailer;
+    }
+
+    /// <summary>
+    /// The boot DOL offset for a decrypted partition view (Dolphin: GetBootDOLOffset); the
+    /// Datel AR disc stores 0 and does not use a DOL.
+    /// </summary>
+    /// <param name="view">A decrypted partition view (or a GameCube disc).</param>
+    /// <returns>The DOL offset, or null when it is absent or zero.</returns>
+    public static ulong? GetBootDolOffset(IBlobReader view)
+    {
+        if (!TryReadSwapped(view, 0x420, out var value))
+        {
+            return null;
+        }
+
+        var offset = (ulong)value << 2;
+        return offset == 0 ? null : offset;
+    }
+
+    /// <summary>
+    /// The boot DOL size for a decrypted partition view (Dolphin: GetBootDOLSize): the largest
+    /// end offset of the seven text and eleven data segments in the DOL header.
+    /// </summary>
+    /// <param name="view">A decrypted partition view (or a GameCube disc).</param>
+    /// <param name="dolOffset">The DOL offset, from <see cref="GetBootDolOffset"/>.</param>
+    /// <returns>The DOL size, or null when the header cannot be read.</returns>
+    public static uint? GetBootDolSize(IBlobReader view, ulong dolOffset)
+    {
+        uint size = 0;
+        for (var i = 0; i < 7; i++)
+        {
+            if (!TryReadSwapped(view, dolOffset + (ulong)(0x00 + i * 4), out var offset) ||
+                !TryReadSwapped(view, dolOffset + (ulong)(0x90 + i * 4), out var segmentSize))
+            {
+                return null;
+            }
+
+            size = Math.Max(size, offset + segmentSize);
+        }
+
+        for (var i = 0; i < 11; i++)
+        {
+            if (!TryReadSwapped(view, dolOffset + (ulong)(0x1C + i * 4), out var offset) ||
+                !TryReadSwapped(view, dolOffset + (ulong)(0xAC + i * 4), out var segmentSize))
+            {
+                return null;
+            }
+
+            size = Math.Max(size, offset + segmentSize);
+        }
+
+        return size;
     }
 
     /// <summary>Maps a partition-data-relative offset to a disc-relative offset.</summary>
@@ -221,6 +292,19 @@ public static class WiiVolume
     private static bool TryReadAt(IBlobReader disc, ulong offset, Span<byte> buffer)
     {
         return offset < (ulong)disc.Length && disc.ReadAt((long)offset, buffer) == buffer.Length;
+    }
+
+    private static bool TryReadSwapped(IBlobReader disc, ulong offset, out uint value)
+    {
+        Span<byte> bytes = stackalloc byte[4];
+        if (TryReadAt(disc, offset, bytes))
+        {
+            value = ReadBe32(bytes, 0);
+            return true;
+        }
+
+        value = 0;
+        return false;
     }
 
     private static uint ReadBe32(ReadOnlySpan<byte> data, int offset)

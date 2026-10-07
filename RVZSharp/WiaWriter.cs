@@ -39,4 +39,32 @@ public static class WiaWriter
         WiaRvzWriter.Write(input, output, WiaRvzFormat.Wia, options ?? RvzWriteOptions.WiaDefault,
             progress, cancellationToken);
     }
+
+    /// <summary>
+    /// Asynchronous form of <see cref="Write"/>. Encoding is synchronous and CPU-bound, so
+    /// the work runs on the thread pool; the returned task completes when the file has been
+    /// written.
+    /// </summary>
+    /// <param name="input">A GameCube or Wii disc image (plain ISO or a legacy container).</param>
+    /// <param name="output">Destination stream (not disposed by this method).</param>
+    /// <param name="options">
+    /// Writer options; <see cref="RvzWriteOptions.WiaDefault"/> (LZMA2) when null.
+    /// </param>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the input bytes processed.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between group reads.</param>
+    /// <returns>A task that completes when the file has been written.</returns>
+    /// <exception cref="ArgumentException">Invalid chunk size or input too small.</exception>
+    /// <exception cref="RvzFormatException">
+    /// The input is not a GameCube or Wii disc image (no disc header magic at 0x18/0x1C).
+    /// </exception>
+    /// <exception cref="RvzUnsupportedException">Zstandard compression requested (RVZ-only method).</exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    public static Task WriteAsync(IBlobReader input, Stream output, RvzWriteOptions? options = null,
+        IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        return Task.Run(
+            () => Write(input, output, options, progress, cancellationToken), cancellationToken);
+    }
 }

@@ -41,6 +41,17 @@ or, for an original source image: compute the SHA-1 of the source ISO once, then
 WBFS has a fixed ~9.4 GiB logical size; converting reads the whole logical image even when
 the file is mostly empty clusters. Prefer `decode` then `convert game.iso`.
 
+**Can I get the files out of a disc image?**
+Yes — `rvzsharp extract` (DolphinTool-compatible) lists or extracts the FST tree and the
+standard system data (boot/BI2/apploader/DOL/FST, Wii disc header/region,
+ticket/TMD/cert/H3). The library equivalent is `DiscFileSystem` + `PartitionReader`. CISO,
+WBFS and other containers work as inputs because everything decodes to the same disc bytes.
+
+**Does decoding use multiple cores?**
+Full-image RVZ/WIA decode does (`convert -f iso --threads 0`, or `CopyTo(..., maxThreads)`)
+— chunks are decompressed on a worker pool and written in order, so the output is
+byte-identical to sequential. Random-access `ReadAt` calls stay sequential.
+
 **Why does NFS need a `content` directory?**
 Dolphin treats NFS files as `…/content/hif_000000.nfs` with the AES key in
 `…/code/htk.bin`. RVZSharp follows the same convention; use `Blob.Open(stream, nfsKey, …)`

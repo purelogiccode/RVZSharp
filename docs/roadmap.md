@@ -12,6 +12,7 @@
 | 6 — Real-world validation | 97 real-file tests (`RVZSharp.Slow.Tests`) against 30 GameCube/Wii RVZ games (No-Intro SHA-1) incl. writer round-trips — found & fixed the 2 MiB ticket-key writer bug | ✅ done |
 | 7 — Writer performance | parallel group compression (`MaxThreads` / `--threads`, Dolphin's worker-pool model), `convert --verify` hash comparison | ✅ done |
 | 8 — GCZ writer | `GczWriter` / `convert -f gcz`: 16 KiB zlib blocks, raw-block fallback, per-block Adler-32, parallel block deflate | ✅ done |
+| 9 — Filesystem & concurrency | `DiscFileSystem` FST parser + `PartitionReader`, CLI `extract` (list/extract/single/partition/gameonly, system data), parallel full-image decode (`--threads`), async API (`CopyToAsync`/`ReadFullyAsync`/`WriteAsync`), `-c purge` for WIA | ✅ done |
 
 ## Supported
 
@@ -26,7 +27,11 @@
 - Progress/cancellation on both encode (`RvzWriter.Write`/`WiaWriter.Write`) and decode
   (`IBlobReader.CopyTo`/`ReadFully`); `DiscHasher` computes CRC-32/MD5/SHA-1 in one pass.
 - Parallel group compression in the writer (`MaxThreads`, CLI `--threads`; output is
-  byte-identical to sequential) and `convert --verify` (input vs output hashes).
+  byte-identical to sequential), parallel full-image decode for RVZ/WIA, `convert --verify`
+  (input vs output hashes), and an async API (`CopyToAsync`, `ReadFullyAsync`, `WriteAsync`).
+- File system access: `DiscFileSystem` parses the GameCube/Wii FST (case-insensitive lookup,
+  file streaming) and the CLI `extract` command lists/extracts the tree plus the standard
+  system data per partition (DolphinTool-compatible layout).
 - Real-world validation: 30 real GC/Wii RVZ images decode byte-for-byte to their official
   No-Intro SHA-1s; real images re-encode to RVZ (default 2 MiB chunks) and decode back to
   the same hash. See [testing.md](testing.md#real-file-suite) for the suite details.
@@ -36,10 +41,9 @@
 | Limitation | Detail |
 |---|---|
 | WBFS conversion is slow | WBFS reports a fixed 9.4 GiB logical image; converting reads all of it (mostly zero clusters). `decode` + `convert` on the ISO is faster in practice. |
-| PURGE output | PURGE is WIA-only; `WiaWriter` supports it (`CompressionType.Purge`), but the CLI's `-c` choices mirror DolphinTool and do not expose it. RVZ readers reject PURGE containers. |
-| No `extract` command | DolphinTool's `extract` requires a disc filesystem (FST) implementation; the CLI validates the arguments and reports it as unsupported. |
+| PURGE output | PURGE is WIA-only; `WiaWriter` and the CLI (`-c purge`) support it, but RVZ readers reject PURGE containers. |
 | NFS key location | the AES key must come from `code/htk.bin` next to the `content/hif_000000.nfs` file (or be supplied via the library API). |
-| Single-threaded reads | decoding is sequential; only the writer compresses groups in parallel (`MaxThreads`). |
+| Sequential random access | full-image decode can use a worker pool (RVZ/WIA, `--threads`), but individual `ReadAt` calls and the other formats decode sequentially. |
 
 ## Open questions
 
@@ -47,11 +51,12 @@
    byte-for-byte to their official No-Intro SHA-1s, and real images re-encode to RVZ and
    decode back. Legacy-format real files (GCZ/CISO/WBFS/TGC/NFS/WIA) are still only
    validated against synthetic images.
-2. **Performance targets** — ✅ resolved for writing: group packing/compression runs on a
-   worker pool (`MaxThreads`); reading is still sequential.
+2. **Performance targets** — ✅ resolved for writing and full-image reads: group
+   packing/compression and RVZ/WIA chunk decoding both run on worker pools (`MaxThreads`);
+   per-range `ReadAt` remains sequential by design.
 
 ## Possible next steps
 
-- `extract` command: FST parser + file/directory extraction, listing, and game-only mode.
-- Async API surface (`CopyToAsync`, `WriteAsync`) for UI consumers.
 - Cross-checks against `wit`/`wwt` output for shared formats.
+- CISO/WBFS/TGC writers (currently read-only inputs).
+- Native AOT/single-file trimming validation for the library.

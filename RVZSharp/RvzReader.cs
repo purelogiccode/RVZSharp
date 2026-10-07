@@ -33,6 +33,13 @@ public sealed class RvzReader : IBlobReader
     private HashExceptionEntry[][] _cachedChunkLists = [];
     private long _cachedChunkKey = -1;
 
+    /// <summary>Serializes file reads; decompression itself runs lock-free on worker threads.</summary>
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _fileLock = new();
+#else
+    private readonly object _fileLock = new();
+#endif
+
     private enum AreaKind
     {
         Raw,
@@ -313,7 +320,7 @@ public sealed class RvzReader : IBlobReader
     /// <summary>
     /// Decodes the whole disc image into a single buffer. The image must fit in memory
     /// (byte arrays are capped at <see cref="int.MaxValue"/> elements, so this supports
-    /// discs up to 2 GiB — use <see cref="ReadAt"/> or <see cref="IBlobReader.CopyTo"/> for larger
+    /// discs up to 2 GiB — use <see cref="ReadAt"/> or <see cref="IBlobReader.CopyTo(Stream, IProgress{double}, CancellationToken)"/> for larger
     /// images, e.g. Wii discs).
     /// </summary>
     public byte[] ReadFully()
@@ -325,7 +332,7 @@ public sealed class RvzReader : IBlobReader
     /// Decodes the whole disc image into a single buffer, reporting progress and observing
     /// cancellation. The image must fit in memory (byte arrays are capped at
     /// <see cref="int.MaxValue"/> elements, so this supports discs up to 2 GiB — use
-    /// <see cref="ReadAt"/> or <see cref="IBlobReader.CopyTo"/> for larger images, e.g. Wii discs).
+    /// <see cref="ReadAt"/> or <see cref="IBlobReader.CopyTo(Stream, IProgress{double}, CancellationToken)"/> for larger images, e.g. Wii discs).
     /// </summary>
     /// <param name="progress">
     /// Optional progress reporter; receives a fraction in [0, 1] of the bytes decoded.
@@ -333,7 +340,7 @@ public sealed class RvzReader : IBlobReader
     /// <param name="cancellationToken">Cancellation is observed between reads.</param>
     /// <returns>The decoded disc image bytes.</returns>
     /// <exception cref="RvzFormatException">
-    /// The image is larger than 2 GiB (use <see cref="IBlobReader.CopyTo"/> for images that large), or
+    /// The image is larger than 2 GiB (use <see cref="IBlobReader.CopyTo(Stream, IProgress{double}, CancellationToken)"/> for images that large), or
     /// decoding stopped before the end of the image.
     /// </exception>
     /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
@@ -384,6 +391,223 @@ public sealed class RvzReader : IBlobReader
         CancellationToken cancellationToken = default)
     {
         return BlobCopy.CopyTo(this, destination, progress, cancellationToken);
+    }
+
+    /// <summary>
+    /// Streams the decoded disc image, optionally decoding chunks on a worker pool. Decoding
+    /// is split into independent units (raw chunks and 64-sector partition regions); workers
+    /// only serialize the short file reads, so LZMA/LZMA2 decompression runs in parallel.
+    /// Results are written in disc order, so the output is byte-identical to
+    /// <see cref="CopyTo(Stream, IProgress{double}, CancellationToken)"/> for any thread count.
+    /// </summary>
+    /// <param name="destination">The stream that receives the decoded image bytes.</param>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the bytes decoded.
+    /// </param>
+    /// <param name="maxThreads">
+    /// Decoding threads: 0 uses the processor count, 1 forces sequential decoding.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between batches.</param>
+    /// <returns>The number of bytes copied (the image length).</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="destination"/> is null.</exception>
+    /// <exception cref="RvzFormatException">Decoding stopped before the end of the image.</exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    public long CopyTo(Stream destination, IProgress<double>? progress, int maxThreads,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        var threads = maxThreads > 0 ? maxThreads : Environment.ProcessorCount;
+        if (threads <= 1)
+        {
+            return BlobCopy.CopyTo(this, destination, progress, cancellationToken);
+        }
+
+        return ParallelCopyTo(destination, progress, threads, cancellationToken);
+    }
+
+    private long ParallelCopyTo(Stream destination, IProgress<double>? progress, int threads,
+        CancellationToken cancellationToken)
+    {
+        const long regionBytes = 64L * PartitionRegionBuilder.SectorSize;
+        // Decoded payloads held per batch; keeps peak memory bounded for any chunk size.
+        const long maxBatchBytes = 128L * 1024 * 1024;
+
+        // The first 0x80 bytes of the image are served from the disc header (dhead).
+        var copied = 0L;
+        if (Length >= WiaDisc.DiscHeaderSize)
+        {
+            destination.Write(Disc.DiscHeader.AsSpan(0, WiaDisc.DiscHeaderSize));
+            copied = WiaDisc.DiscHeaderSize;
+            progress?.Report((double)copied / Length);
+        }
+
+        foreach (var area in _areas)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (area.End <= copied)
+            {
+                continue; // already served by the disc header (an area can start at 0)
+            }
+
+            if (area.Start > copied)
+            {
+                throw new RvzFormatException(
+                    $"No data covers disc offset 0x{copied:X}; the file is not a complete disc image.");
+            }
+
+            var areaSize = area.End - area.Start;
+            var unitSize = area.Kind == AreaKind.Raw ? (long)Disc.ChunkSize : regionBytes;
+            var unitCount = (areaSize + unitSize - 1) / unitSize;
+            // The disc header can leave the current position in the middle of the first unit.
+            var firstUnit = (copied - area.Start) / unitSize;
+            var batchSize = (int)Math.Max(1, Math.Min((long)threads * 2, maxBatchBytes / unitSize));
+            var results = new byte[batchSize][];
+
+            for (long first = firstUnit; first < unitCount; first += batchSize)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var count = (int)Math.Min(batchSize, unitCount - first);
+                if (count == 1)
+                {
+                    results[0] = DecodeUnit(area, first, unitSize);
+                }
+                else
+                {
+                    Parallel.For(0, count,
+                        new ParallelOptions
+                        {
+                            MaxDegreeOfParallelism = threads,
+                            CancellationToken = cancellationToken
+                        },
+                        i => results[i] = DecodeUnit(area, first + i, unitSize));
+                }
+
+                for (var i = 0; i < count; i++)
+                {
+                    var payload = results[i];
+                    var unitStart = area.Start + (first + i) * unitSize;
+                    var skip = (int)(copied - unitStart);
+                    // The last unit of an area can be shorter than the unit size.
+                    var take = (int)Math.Min(payload.Length - skip, area.End - copied);
+                    if (take > 0)
+                    {
+                        destination.Write(payload, skip, take);
+                        copied += take;
+                    }
+
+                    results[i] = null!;
+                }
+
+                progress?.Report((double)copied / Length);
+            }
+        }
+
+        if (copied != Length)
+        {
+            throw new RvzFormatException(
+                $"No data covers disc offset 0x{copied:X}; the file is not a complete disc image.");
+        }
+
+        return copied;
+    }
+
+    private byte[] DecodeUnit(DataArea area, long unitIndex, long unitSize)
+    {
+        if (area.Kind == AreaKind.Raw)
+        {
+            return DecodeRawChunk(area.Index, unitIndex, area.End - area.Start);
+        }
+
+        return DecodePartitionRegion(area, unitIndex);
+    }
+
+    private byte[] DecodeRawChunk(int rawIndex, long chunkIndex, long areaSize)
+    {
+        var entry = RawDataEntries[rawIndex];
+        var groupIndex = entry.GroupIndex + chunkIndex;
+        if (groupIndex >= GroupEntries.Length)
+        {
+            throw new RvzFormatException(
+                $"Raw-data entry {rawIndex} references group {groupIndex}, but only "
+                + $"{GroupEntries.Length} groups exist.");
+        }
+
+        var expectedSize = (int)Math.Min(Disc.ChunkSize, areaSize - chunkIndex * Disc.ChunkSize);
+        return DecodeStoredGroup(GroupEntries[groupIndex], isPartition: false, expectedSize,
+            chunkIndex * Disc.ChunkSize).Payload;
+    }
+
+    private byte[] DecodePartitionRegion(DataArea area, long regionIndex)
+    {
+        // One chunk payload can feed several sectors of a region; cache it locally so the
+        // parallel path never touches the reader's single-slot caches.
+        var chunks = new Dictionary<long, (byte[] Payload, HashExceptionEntry[][] Lists)>();
+        return BuildPartitionRegion(area, regionIndex, chunkIndex =>
+        {
+            if (!chunks.TryGetValue(chunkIndex, out var chunk))
+            {
+                chunk = ReadAndDecodePartitionChunk(area, chunkIndex);
+                chunks[chunkIndex] = chunk;
+            }
+
+            return chunk;
+        });
+    }
+
+    private (byte[] Payload, HashExceptionEntry[][] Lists) ReadAndDecodePartitionChunk(
+        DataArea area, long chunkIndex)
+    {
+        var pd = Partitions[area.Index].Data[area.Segment];
+        var sectorsPerChunk = Disc.ChunkSize / WiaDisc.SectorSize;
+        var remainingSectors = pd.NumSectors - chunkIndex * sectorsPerChunk;
+        var expectedSize =
+            (int)(Math.Min(sectorsPerChunk, remainingSectors) * WiiHashCalculator.SectorDataSize);
+
+        var groupIndex = pd.GroupIndex + chunkIndex;
+        if (groupIndex >= GroupEntries.Length)
+        {
+            throw new RvzFormatException(
+                $"Partition data entry references group {groupIndex}, but only "
+                + $"{GroupEntries.Length} groups exist.");
+        }
+
+        var result = DecodeStoredGroup(GroupEntries[groupIndex], isPartition: true, expectedSize,
+            chunkIndex * PartitionChunkPayloadSize);
+        return (result.Payload, result.ExceptionLists);
+    }
+
+    /// <summary>
+    /// Reads a group's stored bytes under the file lock and decodes them from memory, so
+    /// worker threads only serialize the short reads (Dolphin decodes from per-thread buffers).
+    /// </summary>
+    private ChunkDecodeResult DecodeStoredGroup(GroupEntry group, bool isPartition,
+        int expectedSize, long dataOffset)
+    {
+        if (group.StoredSize == 0)
+        {
+            // Special case: all zeroes, empty exception lists (ChunkDecoder.DecodeChunk).
+            return new ChunkDecodeResult { Payload = new byte[expectedSize] };
+        }
+
+        var stored = new byte[group.StoredSize];
+        lock (_fileLock)
+        {
+            if (!ReadExactlyAt(_file, (long)group.FileOffset, stored))
+            {
+                throw new RvzFormatException(
+                    $"Group at file offset 0x{group.FileOffset:X} is truncated.");
+            }
+        }
+
+        using var memory = new MemoryStream(stored, writable: false);
+        return ChunkDecoder.DecodeChunk(memory, Disc, _codec, new ChunkDecodeRequest
+        {
+            Group = new GroupEntry(0, group.StoredSize, group.UsesDiscCompression,
+                group.RvzPackedSize),
+            IsPartition = isPartition,
+            ExpectedSize = expectedSize,
+            DataOffset = dataOffset
+        });
     }
 
     private int ClampToRawChunk(DataArea area, long position, int requested)
@@ -469,6 +693,13 @@ public sealed class RvzReader : IBlobReader
 
     private byte[] BuildPartitionRegion(DataArea area, long regionIndex)
     {
+        return BuildPartitionRegion(area, regionIndex,
+            chunkIndex => GetPartitionChunk(area, chunkIndex));
+    }
+
+    private byte[] BuildPartitionRegion(DataArea area, long regionIndex,
+        Func<long, (byte[] Payload, HashExceptionEntry[][] Lists)> getChunk)
+    {
         var part = Partitions[area.Index];
         var pd = part.Data[area.Segment];
         var sectorsInArea = (long)pd.NumSectors;
@@ -481,7 +712,7 @@ public sealed class RvzReader : IBlobReader
         {
             var chunkIndex = sector / sectorsPerChunk;
             var sectorInChunk = (int)(sector % sectorsPerChunk);
-            var (payload, lists) = GetPartitionChunk(area, chunkIndex);
+            var (payload, lists) = getChunk(chunkIndex);
             var sectorData = payload.AsSpan(sectorInChunk * WiiHashCalculator.SectorDataSize,
                 WiiHashCalculator.SectorDataSize);
 

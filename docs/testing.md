@@ -2,7 +2,7 @@
 
 The test suite is split into **two projects**, so the default run is always the fast one:
 
-- **`RVZSharp.Tests`** — **373 synthetic tests** (unit + end-to-end round trips), ~30
+- **`RVZSharp.Tests`** — **395 synthetic tests** (unit + end-to-end round trips), ~30
   seconds per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
 - **`RVZSharp.Slow.Tests`** — **97 real-file tests** (full decode, structural checks,
   writer round trips against real game images), ~12 minutes when the games are mounted.
@@ -67,6 +67,9 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, junk-only image, >2 MiB chunks, overlapping/odd partitions, scrubbing, raw-table group counts, `MaxThreads` determinism |
 | `WiaWriterTests` | WIA round trips across all five codecs (GC + Wii with hash exceptions), 4/6 MiB chunks, magic/version, PURGE, option validation, `MaxThreads` determinism |
 | `GczWriterTests` | GCZ round trips (GC + Wii), last-block zero padding, header fields, raw/compressed block storage, `MaxThreads` determinism, option validation |
+| `ParallelDecodeTests` | parallel `CopyTo` equals sequential for GC/Wii/WIA (multi-batch, multi-region chunks, exceptions), progress, cancellation, non-RVZ fallback |
+| `AsyncApiTests` | `ReadFullyAsync`/`CopyToAsync`/`WriteAsync` equal their synchronous forms, cancellation |
+| `DiscFileSystemTests` | FST parsing (GC + decrypted Wii partitions), case-insensitive lookup, file reads, `PartitionReader` decryption, invalid FST rejection |
 | `RVZSharp.Slow.Tests/RealRvzFileTests.cs` | 97 real-file tests (see below) |
 | `RVZSharp.Slow.Tests/RealFileDecodeTests.cs` | env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`) |
 

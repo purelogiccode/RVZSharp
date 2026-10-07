@@ -13,7 +13,7 @@ implementations in
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 373 fast (every framework, ~30 s) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 395 fast (every framework, ~30 s) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing), WIA (None, PURGE, Bzip2, LZMA1, LZMA2) and GCZ (zlib deflate) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
@@ -24,8 +24,8 @@ implementations in
 |---|---|
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
 | [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
-| [CLI reference](usage-cli.md) | `info`, `decode`, `convert` — options and examples |
-| [Library API](usage-library.md) | `Blob`, `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `DiscHasher`, codecs, packing API |
+| [CLI reference](usage-cli.md) | `convert`, `header`, `verify`, `extract` (+ legacy `info`/`decode`) — options and examples |
+| [Library API](usage-library.md) | `Blob`, `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `DiscFileSystem`, `DiscHasher`, codecs, packing API |
 | [Architecture](architecture.md) | Module map, read/write pipelines, design decisions |
 | [RVZ container format](format/rvz.md) | File head, disc struct, tables, groups, chunking |
 | [Compression & packing](format/compression-packing.md) | Codec details and the Lagged-Fibonacci junk packing |
@@ -54,6 +54,12 @@ implementations in
   hash exceptions (the same space-saving trick Dolphin uses), detects and packs PRNG junk
   with a recovered seed (RVZ), and emits fully checksummed tables (SHA-1 everywhere Dolphin
   puts them); GCZ is written as Dolphin-compatible zlib blocks with per-block Adler-32s.
+- **File system access** — `DiscFileSystem` parses the GameCube/Wii FST (case-insensitive
+  lookup, file streaming through decrypted partition views), and the CLI `extract` command
+  lists/extracts the tree and the standard system data per partition.
+- **Parallel and async** — RVZ/WIA chunk decoding and group compression run on bounded
+  worker pools (`--threads`; output byte-identical for any thread count), and the async API
+  (`CopyToAsync`/`ReadFullyAsync`/`WriteAsync`) wraps the CPU-bound work for UI consumers.
 - **Verifiable** — every conversion is byte-exact: the test suite round-trips synthetic
   discs through every codec, packing setting and chunk size, decodes **30 real GameCube/Wii
   RVZ files** byte-for-byte against their official No-Intro SHA-1s, re-encodes real GC/Wii

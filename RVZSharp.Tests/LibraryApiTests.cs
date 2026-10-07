@@ -8,7 +8,7 @@ namespace RVZSharp.Tests;
 
 /// <summary>
 /// Tests for the package-facing API surface: path-based opening, the default
-/// <see cref="IBlobReader.ReadFully()"/> / <see cref="IBlobReader.CopyTo"/> implementations,
+/// <see cref="IBlobReader.ReadFully()"/> / <see cref="IBlobReader.CopyTo(Stream, IProgress{double}, CancellationToken)"/> implementations,
 /// disc validation, and the writer's progress and cancellation support.
 /// </summary>
 public class LibraryApiTests

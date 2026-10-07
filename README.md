@@ -169,22 +169,26 @@ container magic).
 ```
 dotnet run --project RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
 dotnet run --project RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1]
-dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz|wia \
-    [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>] [-s] \
+dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz|wia|gcz \
+    [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2|purge] [-l <level>] [-s] \
     [--threads <n>] [--verify]
+dotnet run --project RVZSharp.Cli -- extract -i <file> [-o <dir>] [-p <name>] \
+    [-s <path>] [-l] [-q] [-g]
 ```
 
 The CLI accepts the same command arguments as Dolphin's `dolphin-tool` (`convert`,
-`verify`, `header`; `extract` is recognized but not implemented). `convert` accepts
+`verify`, `header`, `extract`). `convert` accepts
 **any** readable blob (a plain ISO or one of the legacy formats, including **split WBFS**
 `.wbfs`+`.wbf1…` parts) and writes an RVZ, WIA or GCZ file, mirroring Dolphin's converter:
 Wii partitions are stored decrypted with hash exceptions (RVZ/WIA), raw data as-is, PRNG
 junk is packed with a recovered seed (Lagged Fibonacci `GetSeed`, RVZ only), and the tables
 carry all SHA-1 checksums. `--scrub` zeroes the data of non-game Wii partitions
-(update/channel) before converting. `-f iso` decodes back to a plain ISO. Two RVZSharp
-extensions: `--threads <n>` sets the compression worker count (output is byte-identical for
-any value), and `--verify` re-decodes the written file and compares CRC-32/MD5/SHA-1 with the
-input.
+(update/channel) before converting. `-f iso` decodes back to a plain ISO. RVZSharp
+extensions: `--threads <n>` sets the compression/decode worker count (output is
+byte-identical for any value), `--verify` re-decodes the written file and compares
+CRC-32/MD5/SHA-1 with the input, and `-c purge` exposes PURGE for WIA. `extract` reads the
+disc's file system: list or extract the FST tree and the system data (boot/BI2/apploader/
+DOL/FST, Wii disc header/region, ticket/TMD/cert/H3) per partition.
 
 ## Documentation
 
@@ -202,17 +206,18 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
 - `RVZSharp` — the library: `Models` (container structs), `Interfaces` (`IBlobReader`,
   codec contracts), `IO` (big-endian reading, section streams), `Compression` (codecs +
   factories), `Chunks` (group decoding, exception lists), `Packing` (RVZ packing + PRNG,
-  encoder and decoder), `Wii` (hash tree + region rebuild, partition extraction for the
-  writer), `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`. Every public and internal type
-  and member carries XML documentation (shipped in the package as `RVZSharp.xml` for
-  IntelliSense).
-- `RVZSharp.Cli` — the `header`/`verify`/`convert` tool (DolphinTool-compatible surface,
-  plus the legacy `info`/`decode` commands).
-- `RVZSharp.Tests` — 373 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+  encoder and decoder), `Wii` (hash tree + region rebuild, partition extraction, decrypted
+  `PartitionReader`), `Files` (`DiscFileSystem` FST parser), `RvzReader`, `RvzWriter`,
+  `WiaWriter`, `GczWriter`. Every public and internal type and member carries XML
+  documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
+- `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
+  surface, plus the legacy `info`/`decode` commands).
+- `RVZSharp.Tests` — 395 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
-  packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), GCZ writer tests, parallel-writer
-  determinism tests, package-facing API tests (path open, ReadFully, progress, cancellation).
+  packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), GCZ writer tests, parallel
+  write/decode determinism tests, FST/file-system tests, async API tests, package-facing
+  API tests (path open, ReadFully, progress, cancellation).
 - `RVZSharp.Slow.Tests` — 97 real-file tests (`RealRvzFileTests`) that decode real
   GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
   Kept out of the solution, so a plain `dotnet test` never runs them (~12 min); run

@@ -21,7 +21,8 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 | `RVZSharp.Compression` | codec factories: `CompressionCodecFactory`, `CompressionEncoderFactory` (the vendored 7-Zip LZMA port is internal) |
 | `RVZSharp.IO` | `Adler32`, `SpanReader`, `SectionStream`, `NonDisposingStream` |
 | `RVZSharp.Packing` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator` |
-| `RVZSharp.Wii` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor` |
+| `RVZSharp.Wii` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor`, `PartitionReader` |
+| `RVZSharp.Files` | `DiscFileSystem`, `DiscFileInfo` (FST parsing and file extraction) |
 
 ---
 
@@ -150,6 +151,13 @@ public interface IBlobReader : IDisposable
     byte[] ReadFully(IProgress<double>? progress, CancellationToken cancellationToken = default);
     long CopyTo(Stream destination, IProgress<double>? progress = null,
         CancellationToken cancellationToken = default);
+    long CopyTo(Stream destination, IProgress<double>? progress, int maxThreads,
+        CancellationToken cancellationToken = default);
+    Task<byte[]> ReadFullyAsync(IProgress<double>? progress = null, CancellationToken cancellationToken = default);
+    Task<long> CopyToAsync(Stream destination, IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default);
+    Task<long> CopyToAsync(Stream destination, IProgress<double>? progress, int maxThreads,
+        CancellationToken cancellationToken = default);
 }
 ```
 
@@ -193,6 +201,26 @@ blob.CopyTo(output, progress);
 For explicit random-access control, the same loop can be written by hand with `ReadAt`
 (1 MiB at a time, as `CopyTo` does internally).
 
+### Parallel and async decoding
+
+`CopyTo(..., maxThreads)` decodes RVZ/WIA chunks on a worker pool (raw chunks and 64-sector
+partition regions are independent units; only the short file reads are serialized, so
+LZMA/LZMA2 decompression runs in parallel). Results are written in disc order, so the output
+is byte-identical for any thread count. Other formats fall back to the sequential default
+implementation. `0` uses the processor count, `1` forces sequential.
+
+```csharp
+blob.CopyTo(output, progress, maxThreads: 0);   // parallel where supported
+```
+
+The `...Async` forms run the synchronous, CPU-bound decoders on the thread pool and return
+a task; progress and cancellation behave exactly like the synchronous methods.
+
+```csharp
+byte[] iso = await blob.ReadFullyAsync(progress, cancellationToken);
+await blob.CopyToAsync(output, progress, maxThreads: 0, cancellationToken);
+```
+
 ---
 
 ## Reading RVZ / WIA in detail
@@ -221,6 +249,40 @@ coverage). A damaged file throws `RvzHashMismatchException` or `RvzFormatExcepti
 
 WIA files (read-compatible version `0x00080000`) support the PURGE codec and lack Zstd and
 packing; `RvzReader` handles both formats transparently.
+
+---
+
+## Reading the file system (FST)
+
+`DiscFileSystem` parses the GameCube/Wii file system table (Dolphin: `FileSystemGCWii`) and
+gives you the tree plus file data reads. GameCube discs open directly; Wii partitions open
+through a decrypted `PartitionReader` view, so paths and offsets match Dolphin.
+
+```csharp
+using RVZSharp.Files;
+using RVZSharp.Wii;
+
+// GameCube (or any disc whose data starts at offset 0):
+using var fs = DiscFileSystem.Open(blob);
+
+// Wii: pick a partition (WiiVolume.GetPartitions, type 0 = DATA/game):
+using var fs = DiscFileSystem.Open(blob, WiiVolume.GetPartitions(blob)[0]);
+
+var file = fs.Find("files/maps/foo.dat");       // case-insensitive, '/' separators
+foreach (var child in fs.Root.Children) { }     // Name, Path, IsDirectory, Size, Offset
+
+using var output = File.Create("foo.dat");
+fs.CopyFileTo(file, output);                    // streams the decrypted file bytes
+```
+
+- `Find` accepts a leading `/` and matches names case-insensitively (Dolphin behavior).
+- Entry offsets are partition-relative; `CopyFileTo` reads through the same decrypted view,
+  so no manual sector math is needed.
+- Invalid file systems (no magic, truncated table, impossible entry ranges, no trailing NUL)
+  throw `RvzFormatException` at `Open`.
+- `PartitionReader` (public, `IBlobReader`) exposes any Wii partition's decrypted bytes
+  directly; it decrypts sectors on demand and is also what `WiiVolume.GetFstOffset`/
+  `GetFstSize` use internally.
 
 ---
 
@@ -453,6 +515,8 @@ These types back the partition optimization:
 - `WiiPartitionExtractor` — writer side: reads encrypted regions from the input, decrypts
   them (AES-128-CBC), recomputes the hash tree, and diffs it against the original to
   produce the exception lists.
+- `PartitionReader` — a decrypted `IBlobReader` view of one partition (0 = data-area start);
+  decrypts sectors on demand and powers `DiscFileSystem` and the FST offset reads.
 
 ```csharp
 foreach (var partition in WiiVolume.GetPartitions(blob))
@@ -534,9 +598,11 @@ foreach (var partition in WiiVolume.GetPartitions(blob))
 
 - `IBlobReader` instances are **not thread-safe**: `ReadAt` mutates internal caches
   (`RvzReader` caches the last raw chunk and partition region). Use one reader per thread,
-  or synchronize access.
-- `RvzWriter.Write` is single-threaded by design; progress reports are raised on the
-  calling thread.
+  or synchronize access. The parallel `CopyTo` overload uses its own workers and does not
+  make concurrent `ReadAt` calls safe.
+- The writers and the parallel decode path manage their own worker pools; progress reports
+  are raised on the calling thread between groups/batches, and cancellation is observed at
+  the same points.
 
 ## Compatibility notes
 

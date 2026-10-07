@@ -3,9 +3,9 @@ using RVZSharp.Interfaces;
 namespace RVZSharp.IO;
 
 /// <summary>
-/// Shared implementation of <see cref="IBlobReader.CopyTo"/>: streams a decoded disc image
-/// into a destination stream in bounded 1 MiB blocks, reporting progress and observing
-/// cancellation between blocks.
+/// Shared implementation of <see cref="IBlobReader.CopyTo(Stream, IProgress{double}, CancellationToken)"/>:
+/// streams a decoded disc image into a destination stream in bounded 1 MiB blocks, reporting
+/// progress and observing cancellation between blocks.
 /// </summary>
 internal static class BlobCopy
 {

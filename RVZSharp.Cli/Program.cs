@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using RVZSharp.Blobs;
+using RVZSharp.Files;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
 using RVZSharp.Wii;
@@ -86,13 +87,13 @@ internal static class Program
                                 legacy commands:    [info, decode]
 
                                 convert  -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
-                                         [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
+                                         [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2|purge] [-l <level>]
                                          [--threads <int>] [--verify]
                                 header   -i <FILE> [-j] [-b] [-c] [-l]
                                 verify   -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
-                                extract  -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l <path>] [-q] [-g]
+                                extract  -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l] [-q] [-g]
                                 info     <FILE>                        (legacy alias of 'header')
-                                decode   <FILE> <OUT> [--sha1 <hex>]   (decode any blob to a plain ISO)
+                                decode   <FILE> <OUT> [--sha1 <hex>] [--threads <int>] (decode any blob to a plain ISO)
                                 """);
     }
 
@@ -334,7 +335,7 @@ internal static class Program
         ["format"] = new OptionSpec("-f", true, ["iso", "gcz", "wia", "rvz"]),
         ["scrub"] = new OptionSpec("-s", false, null),
         ["block_size"] = new OptionSpec("-b", true, null),
-        ["compression"] = new OptionSpec("-c", true, ["none", "zstd", "bzip2", "lzma", "lzma2"]),
+        ["compression"] = new OptionSpec("-c", true, ["none", "zstd", "bzip2", "lzma", "lzma2", "purge"]),
         ["compression_level"] = new OptionSpec("-l", true, null),
         // RVZSharp extensions (accepted in flag mode too)
         ["chunk-size"] = new OptionSpec("--chunk-size", true, null),
@@ -359,7 +360,7 @@ internal static class Program
                     + "  -b, --block_size <int>     block size in bytes (required for GCZ/WIA/RVZ)\n"
                     + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
                     + "  -l, --compression_level    level of compression for the selected method\n"
-                    + "  --threads <int>            compression threads (0 = processor count, default)\n"
+                    + "  --threads <int>            compression/decode threads (0 = processor count, default)\n"
                     + "  --verify                   verify the written file decodes to the input image");
                 return args.Count == 0 ? 1 : 0;
             }
@@ -451,9 +452,16 @@ internal static class Program
                     ConsoleProgress.Clear();
                 }
 
+                var maxThreads = 0;
+                if (options.IsSet("threads") &&
+                    (!int.TryParse(options.Get("threads"), out maxThreads) || maxThreads < 0))
+                {
+                    return Fail("Threads must be a non-negative integer (0 = processor count)");
+                }
+
                 if (format == "iso")
                 {
-                    var decodeResult = DecodeBlob(input, outputPath, expectedSha1: null);
+                    var decodeResult = DecodeBlob(input, outputPath, expectedSha1: null, maxThreads);
                     return decodeResult != 0 || inputHashes is null
                         ? decodeResult
                         : VerifyOutput(inputHashes, outputPath);
@@ -502,7 +510,9 @@ internal static class Program
                             return Fail("Compression type is not supported for the container format");
                         }
 
-                        if (compression == CompressionType.None)
+                        // PURGE has no level (it stores hash exceptions plus a raw stream) and
+                        // is a WIA-only method; the CLI exposes it as an RVZSharp extension.
+                        if (compression is CompressionType.None or CompressionType.Purge)
                         {
                             level = 0;
                         }
@@ -511,7 +521,7 @@ internal static class Program
                             if (!options.IsSet("compression_level") ||
                                 !int.TryParse(options.Get("compression_level"), out level))
                             {
-                                return Fail("Compression level must be set when compression type is not 'none'");
+                                return Fail("Compression level must be set when compression type is not 'none' or 'purge'");
                             }
 
                             var (min, max) = GetAllowedCompressionLevels(compression);
@@ -528,13 +538,6 @@ internal static class Program
 
                         break;
                     }
-                }
-
-                var maxThreads = 0;
-                if (options.IsSet("threads") &&
-                    (!int.TryParse(options.Get("threads"), out maxThreads) || maxThreads < 0))
-                {
-                    return Fail("Threads must be a non-negative integer (0 = processor count)");
                 }
 
                 var writeOptions = new RvzWriteOptions
@@ -1055,7 +1058,7 @@ internal static class Program
     }
 
     // ------------------------------------------------------------------
-    // extract — DolphinTool-compatible surface (not implemented yet).
+    // extract — DolphinTool-compatible surface.
     // ------------------------------------------------------------------
 
     private static readonly Dictionary<string, OptionSpec> ExtractSpec = new()
@@ -1078,12 +1081,12 @@ internal static class Program
                 Console.Error.WriteLine(
                     "usage: extract [options]...\n"
                     + "  -i, --input <FILE>     path to disc image FILE\n"
-                    + "  -o, --output <dir>     output directory\n"
-                    + "  -p, --partition <name> extract only this partition\n"
-                    + "  -s, --single <path>    extract a single file\n"
-                    + "  -l, --list            list the files under this path\n"
-                    + "  -q, --quiet            do not print progress\n"
-                    + "  -g, --gameonly         only extract the main game partition");
+                    + "  -o, --output <path>    output directory (or list file with --list)\n"
+                    + "  -p, --partition <name> extract only this partition (DATA/UPDATE/CHANNEL/...)\n"
+                    + "  -s, --single <path>    extract (or list) only this file/directory\n"
+                    + "  -l, --list             list the files instead of extracting them\n"
+                    + "  -q, --quiet            do not print per-file progress\n"
+                    + "  -g, --gameonly         only extract the DATA partition");
                 return args.Count == 0 ? 1 : 0;
             }
 
@@ -1103,14 +1106,435 @@ internal static class Program
                 return Fail("No input set");
             }
 
-            return Fail(
-                "The extract command is not supported by this implementation (no disc filesystem support yet).");
+            if (!options.IsSet("output") && !options.HasFlag("list"))
+            {
+                return Fail("No output folder set");
+            }
+
+            var inputPath = options.Get("input")!;
+            var outputPath = options.Get("output") ?? string.Empty;
+            var quiet = options.HasFlag("quiet");
+            var listOnly = options.HasFlag("list");
+            var singlePath = options.Get("single") ?? string.Empty;
+            var specificPartition = options.Get("partition") ?? string.Empty;
+            if (options.HasFlag("gameonly"))
+            {
+                specificPartition = "DATA";
+            }
+
+            IBlobReader blob;
+            try
+            {
+                var file = File.OpenRead(inputPath);
+                blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
+            {
+                Log.Error(e, "Failed to open input file '{InputPath}'", inputPath);
+                return Fail("The input file could not be opened.");
+            }
+
+            using (blob)
+            {
+                if (!Blob.IsDisc(blob))
+                {
+                    return Fail("The input is not a GameCube or Wii disc image.");
+                }
+
+                var partitions = WiiVolume.GetPartitions(blob);
+                return listOnly
+                    ? ExtractList(blob, partitions, singlePath, specificPartition, outputPath)
+                    : ExtractToFolder(blob, partitions, singlePath, specificPartition, outputPath,
+                        quiet);
+            }
         }
         catch (Exception e)
         {
             Log.Error(e, "Extract command failed");
             return Fail(e.Message);
         }
+    }
+
+    private static int ExtractList(IBlobReader blob, IReadOnlyList<Partition> partitions,
+        string singlePath, string specificPartition, string outputPath)
+    {
+        var listPath = singlePath.Length > 0 ? singlePath : "/";
+        var text = new StringBuilder();
+        var found = false;
+
+        if (partitions.Count == 0)
+        {
+            found = ListPartition(blob, null, string.Empty, listPath, text);
+        }
+        else
+        {
+            foreach (var partition in partitions)
+            {
+                var name = PartitionName(partition.Type);
+                if (specificPartition.Length > 0 &&
+                    !string.Equals(name, specificPartition, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                text.Append($"/// PARTITION: {name} <{listPath}> ///\n");
+                found |= ListPartition(blob, partition, name, listPath, text);
+            }
+        }
+
+        if (!found)
+        {
+            return Fail("Found nothing to list");
+        }
+
+        if (outputPath.Length > 0)
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(outputPath));
+            if (directory is not null)
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(outputPath, text.ToString());
+        }
+
+        return 0;
+    }
+
+    private static bool ListPartition(IBlobReader blob, Partition? partition, string partitionName,
+        string path, StringBuilder text)
+    {
+        using var fs = TryOpenFileSystem(blob, partition, partitionName);
+        if (fs is null)
+        {
+            return false;
+        }
+
+        var info = fs.Find(path);
+        if (info is null)
+        {
+            if (partitionName.Length > 0)
+            {
+                Log.Warning("{Path} does not exist in partition {Partition}", path, partitionName);
+            }
+
+            return false;
+        }
+
+        ListRecursively(info, text);
+        return true;
+    }
+
+    private static void ListRecursively(DiscFileInfo info, StringBuilder text)
+    {
+        if (!info.IsRoot)
+        {
+            var line = info.Path + "\n";
+            Console.Write(line);
+            text.Append(line);
+        }
+
+        foreach (var child in info.Children)
+        {
+            ListRecursively(child, text);
+        }
+    }
+
+    private static int ExtractToFolder(IBlobReader blob, IReadOnlyList<Partition> partitions,
+        string singlePath, string specificPartition, string outputFolder, bool quiet)
+    {
+        var extracted = false;
+
+        if (partitions.Count == 0)
+        {
+            if (specificPartition.Length > 0)
+            {
+                Log.Warning(
+                    "--partition has a value even though this image doesn't have any partitions.");
+            }
+
+            extracted = ExtractPartition(blob, null, string.Empty, singlePath, outputFolder, quiet);
+        }
+        else
+        {
+            foreach (var partition in partitions)
+            {
+                var name = PartitionName(partition.Type);
+                if (specificPartition.Length > 0 &&
+                    !string.Equals(name, specificPartition, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                extracted |= ExtractPartition(blob, partition, name, singlePath, outputFolder, quiet);
+            }
+        }
+
+        if (!extracted)
+        {
+            if (singlePath.Length > 0)
+            {
+                return Fail("No file/folder was extracted.");
+            }
+
+            return Fail(specificPartition.Length > 0
+                ? "No partitions were extracted. Maybe you misspelled your specified partition?"
+                : "No partitions were extracted.");
+        }
+
+        if (!quiet)
+        {
+            Console.Error.WriteLine("Finished Successfully!");
+        }
+
+        return 0;
+    }
+
+    private static bool ExtractPartition(IBlobReader blob, Partition? partition,
+        string partitionName, string singlePath, string outputFolder, bool quiet)
+    {
+        var basePath = partitionName.Length > 0
+            ? Path.Combine(outputFolder, partitionName)
+            : outputFolder;
+        using var fs = TryOpenFileSystem(blob, partition, partitionName);
+
+        if (singlePath.Length > 0)
+        {
+            if (fs is null)
+            {
+                return false;
+            }
+
+            var info = fs.Find(singlePath);
+            if (info is null)
+            {
+                return false;
+            }
+
+            var target = Path.Combine(basePath, "files",
+                singlePath.Replace('/', Path.DirectorySeparatorChar));
+            if (info.IsDirectory)
+            {
+                ExtractDirectory(fs, info, target, quiet);
+            }
+            else
+            {
+                var directory = Path.GetDirectoryName(Path.GetFullPath(target));
+                if (directory is not null)
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using var output = File.Create(target);
+                fs.CopyFileTo(info, output);
+                if (!quiet)
+                {
+                    Console.Error.WriteLine($"Extracting: {info.Path}");
+                }
+            }
+
+            return true;
+        }
+
+        if (fs is not null)
+        {
+            ExtractDirectory(fs, fs.Root, Path.Combine(basePath, "files"), quiet);
+        }
+
+        ExportSystemData(blob, fs, partition, basePath);
+        return true;
+    }
+
+    private static void ExtractDirectory(DiscFileSystem fs, DiscFileInfo directory,
+        string exportFolder, bool quiet)
+    {
+        Directory.CreateDirectory(exportFolder);
+        foreach (var child in directory.Children)
+        {
+            var path = Path.Combine(exportFolder,
+                child.Name + (child.IsDirectory ? Path.DirectorySeparatorChar.ToString() : string.Empty));
+            if (child.IsDirectory)
+            {
+                ExtractDirectory(fs, child, path, quiet);
+            }
+            else
+            {
+                using var output = File.Create(path);
+                fs.CopyFileTo(child, output);
+                if (!quiet)
+                {
+                    Console.Error.WriteLine($"Extracting: {child.Path}");
+                }
+            }
+        }
+    }
+
+    private static DiscFileSystem? TryOpenFileSystem(IBlobReader blob, Partition? partition,
+        string partitionName)
+    {
+        try
+        {
+            return partition is null
+                ? DiscFileSystem.Open(blob)
+                : DiscFileSystem.Open(blob, partition.Value);
+        }
+        catch (RvzException e)
+        {
+            Log.Warning("Partition '{Partition}' has no usable file system ({Message})",
+                partitionName, e.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Exports the standard system data files (Dolphin: ExportSystemData): the decrypted boot
+    /// header, BI2, apploader, DOL and FST, plus the Wii disc header/region data and the
+    /// partition ticket, TMD, certificate chain and H3 table.
+    /// </summary>
+    private static void ExportSystemData(IBlobReader blob, DiscFileSystem? fs,
+        Partition? partition, string basePath)
+    {
+        IBlobReader view = blob;
+        PartitionReader? partitionView = null;
+        if (partition is not null)
+        {
+            partitionView = new PartitionReader(blob, partition.Value);
+            view = partitionView;
+        }
+
+        try
+        {
+            var sys = Path.Combine(basePath, "sys");
+            Directory.CreateDirectory(sys);
+            CopyData(view, 0x0, 0x440, Path.Combine(sys, "boot.bin"));
+            CopyData(view, 0x440, 0x2000, Path.Combine(sys, "bi2.bin"));
+            if (WiiVolume.GetApploaderSize(view) is ulong apploaderSize)
+            {
+                CopyData(view, 0x2440, (long)apploaderSize, Path.Combine(sys, "apploader.img"));
+            }
+
+            if (WiiVolume.GetBootDolOffset(view) is ulong dolOffset &&
+                WiiVolume.GetBootDolSize(view, dolOffset) is uint dolSize)
+            {
+                CopyData(view, (long)dolOffset, dolSize, Path.Combine(sys, "main.dol"));
+            }
+
+            if (fs is not null)
+            {
+                CopyData(view, (long)fs.FstOffset, (long)fs.FstSize, Path.Combine(sys, "fst.bin"));
+            }
+
+            if (partition is null)
+            {
+                return;
+            }
+
+            var disc = Path.Combine(basePath, "disc");
+            Directory.CreateDirectory(disc);
+            CopyData(blob, 0x0, 0x100, Path.Combine(disc, "header.bin"));
+            CopyData(blob, 0x4E000, 0x20, Path.Combine(disc, "region.bin"));
+
+            var offset = (long)partition.Value.Offset;
+            CopyData(blob, offset, 0x2A4, Path.Combine(basePath, "ticket.bin"));
+            CopyPartitionBlob(blob, offset + 0x2A4, offset + 0x2A8,
+                Path.Combine(basePath, "tmd.bin"));
+            CopyPartitionBlob(blob, offset + 0x2AC, offset + 0x2B0,
+                Path.Combine(basePath, "cert.bin"));
+            CopyPartitionBlob(blob, offset + 0x2B4, null, Path.Combine(basePath, "h3.bin"),
+                fixedSize: 0x18000);
+        }
+        finally
+        {
+            partitionView?.Dispose();
+        }
+    }
+
+    /// <summary>Reads a size/shifted-offset pair from the partition header and copies the blob.</summary>
+    private static void CopyPartitionBlob(IBlobReader blob, long sizeAddress, long? offsetAddress,
+        string path, int fixedSize = 0)
+    {
+        var size = fixedSize;
+        if (size == 0 && !TryReadBe32(blob, sizeAddress, out size))
+        {
+            return;
+        }
+
+        if (offsetAddress is long offsetAddressValue)
+        {
+            if (!TryReadBe32(blob, offsetAddressValue, out var offset))
+            {
+                return;
+            }
+
+            CopyData(blob, (long)((ulong)offset << 2), size, path);
+        }
+        else if (TryReadBe32(blob, sizeAddress, out var rawOffset))
+        {
+            CopyData(blob, (long)((ulong)rawOffset << 2), size, path);
+        }
+    }
+
+    private static bool TryReadBe32(IBlobReader blob, long offset, out int value)
+    {
+        Span<byte> bytes = stackalloc byte[4];
+        if (blob.ReadAt(offset, bytes) == 4)
+        {
+            value = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+            return true;
+        }
+
+        value = 0;
+        return false;
+    }
+
+    private static void CopyData(IBlobReader reader, long offset, long size, string path)
+    {
+        using var output = File.Create(path);
+        var buffer = new byte[1 << 20];
+        var position = offset;
+        var remaining = size;
+        while (remaining > 0)
+        {
+            var take = (int)Math.Min(buffer.Length, remaining);
+            var read = reader.ReadAt(position, buffer.AsSpan(0, take));
+            if (read <= 0)
+            {
+                throw new RvzFormatException(
+                    $"Data ended at 0x{position:X} while exporting '{path}'.");
+            }
+
+            output.Write(buffer, 0, read);
+            position += read;
+            remaining -= read;
+        }
+    }
+
+    /// <summary>Partition folder name (Dolphin: NameForPartitionType with the P- prefix).</summary>
+    private static string PartitionName(uint type)
+    {
+        switch (type)
+        {
+            case 0:
+                return "DATA";
+            case 1:
+                return "UPDATE";
+            case 2:
+                return "CHANNEL";
+        }
+
+        var id = new string(new[]
+        {
+            (char)((type >> 24) & 0xFF),
+            (char)((type >> 16) & 0xFF),
+            (char)((type >> 8) & 0xFF),
+            (char)(type & 0xFF)
+        });
+        if (id.All(char.IsAsciiLetterOrDigit))
+        {
+            return "P-" + id;
+        }
+
+        return "P" + type;
     }
 
     // ------------------------------------------------------------------
@@ -1491,17 +1915,23 @@ internal static class Program
         try
         {
             string? expectedSha1 = null;
+            var maxThreads = 1;
             for (var i = 0; i < args.Count - 1; i++)
             {
                 if (args[i] == "--sha1")
                 {
                     expectedSha1 = args[i + 1];
                 }
+                else if (args[i] == "--threads" &&
+                         (!int.TryParse(args[i + 1], out maxThreads) || maxThreads < 0))
+                {
+                    return Fail("Threads must be a non-negative integer (0 = processor count)");
+                }
             }
 
             using var input = File.OpenRead(inputPath);
             using var reader = Blob.Open(input, filePath: inputPath, leaveOpen: true);
-            return DecodeBlob(reader, outputPath, expectedSha1);
+            return DecodeBlob(reader, outputPath, expectedSha1, maxThreads);
         }
         catch (Exception e)
         {
@@ -1511,7 +1941,8 @@ internal static class Program
         }
     }
 
-    private static int DecodeBlob(IBlobReader reader, string outputPath, string? expectedSha1)
+    private static int DecodeBlob(IBlobReader reader, string outputPath, string? expectedSha1,
+        int maxThreads = 1)
     {
         try
         {
@@ -1520,7 +1951,7 @@ internal static class Program
             var progress = new ConsoleProgress("Decoding ");
             try
             {
-                reader.CopyTo(hashing, progress, Cancellation.Token);
+                reader.CopyTo(hashing, progress, maxThreads, Cancellation.Token);
             }
             catch (OperationCanceledException)
             {

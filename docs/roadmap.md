@@ -10,6 +10,7 @@
 | 4 — Distribution | NuGet package (net8.0/9.0/10.0), multi-target tests, progress/cancellation API | ✅ done |
 | 5 — Reference alignment | audit against dolphin-master + rvz-1.0.3; every finding fixed or documented | ✅ done |
 | 6 — Real-world validation | 97 real-file tests (`RVZSharp.Slow.Tests`) against 30 GameCube/Wii RVZ games (No-Intro SHA-1) incl. writer round-trips — found & fixed the 2 MiB ticket-key writer bug | ✅ done |
+| 7 — Writer performance | parallel group compression (`MaxThreads` / `--threads`, Dolphin's worker-pool model), `convert --verify` hash comparison | ✅ done |
 
 ## Supported
 
@@ -23,6 +24,8 @@
   packing with seed recovery.
 - Progress/cancellation on both encode (`RvzWriter.Write`/`WiaWriter.Write`) and decode
   (`IBlobReader.CopyTo`/`ReadFully`); `DiscHasher` computes CRC-32/MD5/SHA-1 in one pass.
+- Parallel group compression in the writer (`MaxThreads`, CLI `--threads`; output is
+  byte-identical to sequential) and `convert --verify` (input vs output hashes).
 - Real-world validation: 30 real GC/Wii RVZ images decode byte-for-byte to their official
   No-Intro SHA-1s; real images re-encode to RVZ (default 2 MiB chunks) and decode back to
   the same hash. See [testing.md](testing.md#real-file-suite) for the suite details.
@@ -36,7 +39,7 @@
 | No GCZ writer | `convert -f gcz` fails with a clear error (output formats are `iso`, `rvz` and `wia`). |
 | No `extract` command | DolphinTool's `extract` requires a disc filesystem (FST) implementation; the CLI validates the arguments and reports it as unsupported. |
 | NFS key location | the AES key must come from `code/htk.bin` next to the `content/hif_000000.nfs` file (or be supplied via the library API). |
-| Single-threaded | reading and writing are sequential; no multithreading yet. |
+| Single-threaded reads | decoding is sequential; only the writer compresses groups in parallel (`MaxThreads`). |
 
 ## Open questions
 
@@ -44,14 +47,11 @@
    byte-for-byte to their official No-Intro SHA-1s, and real images re-encode to RVZ and
    decode back. Legacy-format real files (GCZ/CISO/WBFS/TGC/NFS/WIA) are still only
    validated against synthetic images.
-2. **Performance targets** — if large collections must be converted, parallel group
-   processing (Dolphin uses a thread pool for exactly this) would give near-linear speedup.
+2. **Performance targets** — ✅ resolved for writing: group packing/compression runs on a
+   worker pool (`MaxThreads`); reading is still sequential.
 
 ## Possible next steps
 
-- Parallel compression in the writer (per-group worker pool, like Dolphin's
-  `MultithreadedCompressor`).
-- `--verify` mode: convert and immediately decode-compare (or rely on `--sha1`).
 - GCZ writer.
 - `extract` command: FST parser + file/directory extraction, listing, and game-only mode.
 - Async API surface (`CopyToAsync`, `WriteAsync`) for UI consumers.

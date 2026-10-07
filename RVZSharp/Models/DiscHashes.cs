@@ -14,4 +14,14 @@ public sealed record DiscHashes
 
     /// <summary>SHA-1 of the decoded image (20 bytes).</summary>
     public required byte[] Sha1 { get; init; }
+
+    /// <summary>Returns true when all three hashes equal <paramref name="other"/>'s.</summary>
+    /// <param name="other">The hashes to compare with; null returns false.</param>
+    public bool Matches(DiscHashes? other)
+    {
+        return other is not null &&
+               Crc32 == other.Crc32 &&
+               Md5.AsSpan().SequenceEqual(other.Md5) &&
+               Sha1.AsSpan().SequenceEqual(other.Sha1);
+    }
 }

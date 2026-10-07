@@ -95,7 +95,9 @@ RvzWriter.Write(input: input, output: output, options: options);
 
 Wii partitions are stored decrypted with hash exceptions, exactly like Dolphin produces.
 `options` defaults to the Dolphin-compatible settings (Zstd / level 5 / 2 MiB chunks,
-packing on). To get a plain ISO back, use the CLI's `convert -f iso` (or a reader + copy).
+packing on). Group packing/compression runs on a worker pool (`MaxThreads`; `0` = processor
+count) and the output is byte-identical for any thread count. To get a plain ISO back, use
+the CLI's `convert -f iso` (or a reader + copy).
 
 **4. Write WIA** (`WiaWriter`, sharing the same writer core; PURGE supported, no packing,
 chunk size a multiple of 2 MiB):
@@ -161,7 +163,8 @@ container magic).
 dotnet run --project RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
 dotnet run --project RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1]
 dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz|wia \
-    [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>] [-s]
+    [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>] [-s] \
+    [--threads <n>] [--verify]
 ```
 
 The CLI accepts the same command arguments as Dolphin's `dolphin-tool` (`convert`,
@@ -171,7 +174,10 @@ The CLI accepts the same command arguments as Dolphin's `dolphin-tool` (`convert
 partitions are stored decrypted with hash exceptions, raw data as-is, PRNG junk is packed
 with a recovered seed (Lagged Fibonacci `GetSeed`, RVZ only), and the tables carry all
 SHA-1 checksums. `--scrub` zeroes the data of non-game Wii partitions (update/channel)
-before converting. `-f iso` decodes back to a plain ISO.
+before converting. `-f iso` decodes back to a plain ISO. Two RVZSharp extensions:
+`--threads <n>` sets the compression worker count (output is byte-identical for any
+value), and `--verify` re-decodes the written file and compares CRC-32/MD5/SHA-1 with the
+input.
 
 ## Documentation
 
@@ -194,11 +200,11 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
 - `RVZSharp.Cli` — the `header`/`verify`/`convert` tool (DolphinTool-compatible surface,
   plus the legacy `info`/`decode` commands).
-- `RVZSharp.Tests` — 356 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 361 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
-  packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), package-facing API tests (path
-  open, ReadFully, progress, cancellation).
+  packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), parallel-writer determinism
+  tests, package-facing API tests (path open, ReadFully, progress, cancellation).
 - `RVZSharp.Slow.Tests` — 97 real-file tests (`RealRvzFileTests`) that decode real
   GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
   Kept out of the solution, so a plain `dotnet test` never runs them (~12 min); run

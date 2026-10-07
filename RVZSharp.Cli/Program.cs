@@ -87,6 +87,7 @@ internal static class Program
 
                                 convert  -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
                                          [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
+                                         [--threads <int>] [--verify]
                                 header   -i <FILE> [-j] [-b] [-c] [-l]
                                 verify   -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
                                 extract  -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l <path>] [-q] [-g]
@@ -337,7 +338,9 @@ internal static class Program
         ["compression_level"] = new OptionSpec("-l", true, null),
         // RVZSharp extensions (accepted in flag mode too)
         ["chunk-size"] = new OptionSpec("--chunk-size", true, null),
-        ["no-packing"] = new OptionSpec("--no-packing", false, null)
+        ["no-packing"] = new OptionSpec("--no-packing", false, null),
+        ["threads"] = new OptionSpec("--threads", true, null),
+        ["verify"] = new OptionSpec("--verify", false, null)
     };
 
     private static int ConvertCommand(IReadOnlyList<string> args)
@@ -355,7 +358,9 @@ internal static class Program
                     + "  -s, --scrub                scrub junk data as part of conversion\n"
                     + "  -b, --block_size <int>     block size in bytes (required for GCZ/WIA/RVZ)\n"
                     + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
-                    + "  -l, --compression_level    level of compression for the selected method");
+                    + "  -l, --compression_level    level of compression for the selected method\n"
+                    + "  --threads <int>            compression threads (0 = processor count, default)\n"
+                    + "  --verify                   verify the written file decodes to the input image");
                 return args.Count == 0 ? 1 : 0;
             }
 
@@ -443,6 +448,23 @@ internal static class Program
                     }
                 }
 
+                // --verify: hash the (possibly scrubbed) input first, then the written file.
+                DiscHashes? inputHashes = null;
+                if (options.HasFlag("verify"))
+                {
+                    var verifyProgress = new ConsoleProgress("Verifying ");
+                    inputHashes = DiscHasher.Compute(input, verifyProgress, Cancellation.Token);
+                    ConsoleProgress.Clear();
+                }
+
+                if (format == "iso")
+                {
+                    var decodeResult = DecodeBlob(input, outputPath, expectedSha1: null);
+                    return decodeResult != 0 || inputHashes is null
+                        ? decodeResult
+                        : VerifyOutput(inputHashes, outputPath);
+                }
+
                 var blockSize = 0;
                 if (format is "gcz" or "wia" or "rvz")
                 {
@@ -512,8 +534,13 @@ internal static class Program
 
                         break;
                     }
-                    case "iso":
-                        return DecodeBlob(input, outputPath, expectedSha1: null);
+                }
+
+                var maxThreads = 0;
+                if (options.IsSet("threads") &&
+                    (!int.TryParse(options.Get("threads"), out maxThreads) || maxThreads < 0))
+                {
+                    return Fail("Threads must be a non-negative integer (0 = processor count)");
                 }
 
                 var writeOptions = new RvzWriteOptions
@@ -521,31 +548,34 @@ internal static class Program
                     Compression = compression,
                     CompressionLevel = level,
                     ChunkSize = blockSize,
-                    Packing = packing
+                    Packing = packing,
+                    MaxThreads = maxThreads
                 };
 
-                using var output = File.Create(outputPath);
-                var progress = new ConsoleProgress("Encoding ");
-                try
+                using (var output = File.Create(outputPath))
                 {
-                    if (format == "wia")
+                    var progress = new ConsoleProgress("Encoding ");
+                    try
                     {
-                        WiaWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                        if (format == "wia")
+                        {
+                            WiaWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                        }
+                        else
+                        {
+                            RvzWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                        }
                     }
-                    else
+                    catch (OperationCanceledException)
                     {
-                        RvzWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                        ConsoleProgress.Clear();
+                        Console.Error.WriteLine("Canceled.");
+                        return 130;
                     }
-                }
-                catch (OperationCanceledException)
-                {
-                    ConsoleProgress.Clear();
-                    Console.Error.WriteLine("Canceled.");
-                    return 130;
                 }
 
                 ConsoleProgress.Clear();
-                return 0;
+                return inputHashes is null ? 0 : VerifyOutput(inputHashes, outputPath);
             }
         }
         catch (Exception e)
@@ -576,6 +606,9 @@ internal static class Program
                         break;
                     case "--no-packing":
                         options = options with { Packing = false };
+                        break;
+                    case "--threads" when i + 1 < args.Count:
+                        options = options with { MaxThreads = int.Parse(args[++i]) };
                         break;
                 }
             }
@@ -620,6 +653,47 @@ internal static class Program
         {
             Log.Error(e, "ConvertLegacy command failed");
             return Fail(e.Message);
+        }
+    }
+
+    /// <summary>
+    /// Reopens the written file and checks that it decodes to the same CRC-32/MD5/SHA-1 as
+    /// the input (the convert command's --verify extension).
+    /// </summary>
+    private static int VerifyOutput(DiscHashes inputHashes, string outputPath)
+    {
+        IBlobReader blob;
+        try
+        {
+            var file = File.OpenRead(outputPath);
+            blob = Blob.Open(file, filePath: outputPath, leaveOpen: false);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
+        {
+            Log.Error(e, "Failed to open output file '{OutputPath}' for verification", outputPath);
+            return Fail("The output file could not be opened for verification.");
+        }
+
+        using (blob)
+        {
+            if (!Blob.IsDisc(blob))
+            {
+                return Fail("Verification failed: the output file is not a GC/Wii disc image.");
+            }
+
+            var progress = new ConsoleProgress("Verifying ");
+            var outputHashes = DiscHasher.Compute(blob, progress, Cancellation.Token);
+            ConsoleProgress.Clear();
+
+            if (!inputHashes.Matches(outputHashes))
+            {
+                Console.Error.WriteLine($"  input  SHA1: {ToLowerHex(inputHashes.Sha1)}");
+                Console.Error.WriteLine($"  output SHA1: {ToLowerHex(outputHashes.Sha1)}");
+                return Fail("Verification failed: the output does not decode to the input image.");
+            }
+
+            Console.WriteLine($"Verification: OK ({ToLowerHex(inputHashes.Sha1)})");
+            return 0;
         }
     }
 

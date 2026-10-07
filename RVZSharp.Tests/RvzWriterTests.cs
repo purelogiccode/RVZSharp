@@ -378,6 +378,43 @@ public class RvzWriterTests
             }));
     }
 
+    [Theory]
+    [InlineData(CompressionType.Zstd)]
+    [InlineData(CompressionType.Lzma2)]
+    public void MaxThreads_OutputIsIdenticalToSequential(CompressionType compression)
+    {
+        // Parallel compression must be byte-identical to sequential: worker results are
+        // appended in group order, independent of scheduling (32 KiB chunks produce enough
+        // groups to span several batches).
+        var iso = BuildGcIso();
+        var sequential = ConvertWithThreads(iso, compression, chunkSize: 0x8000, maxThreads: 1);
+        var parallel = ConvertWithThreads(iso, compression, chunkSize: 0x8000, maxThreads: 4);
+        Assert.Equal(sequential, parallel);
+    }
+
+    [Fact]
+    public void NegativeMaxThreads_Throws()
+    {
+        var iso = BuildGcIso();
+        using var ms = new MemoryStream();
+        Assert.Throws<ArgumentException>(() => RvzWriter.Write(
+            PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions { MaxThreads = -1 }));
+        Assert.Equal(0, ms.Length);
+    }
+
+    private static byte[] ConvertWithThreads(byte[] iso, CompressionType compression,
+        int chunkSize, int maxThreads)
+    {
+        using var ms = new MemoryStream();
+        RvzWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
+        {
+            Compression = compression,
+            ChunkSize = chunkSize,
+            MaxThreads = maxThreads
+        });
+        return ms.ToArray();
+    }
+
     [Fact]
     public void ChunkSize_MultipleOf2MiB_RoundTrips()
     {

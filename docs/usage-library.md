@@ -248,6 +248,10 @@ The writer mirrors Dolphin's converter:
   recovered Lagged-Fibonacci seed.
 - All tables carry SHA-1 checksums; the output is fully self-describing and validated by
   any conforming reader (including Dolphin).
+- **Parallel compression:** groups are packed and compressed on a bounded worker pool (one
+  encoder per worker, like Dolphin's `MultithreadedCompressor`) and appended in group
+  order, so the output is byte-identical regardless of `MaxThreads`. Only compressed
+  groups are retained, so memory stays bounded by the thread count, not the disc size.
 
 ### `RvzWriteOptions`
 
@@ -257,6 +261,7 @@ The writer mirrors Dolphin's converter:
 | `CompressionLevel` | `3` | `Bzip2`/`Lzma`/`Lzma2`: 1–9. `Zstd`: −131072..22 (negative levels = fast modes, 0 = default). |
 | `ChunkSize` | `0x200000` | Power of two between 0x8000 (32 KiB) and 0x200000 (2 MiB), or a multiple of 0x200000 above that (Dolphin's rule). |
 | `Packing` | `true` | Set `false` to store junk literally (larger file, no packing overhead). |
+| `MaxThreads` | `0` | Compression/packing worker count; `0` uses the processor count. Output bytes do not depend on this value. |
 
 ```csharp
 var options = new RvzWriteOptions

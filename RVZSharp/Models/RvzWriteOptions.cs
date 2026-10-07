@@ -23,4 +23,11 @@ public sealed record RvzWriteOptions
 
     /// <summary>Whether to apply the RVZ packing (junk detection) stage.</summary>
     public bool Packing { get; init; } = true;
+
+    /// <summary>
+    /// Maximum number of threads used to compress groups (packing included); 0 uses the
+    /// processor count. The output is byte-identical regardless of this setting, because
+    /// groups are written in disc order (Dolphin: MultithreadedCompressor).
+    /// </summary>
+    public int MaxThreads { get; init; }
 }

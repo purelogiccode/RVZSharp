@@ -120,6 +120,13 @@ internal static class WiaRvzWriter
                 nameof(options));
         }
 
+        if (options.MaxThreads < 0)
+        {
+            throw new ArgumentException(
+                "MaxThreads must be zero (use the processor count) or a positive number.",
+                nameof(options));
+        }
+
         if (isWia && options.Compression == CompressionType.Zstd)
         {
             throw new RvzUnsupportedException(
@@ -285,20 +292,25 @@ internal static class WiaRvzWriter
             groupIndex += (int)area.Groups;
         }
 
-        // Process the areas in disc order: read, decrypt/transform, pack, compress.
-        var groupData = new List<byte[]>();
-        var groupEntries = new List<GroupEntry>();
+        // Process the areas in disc order: read, decrypt/transform, then pack and compress in
+        // parallel batches (the output is byte-identical regardless of the thread count, since
+        // results are appended in group order).
+        var sink = new GroupSink(options, isWia, cancellationToken);
         foreach (var area in areas)
         {
             if (area.IsPartition)
             {
-                ProcessPartitionArea(input, area, options, encoder, groupData, groupEntries, isWia);
+                ProcessPartitionArea(input, area, options, sink);
             }
             else
             {
-                ProcessRawArea(input, area, options, encoder, groupData, groupEntries, isWia);
+                ProcessRawArea(input, area, options, sink);
             }
         }
+
+        sink.Flush();
+        var groupData = sink.GroupData;
+        var groupEntries = sink.GroupEntries;
 
         // Tables. The group table is compressed like the group data, and its size depends on
         // the data offsets inside it; iterate until the layout is stable (same approach as the
@@ -435,8 +447,7 @@ internal static class WiaRvzWriter
     }
 
     private static void ProcessRawArea(IBlobReader input, AreaEntry area, RvzWriteOptions options,
-        ICompressionEncoder encoder, List<byte[]> groupData, List<GroupEntry> groupEntries,
-        bool isWia)
+        GroupSink sink)
     {
         var chunkSize = (ulong)options.ChunkSize;
         var buffer = new byte[chunkSize];
@@ -454,8 +465,7 @@ internal static class WiaRvzWriter
                 throw new RvzFormatException($"Read failed at 0x{position:X}.");
             }
 
-            AddGroup(buffer.AsSpan(0, take), (long)dataOffset, options, encoder, [], groupData,
-                groupEntries, isWia);
+            sink.Add(buffer.AsSpan(0, take), (long)dataOffset, []);
             position += (ulong)take;
             remaining -= (ulong)take;
             dataOffset += (ulong)take;
@@ -463,8 +473,7 @@ internal static class WiaRvzWriter
     }
 
     private static void ProcessPartitionArea(IBlobReader input, AreaEntry area,
-        RvzWriteOptions options, ICompressionEncoder encoder, List<byte[]> groupData,
-        List<GroupEntry> groupEntries, bool isWia)
+        RvzWriteOptions options, GroupSink sink)
     {
         var blocksPerChunk = (int)((ulong)options.ChunkSize / SectorSize);
         var chunkPayload = blocksPerChunk * WiiHashCalculator.SectorDataSize;
@@ -503,8 +512,8 @@ internal static class WiaRvzWriter
                             e.Hash))
                         .ToList();
 
-                    AddGroup(chunkData, dataOffsetInPartition, options, encoder,
-                        BuildExceptionListBytes([chunkExceptions]), groupData, groupEntries, isWia);
+                    sink.Add(chunkData, dataOffsetInPartition,
+                        BuildExceptionListBytes([chunkExceptions]));
                     dataOffsetInPartition += chunkData.Length;
                 }
             }
@@ -532,15 +541,14 @@ internal static class WiaRvzWriter
                     lists[(regionStart - chunkStart) / 64].AddRange(regionExceptions);
                 }
 
-                AddGroup(chunkData, dataOffsetInPartition, options, encoder,
-                    BuildExceptionListBytes(lists), groupData, groupEntries, isWia);
+                sink.Add(chunkData, dataOffsetInPartition, BuildExceptionListBytes(lists));
                 dataOffsetInPartition += chunkData.Length;
             }
         }
     }
 
     /// <summary>Serializes exception lists: a big-endian u16 count per list, then 22-byte entries.</summary>
-    private static List<byte> BuildExceptionListBytes(IReadOnlyList<List<HashExceptionEntry>> lists)
+    private static byte[] BuildExceptionListBytes(IReadOnlyList<List<HashExceptionEntry>> lists)
     {
         var bytes = new List<byte>(lists.Count * 2);
         foreach (var list in lists)
@@ -555,19 +563,113 @@ internal static class WiaRvzWriter
             }
         }
 
-        return bytes;
+        return bytes.ToArray();
     }
 
-    private static void AddGroup(ReadOnlySpan<byte> payload, long dataOffset, RvzWriteOptions options,
-        ICompressionEncoder encoder, List<byte> exceptionLists, List<byte[]> groupData,
-        List<GroupEntry> groupEntries, bool isWia)
+    /// <summary>One group's compression input: the payload and its serialized exception lists.</summary>
+    private readonly record struct GroupJob(byte[] Payload, long DataOffset, byte[] ExceptionLists);
+
+    /// <summary>One group's compression result, stored in submission order.</summary>
+    private readonly record struct GroupResult(byte[] Stored, GroupEntry Entry);
+
+    /// <summary>
+    /// Collects group jobs and compresses them in bounded parallel batches, one encoder per
+    /// worker (Dolphin: MultithreadedCompressor). Results are appended in group order, so the
+    /// output bytes do not depend on <see cref="RvzWriteOptions.MaxThreads"/>.
+    /// </summary>
+    private sealed class GroupSink
     {
+        private readonly RvzWriteOptions _options;
+        private readonly bool _isWia;
+        private readonly int _maxThreads;
+        private readonly CancellationToken _cancellationToken;
+        private readonly List<GroupJob> _batch = [];
+        private readonly int _batchCapacity;
+
+        public GroupSink(RvzWriteOptions options, bool isWia, CancellationToken cancellationToken)
+        {
+            _options = options;
+            _isWia = isWia;
+            _cancellationToken = cancellationToken;
+            _maxThreads = options.MaxThreads > 0 ? options.MaxThreads : Environment.ProcessorCount;
+            // Two groups per worker keeps every worker busy without buffering the whole
+            // disc's payloads (only the compressed groups are retained).
+            _batchCapacity = Math.Max(1, _maxThreads * 2);
+        }
+
+        public List<byte[]> GroupData { get; } = [];
+
+        public List<GroupEntry> GroupEntries { get; } = [];
+
+        public void Add(ReadOnlySpan<byte> payload, long dataOffset,
+            ReadOnlySpan<byte> exceptionLists)
+        {
+            _batch.Add(new GroupJob(payload.ToArray(), dataOffset, exceptionLists.ToArray()));
+            if (_batch.Count >= _batchCapacity)
+            {
+                Flush();
+            }
+        }
+
+        public void Flush()
+        {
+            if (_batch.Count == 0)
+            {
+                return;
+            }
+
+            _cancellationToken.ThrowIfCancellationRequested();
+            var count = _batch.Count;
+            var results = new GroupResult[count];
+            if (_maxThreads <= 1)
+            {
+                var (encoder, _) = CompressionEncoderFactory.Create(
+                    _options.Compression, _options.CompressionLevel);
+                for (var i = 0; i < count; i++)
+                {
+                    results[i] = CompressGroup(_batch[i], _options, encoder, _isWia);
+                }
+            }
+            else
+            {
+                Parallel.For(0, count,
+                    new ParallelOptions
+                    {
+                        MaxDegreeOfParallelism = _maxThreads,
+                        CancellationToken = _cancellationToken
+                    },
+                    () => CompressionEncoderFactory.Create(
+                        _options.Compression, _options.CompressionLevel).Encoder,
+                    (i, _, encoder) =>
+                    {
+                        results[i] = CompressGroup(_batch[i], _options, encoder, _isWia);
+                        return encoder;
+                    },
+                    _ => { });
+            }
+
+            foreach (var result in results)
+            {
+                GroupData.Add(result.Stored);
+                GroupEntries.Add(result.Entry);
+            }
+
+            _batch.Clear();
+        }
+    }
+
+    private static GroupResult CompressGroup(GroupJob job, RvzWriteOptions options,
+        ICompressionEncoder encoder, bool isWia)
+    {
+        var payload = job.Payload.AsSpan();
+        var listBytes = job.ExceptionLists;
+
         // Pack the payload (junk detection, RVZ only) unless packing is disabled.
         var mainData = new List<byte>(payload.Length);
         uint packedSize = 0;
         if (!isWia && options.Packing)
         {
-            RvzPackingEncoder.Pack(payload, dataOffset, payload.Length, 1,
+            RvzPackingEncoder.Pack(payload, job.DataOffset, payload.Length, 1,
                 allowJunkReuse: true, options.Compression != CompressionType.None, mainData,
                 ref packedSize);
         }
@@ -578,14 +680,11 @@ internal static class WiaRvzWriter
 
         // A chunk whose data is all zeroes (and has no exceptions) becomes a zero group:
         // nothing is stored (a group size of 0 means "all zeroes" in the format).
-        if (exceptionLists.Count == 0 && IsAllZero(payload))
+        if (listBytes.Length == 0 && IsAllZero(payload))
         {
-            groupData.Add([]);
-            groupEntries.Add(new GroupEntry(0, 0, false, 0));
-            return;
+            return new GroupResult([], new GroupEntry(0, 0, false, 0));
         }
 
-        var listBytes = exceptionLists.ToArray();
         var compressedExceptionLists = (int)options.Compression > (int)CompressionType.Purge;
 
         byte[] stored;
@@ -633,8 +732,7 @@ internal static class WiaRvzWriter
             }
         }
 
-        groupData.Add(stored);
-        groupEntries.Add(isWia
+        return new GroupResult(stored, isWia
             ? new GroupEntry(0, (uint)stored.Length, usesDiscCompression: true, rvzPackedSize: 0)
             : new GroupEntry(0, (uint)stored.Length, compressed, packedSize));
     }

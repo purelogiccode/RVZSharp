@@ -226,6 +226,20 @@ public class LibraryApiTests
     }
 
     [Fact]
+    public void DiscHashes_Matches_ComparesAllThreeHashes()
+    {
+        var data = "123456789"u8.ToArray();
+        using IBlobReader blob = PlainBlob.Open(new MemoryStream(data), leaveOpen: true);
+        var hashes = DiscHasher.Compute(blob);
+
+        Assert.True(hashes.Matches(hashes));
+        Assert.False(hashes.Matches(null));
+        Assert.False(hashes.Matches(hashes with { Crc32 = hashes.Crc32 ^ 1 }));
+        Assert.False(hashes.Matches(hashes with { Md5 = new byte[16] }));
+        Assert.False(hashes.Matches(hashes with { Sha1 = new byte[20] }));
+    }
+
+    [Fact]
     public void DiscHasher_MatchesFrameworkHashes_AndReportsProgress()
     {
         var iso = MakeGcIso(0x10000);

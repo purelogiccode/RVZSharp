@@ -68,6 +68,20 @@ public class WiaWriterTests
     }
 
     [Fact]
+    public void MaxThreads_OutputIsIdenticalToSequential()
+    {
+        // Parallel compression must be byte-identical to sequential: worker results are
+        // appended in group order, independent of scheduling (10 groups span two batches
+        // with four threads).
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 600, TestWiiIsoBuilder.RandomData(600),
+            corruptSomeHashes: true);
+        var sequential = Convert(iso, CompressionType.Lzma2, maxThreads: 1, level: 1);
+        var parallel = Convert(iso, CompressionType.Lzma2, maxThreads: 4, level: 1);
+        Assert.Equal(sequential, parallel);
+    }
+
+    [Fact]
     public void DefaultOptions_UseLzma2_AndRoundTrip()
     {
         var iso = BuildGcIso();
@@ -146,14 +160,16 @@ public class WiaWriterTests
     }
 
     private static byte[] Convert(byte[] iso, CompressionType compression, bool packing = true,
-        int chunkSize = (int)WiaDisc.GroupSize)
+        int chunkSize = (int)WiaDisc.GroupSize, int maxThreads = 0, int level = 3)
     {
         using var ms = new MemoryStream();
         WiaWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms, new RvzWriteOptions
         {
             Compression = compression,
+            CompressionLevel = level,
             ChunkSize = chunkSize,
-            Packing = packing
+            Packing = packing,
+            MaxThreads = maxThreads
         });
         return ms.ToArray();
     }

@@ -45,6 +45,7 @@ Converts a disc image to another container format (DolphinTool semantics):
 ```
 convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
         [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
+        [--threads <int>] [--verify]
 ```
 
 | Option | Meaning |
@@ -57,6 +58,8 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
 | `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`. Required for WIA/RVZ. |
 | `-l`, `--compression_level` | compression level. Required unless `-c none`. |
 | `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso` a warning notes that scrubbing gains little. |
+| `--threads` | compression threads (RVZSharp extension). `0` (default) uses the processor count; the output is byte-identical for any value. |
+| `--verify` | after writing, decode the output and compare its CRC-32/MD5/SHA-1 with the input (RVZSharp extension); prints `Verification: OK (<sha1>)` or fails. With `-s` the scrubbed input is the reference. |
 
 Block-size validation follows Dolphin's `IsDiscImageBlockSizeValid`:
 
@@ -84,6 +87,11 @@ Notes:
   `CompressionType.Purge`, which DolphinTool's CLI does not expose).
 - **`-f gcz`** is not implemented yet — the command fails with a clear error (output
   formats are `iso`, `rvz` and `wia`).
+- **`--threads`** (RVZSharp extension) controls the writer's group-compression pool
+  (packing included). The default `0` uses the processor count; results are appended in
+  group order, so the output file is byte-identical for any thread count.
+- **`--verify`** (RVZSharp extension) hashes the input before writing and re-decodes the
+  written file afterwards, comparing CRC-32, MD5 and SHA-1. It works for every `-f` value.
 - `-s` (scrub) requires a Wii disc with a game partition; other inputs fail with
   Dolphin's "Unable to process disc image. Try again without --scrub."
 
@@ -91,7 +99,7 @@ Legacy positional form (RVZSharp extension, still works):
 
 ```
 rvzsharp convert <input> <output.rvz> [--compression <method>] [--level <n>]
-                 [--chunk-size <bytes>] [--no-packing]
+                 [--chunk-size <bytes>] [--no-packing] [--threads <n>]
 ```
 
 ## `header`

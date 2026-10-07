@@ -23,7 +23,8 @@ public class WiiPartitionExtractorTests
         var builder = new PartitionRegionBuilder(key);
         for (var sector = 0; sector < sectorCount; sector++)
         {
-            builder.AddSector(data.AsSpan(sector * WiiHashCalculator.SectorDataSize, WiiHashCalculator.SectorDataSize), []);
+            builder.AddSector(data.AsSpan(sector * WiiHashCalculator.SectorDataSize, WiiHashCalculator.SectorDataSize),
+                []);
         }
 
         return builder.Finish();

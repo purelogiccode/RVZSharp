@@ -94,7 +94,8 @@ internal sealed class LzmaStream : Stream
         bool leaveOpen
     )
     {
-        return Create(properties, inputStream, inputSize, outputSize, presetDictionary, properties.Length < 5, leaveOpen);
+        return Create(properties, inputStream, inputSize, outputSize, presetDictionary, properties.Length < 5,
+            leaveOpen);
     }
 
     /// <summary>
@@ -281,7 +282,8 @@ internal sealed class LzmaStream : Stream
 
         if (_endReached)
         {
-            if ((_inputSize >= 0 && CompressedBytesRead != _inputSize) || (_outputSize >= 0 && _position != _outputSize))
+            if ((_inputSize >= 0 && CompressedBytesRead != _inputSize) ||
+                (_outputSize >= 0 && _position != _outputSize))
             {
                 throw new DataErrorException();
             }
@@ -313,7 +315,8 @@ internal sealed class LzmaStream : Stream
 
         if (_endReached)
         {
-            if ((_inputSize >= 0 && CompressedBytesRead != _inputSize) || (_outputSize >= 0 && _position != _outputSize))
+            if ((_inputSize >= 0 && CompressedBytesRead != _inputSize) ||
+                (_outputSize >= 0 && _position != _outputSize))
             {
                 throw new DataErrorException();
             }

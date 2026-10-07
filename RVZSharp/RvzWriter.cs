@@ -224,13 +224,15 @@ public static class RvzWriter
                         // Nothing to encode as partition data; the region stays raw.
                         continue;
                     case > 0:
-                        areas.Add(new AreaEntry { Offset = dataStart, Size = size0, IsPartition = true, Partition = effective });
+                        areas.Add(new AreaEntry
+                            { Offset = dataStart, Size = size0, IsPartition = true, Partition = effective });
                         break;
                 }
 
                 if (size1 > 0)
                 {
-                    areas.Add(new AreaEntry { Offset = splitPoint, Size = size1, IsPartition = true, Partition = effective });
+                    areas.Add(new AreaEntry
+                        { Offset = splitPoint, Size = size1, IsPartition = true, Partition = effective });
                 }
 
                 // The partition's unaligned tail (and any gap after segment 0) is covered

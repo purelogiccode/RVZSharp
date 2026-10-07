@@ -1,43 +1,47 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <ItemGroup>
-    <ProjectReference Include="..\RVZSharp\RVZSharp.csproj" />
-    <!-- CP1252 / Shift-JIS decoders for the disc internal name: provided in-box on net10.0
-         (Dolphin: Volume::DecodeString). -->
-    <PackageReference Include="Serilog" Version="4.4.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.157">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <!-- The CLI targets net10.0 (current LTS-aligned runtime); published binaries are
-         single-file self-contained, so target machines need no runtime installed. -->
-    <TargetFrameworks>net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
-    <!-- Icon embedded in the built rvzsharp executable (Windows explorer). -->
-    <ApplicationIcon>icon\icon.ico</ApplicationIcon>
-    <Company>PureLogicCode.com</Company>
-    <AssemblyVersion>1.0.1</AssemblyVersion>
-    <FileVersion>1.0.1</FileVersion>
-    <NeutralLanguage>en</NeutralLanguage>
-    <!-- No XML docs for the CLI: the publish output ships the single binary only. -->
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
-  </PropertyGroup>
-
-  <!-- Single-file distribution: drop the (*.xml) documentation sidecars from the publish
-       folder so each runtime directory contains just the executable. -->
-  <Target Name="RemoveDocumentationFromPublish" AfterTargets="Publish">
     <ItemGroup>
-      <PublishXmlDocs Include="$(PublishDir)**/*.xml" />
+        <ProjectReference Include="..\RVZSharp\RVZSharp.csproj" />
+        <PackageReference Include="Roslynator.Analyzers" Version="5.0.1">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <!-- CP1252 / Shift-JIS decoders for the disc internal name: provided in-box on net10.0
+         (Dolphin: Volume::DecodeString). -->
+        <PackageReference Include="Serilog" Version="4.4.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+        <PackageReference Include="Meziantou.Analyzer" Version="3.0.294">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+        </PackageReference>
     </ItemGroup>
-    <Delete Files="@(PublishXmlDocs)" />
-  </Target>
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <!-- The CLI targets net10.0 (current LTS-aligned runtime); published binaries are
+         single-file self-contained, so target machines need no runtime installed. -->
+        <TargetFrameworks>net10.0</TargetFrameworks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <!-- Icon embedded in the built rvzsharp executable (Windows explorer). -->
+        <ApplicationIcon>icon\icon.ico</ApplicationIcon>
+        <Company>PureLogicCode.com</Company>
+        <AssemblyVersion>1.0.1</AssemblyVersion>
+        <FileVersion>1.0.1</FileVersion>
+        <NeutralLanguage>en</NeutralLanguage>
+        <!-- No XML docs for the CLI: the publish output ships the single binary only. -->
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <!-- Single-file distribution: drop the (*.xml) documentation sidecars from the publish
+       folder so each runtime directory contains just the executable. -->
+    <Target Name="RemoveDocumentationFromPublish" AfterTargets="Publish">
+        <ItemGroup>
+            <PublishXmlDocs Include="$(PublishDir)**/*.xml" />
+        </ItemGroup>
+        <Delete Files="@(PublishXmlDocs)" />
+    </Target>
 
 </Project>

@@ -14,7 +14,8 @@ public class BlobDetectionTests
         rng.NextBytes(iso);
 
         var rvz = TestRvzBuilder.Build(new RvzSpec { Compression = CompressionType.Zstd, RawSize = 0x8000 });
-        var wia = TestRvzBuilder.Build(new RvzSpec { IsWia = true, Compression = CompressionType.Bzip2, RawSize = 0x8000 });
+        var wia = TestRvzBuilder.Build(new RvzSpec
+            { IsWia = true, Compression = CompressionType.Bzip2, RawSize = 0x8000 });
         var gcz = TestLegacyBuilders.BuildGcz(iso);
         var ciso = TestLegacyBuilders.BuildCiso(iso, 0x8000, [0, 1]);
         var wbfs = TestLegacyBuilders.BuildWbfs(iso);

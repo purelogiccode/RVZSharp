@@ -52,7 +52,8 @@ internal sealed class StatsApiClient : IDisposable
             var json = JsonSerializer.Serialize(payload, JsonOptions);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await _httpClient.PostAsync(ApiUrl, content).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode && (int)response.StatusCode != (int)System.Net.HttpStatusCode.TooManyRequests)
+            if (!response.IsSuccessStatusCode &&
+                (int)response.StatusCode != (int)System.Net.HttpStatusCode.TooManyRequests)
             {
                 ReportFailure($"Stats API returned HTTP {(int)response.StatusCode}");
             }

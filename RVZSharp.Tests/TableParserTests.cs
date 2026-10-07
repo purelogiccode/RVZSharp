@@ -55,7 +55,8 @@ public class TableParserTests
         return result;
     }
 
-    private static byte[] MakePartEntry(uint firstSector, uint numSectors, uint groupIndex, uint numGroups, byte keySeed = 0)
+    private static byte[] MakePartEntry(uint firstSector, uint numSectors, uint groupIndex, uint numGroups,
+        byte keySeed = 0)
     {
         var b = new byte[0x30];
         for (var i = 0; i < 16; i++)

@@ -194,7 +194,8 @@ public class PurgeDecoderTests
     {
         var data = new byte[0x8000];
         new Random(14).NextBytes(data.AsSpan(0x10, 0x100));
-        var preceding = new byte[] { 0x00, 0x02, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0, 0 };
+        var preceding = new byte[]
+            { 0x00, 0x02, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0, 0 };
 
         var encoded = TestCompressor.CompressPurge(data, preceding);
         Assert.Equal(data, PurgeDecoder.Decode(encoded, preceding, data.Length));

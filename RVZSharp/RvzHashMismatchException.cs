@@ -9,4 +9,12 @@ public sealed class RvzHashMismatchException : RvzException
         : base(message)
     {
     }
+
+    public RvzHashMismatchException(string message, Exception inner) : base(message, inner)
+    {
+    }
+
+    public RvzHashMismatchException()
+    {
+    }
 }

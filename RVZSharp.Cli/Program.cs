@@ -62,19 +62,19 @@ internal static class Program
     private static void PrintUsage()
     {
         Console.Error.WriteLine("""
-            usage: rvzsharp COMMAND -h
+                                usage: rvzsharp COMMAND -h
 
-            commands supported: [convert, verify, header, extract]
-            legacy commands:    [info, decode]
+                                commands supported: [convert, verify, header, extract]
+                                legacy commands:    [info, decode]
 
-            convert  -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
-                     [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
-            header   -i <FILE> [-j] [-b] [-c] [-l]
-            verify   -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
-            extract  -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l <path>] [-q] [-g]
-            info     <FILE>                        (legacy alias of 'header')
-            decode   <FILE> <OUT> [--sha1 <hex>]   (decode any blob to a plain ISO)
-            """);
+                                convert  -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
+                                         [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
+                                header   -i <FILE> [-j] [-b] [-c] [-l]
+                                verify   -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
+                                extract  -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l <path>] [-q] [-g]
+                                info     <FILE>                        (legacy alias of 'header')
+                                decode   <FILE> <OUT> [--sha1 <hex>]   (decode any blob to a plain ISO)
+                                """);
     }
 
     private static int PrintUsageAndFail()
@@ -189,6 +189,14 @@ internal static class Program
     {
         public CliError(string message)
             : base(message)
+        {
+        }
+
+        public CliError()
+        {
+        }
+
+        public CliError(string? message, Exception? innerException) : base(message, innerException)
         {
         }
     }
@@ -924,7 +932,8 @@ internal static class Program
                 return Fail("No input set");
             }
 
-            return Fail("The extract command is not supported by this implementation (no disc filesystem support yet).");
+            return Fail(
+                "The extract command is not supported by this implementation (no disc filesystem support yet).");
         }
         catch (Exception e)
         {

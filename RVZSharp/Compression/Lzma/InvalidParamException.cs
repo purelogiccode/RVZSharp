@@ -18,4 +18,12 @@ internal sealed class InvalidParamException : IOException
         : base(message)
     {
     }
+
+    public InvalidParamException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
+
+    public InvalidParamException(string? message, int hresult) : base(message, hresult)
+    {
+    }
 }

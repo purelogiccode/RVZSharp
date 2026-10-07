@@ -18,4 +18,12 @@ internal sealed class DataErrorException : IOException
         : base(message)
     {
     }
+
+    public DataErrorException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
+
+    public DataErrorException(string? message, int hresult) : base(message, hresult)
+    {
+    }
 }

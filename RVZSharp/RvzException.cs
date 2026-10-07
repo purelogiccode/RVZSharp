@@ -17,4 +17,8 @@ public class RvzException : Exception
         : base(message, inner)
     {
     }
+
+    public RvzException()
+    {
+    }
 }

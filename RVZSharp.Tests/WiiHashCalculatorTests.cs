@@ -31,7 +31,8 @@ public class WiiHashCalculatorTests
         {
             var expected = SHA1.HashData(
                 data.AsSpan(block * WiiHashCalculator.BlockDataSize, WiiHashCalculator.BlockDataSize));
-            Assert.Equal(expected, hashArea.AsSpan(block * WiiHashCalculator.HashSize, WiiHashCalculator.HashSize).ToArray());
+            Assert.Equal(expected,
+                hashArea.AsSpan(block * WiiHashCalculator.HashSize, WiiHashCalculator.HashSize).ToArray());
         }
 
         // h0 padding 0x26C-0x280 is zero.
@@ -70,7 +71,8 @@ public class WiiHashCalculatorTests
 
         Assert.Throws<ArgumentException>(() => WiiHashCalculator.BuildHashArea(new byte[0x7BFF], hashArea));
         Assert.Throws<ArgumentException>(() => WiiHashCalculator.BuildHashArea(new byte[0x7C01], hashArea));
-        Assert.Throws<ArgumentException>(() => WiiHashCalculator.BuildHashArea(new byte[WiiHashCalculator.SectorDataSize], new byte[0x3FF]));
+        Assert.Throws<ArgumentException>(() =>
+            WiiHashCalculator.BuildHashArea(new byte[WiiHashCalculator.SectorDataSize], new byte[0x3FF]));
     }
 
     [Fact]

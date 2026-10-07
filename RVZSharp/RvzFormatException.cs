@@ -17,4 +17,8 @@ public sealed class RvzFormatException : RvzException
         : base(message, inner)
     {
     }
+
+    public RvzFormatException()
+    {
+    }
 }

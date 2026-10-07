@@ -9,4 +9,12 @@ public sealed class RvzUnsupportedException : RvzException
         : base(message)
     {
     }
+
+    public RvzUnsupportedException(string message, Exception inner) : base(message, inner)
+    {
+    }
+
+    public RvzUnsupportedException()
+    {
+    }
 }

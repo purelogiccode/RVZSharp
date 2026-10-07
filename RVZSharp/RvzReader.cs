@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using RVZSharp.Interfaces;
 using RVZSharp.Chunks;
 using RVZSharp.Compression;
+using RVZSharp.IO;
 using RVZSharp.Models;
 using RVZSharp.Wii;
 
@@ -312,14 +313,44 @@ public sealed class RvzReader : IBlobReader
     /// <summary>
     /// Decodes the whole disc image into a single buffer. The image must fit in memory
     /// (byte arrays are capped at <see cref="int.MaxValue"/> elements, so this supports
-    /// discs up to 2 GiB — use <see cref="ReadAt"/> for larger images).
+    /// discs up to 2 GiB — use <see cref="ReadAt"/> or <see cref="IBlobReader.CopyTo"/> for larger
+    /// images, e.g. Wii discs).
     /// </summary>
     public byte[] ReadFully()
     {
+        return ReadFully(null, default);
+    }
+
+    /// <summary>
+    /// Decodes the whole disc image into a single buffer, reporting progress and observing
+    /// cancellation. The image must fit in memory (byte arrays are capped at
+    /// <see cref="int.MaxValue"/> elements, so this supports discs up to 2 GiB — use
+    /// <see cref="ReadAt"/> or <see cref="IBlobReader.CopyTo"/> for larger images, e.g. Wii discs).
+    /// </summary>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the bytes decoded.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between reads.</param>
+    /// <returns>The decoded disc image bytes.</returns>
+    /// <exception cref="RvzFormatException">
+    /// The image is larger than 2 GiB (use <see cref="IBlobReader.CopyTo"/> for images that large), or
+    /// decoding stopped before the end of the image.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    public byte[] ReadFully(IProgress<double>? progress, CancellationToken cancellationToken = default)
+    {
+        if (Length > int.MaxValue)
+        {
+            throw new RvzFormatException(
+                $"The image is {Length} bytes; ReadFully supports at most {int.MaxValue} bytes — "
+                + "stream it with CopyTo instead.");
+        }
+
         var output = new byte[Length];
         var position = 0L;
         while (position < Length)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Copy in bounded pieces so the span offsets stay within int range.
             var take = (int)Math.Min(1 << 20, Length - position);
             var read = ReadAt(position, output.AsSpan((int)position, take));
@@ -329,9 +360,30 @@ public sealed class RvzReader : IBlobReader
             }
 
             position += read;
+            progress?.Report((double)position / Length);
         }
 
         return output;
+    }
+
+    /// <summary>
+    /// Streams the decoded disc image into <paramref name="destination"/> in bounded blocks
+    /// (1 MiB per read), reporting progress and observing cancellation. Unlike
+    /// <see cref="ReadFully()"/>, this supports images of any size, e.g. Wii discs.
+    /// </summary>
+    /// <param name="destination">The stream that receives the decoded image bytes.</param>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the bytes decoded.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between reads.</param>
+    /// <returns>The number of bytes copied (the image length).</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="destination"/> is null.</exception>
+    /// <exception cref="RvzFormatException">Decoding stopped before the end of the image.</exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    public long CopyTo(Stream destination, IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        return BlobCopy.CopyTo(this, destination, progress, cancellationToken);
     }
 
     private int ClampToRawChunk(DataArea area, long position, int requested)

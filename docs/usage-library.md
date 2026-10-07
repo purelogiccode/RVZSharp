@@ -103,6 +103,26 @@ Notes:
   garbage (absent blocks decode to zeroes); the disc-header validation in
   `RvzWriter.Write` is what keeps such garbage from being wrapped into an RVZ.
 
+### Is it a real disc?
+
+Container sniffing only recognizes the *file format*; a plain file that is not a disc
+opens as `PlainBlob` too. To ask "is this actually a GameCube/Wii disc?", inspect the
+decoded disc header (Wii magic at `0x18`, GameCube magic at `0x1C` — the same check
+Dolphin's `TryCreateDisc` and `RvzWriter.Write` perform):
+
+```csharp
+using IBlobReader blob = Blob.Open(path);
+
+if (!Blob.IsDisc(blob))                 // false for arbitrary data
+    throw new InvalidDataException("not a GameCube/Wii disc");
+
+DiscType type = Blob.GetDiscType(blob); // DiscType.Wii / DiscType.GameCube / DiscType.Unknown
+```
+
+`Blob.GetDiscType` / `Blob.IsDisc` read the decoded bytes, so they work for every input
+format (plain ISO or any container). `RvzWriter.Write` rejects inputs that fail this check
+with `RvzFormatException` before writing a byte.
+
 ### Scrubbing
 
 `ScrubbedBlob.Create(blob)` wraps any disc image and zeroes the data of every non-game Wii
@@ -126,7 +146,10 @@ public interface IBlobReader : IDisposable
     long Length { get; }        // decoded ISO size in bytes
     int BlockSize { get; }      // natural block size, 0 when the format has none
     int ReadAt(long position, Span<byte> buffer);
-    byte[] ReadFully();         // default implementation (streams via ReadAt)
+    byte[] ReadFully();         // default implementation (streams via ReadAt, ≤ 2 GiB)
+    byte[] ReadFully(IProgress<double>? progress, CancellationToken cancellationToken = default);
+    long CopyTo(Stream destination, IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default);
 }
 ```
 
@@ -140,7 +163,7 @@ using var blob = Blob.Open(path);
 Span<byte> sector = stackalloc byte[0x8000];
 blob.ReadAt(0x1234 * 0x8000, sector);
 
-// Whole-image decode.
+// Whole-image decode (images up to 2 GiB).
 byte[] iso = blob.ReadFully();
 ```
 
@@ -148,30 +171,27 @@ byte[] iso = blob.ReadFully();
   of the image. Reads are **not** required to be sequential.
 - `BlockSize` is the format's natural block (GCZ: 0x4000, RVZ: chunk size, CISO: 0x8000,
   WBFS: cluster size, NFS: 0x8000, TGC/plain: 0).
-- `ReadFully()` is a default interface method: it works on every reader and is overridden
-  where a faster path exists (`RvzReader`).
+- `ReadFully()` / `ReadFully(progress, ct)` are default interface methods: they work on
+  every reader and are overridden where a faster path exists (`RvzReader`).
+- `CopyTo` streams the whole image into any `Stream` in 1 MiB blocks — no 2 GiB limit —
+  reporting progress and observing cancellation. `RvzReader` exposes the same method
+  directly, so no cast is needed.
 
 ### Streaming pattern (large images)
 
-GameCube/Wii images are 0.5–9.4 GiB. To avoid holding the whole image in memory, stream it:
+GameCube/Wii images are 0.5–9.4 GiB. To avoid holding the whole image in memory, stream it
+with `CopyTo`:
 
 ```csharp
 using var blob = Blob.Open(path);
 using var output = File.Create(@"C:\games\out.iso");
-var buffer = new byte[1 << 20];
-long position = 0;
-while (position < blob.Length)
-{
-    int read = blob.ReadAt(position, buffer);
-    if (read <= 0)
-    {
-        throw new IOException($"Decoding stopped at 0x{position:X}.");
-    }
+var progress = new Progress<double>(f => Console.Error.Write($"\r{f,6:P1}"));
 
-    output.Write(buffer, 0, read);
-    position += read;
-}
+blob.CopyTo(output, progress);
 ```
+
+For explicit random-access control, the same loop can be written by hand with `ReadAt`
+(1 MiB at a time, as `CopyTo` does internally).
 
 ---
 
@@ -218,7 +238,8 @@ The writer mirrors Dolphin's converter:
   GameCube `C2 33 9F 3D` at offset `0x1C`, matching Dolphin's `TryCreateDisc`). Anything
   else throws `RvzFormatException` before a single byte is written, so arbitrary data can
   never be wrapped into an unusable RVZ. This also means `Blob.Open` + `RvzWriter.Write`
-  is a complete "is this a real disc?" pipeline for any input format.
+  is a complete "is this a real disc?" pipeline for any input format; to run the same
+  check up front, call `Blob.GetDiscType` / `Blob.IsDisc`.
 - **Wii discs** (disc header magic + hash/encryption flags set) are stored with the
   partition optimization: partition data is written *decrypted* with SHA-1 hash exceptions,
   split at the FST end — this is what makes RVZ small.
@@ -251,17 +272,22 @@ The writer does **not** dispose the output stream; the caller owns it.
 
 ### Progress and cancellation
 
-Long conversions (multi-GiB images) can be monitored and canceled:
+Long conversions (multi-GiB images) can be monitored and canceled on both the write and the
+decode path:
 
 ```csharp
 using var cts = new CancellationTokenSource();
 var progress = new Progress<double>(fraction =>
-    Console.Error.Write($"\rconverting… {fraction,6:P1}"));
+    Console.Error.Write($"\r{fraction,6:P1}"));
 
 try
 {
+    // Encode: progress is the fraction of input bytes processed.
     RvzWriter.Write(blob, output, options,
         progress: progress, cancellationToken: cts.Token);
+
+    // Decode/stream: progress is the fraction of image bytes decoded.
+    blob.CopyTo(isoStream, progress, cts.Token);
 }
 catch (OperationCanceledException)
 {
@@ -269,9 +295,10 @@ catch (OperationCanceledException)
 }
 ```
 
-- `progress` receives a fraction in `[0, 1]` of the input bytes processed, reported
-  per group read; the sequence is monotonic and ends at `1.0`.
-- Cancellation is observed between reads and throws `OperationCanceledException`.
+- `progress` receives a fraction in `[0, 1]`, reported per read; the sequence is monotonic
+  and ends at `1.0`.
+- Cancellation is observed between reads on both paths and throws
+  `OperationCanceledException`.
 
 ### Verifying your output
 

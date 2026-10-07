@@ -28,33 +28,62 @@ public interface IBlobReader : IDisposable
 
     /// <summary>
     /// Decodes the entire disc image into a byte array. For large images prefer streaming
-    /// with <see cref="ReadAt"/> so the image is never fully resident in memory.
+    /// with <see cref="CopyTo"/> so the image is never fully resident in memory.
     /// </summary>
     /// <exception cref="RvzFormatException">
-    /// The image is larger than 2 GiB (use <see cref="ReadAt"/> for images that large).
+    /// The image is larger than 2 GiB (use <see cref="CopyTo"/> for images that large).
     /// </exception>
     byte[] ReadFully()
+    {
+        return ReadFully(null, default);
+    }
+
+    /// <summary>
+    /// Decodes the entire disc image into a byte array, reporting progress and observing
+    /// cancellation. For large images prefer streaming with <see cref="CopyTo"/>.
+    /// </summary>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the bytes decoded.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between reads.</param>
+    /// <returns>The decoded disc image bytes.</returns>
+    /// <exception cref="RvzFormatException">
+    /// The image is larger than 2 GiB (use <see cref="CopyTo"/> for images that large), or
+    /// decoding stopped before the end of the image.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    byte[] ReadFully(IProgress<double>? progress, CancellationToken cancellationToken = default)
     {
         if (Length > int.MaxValue)
         {
             throw new RvzFormatException(
                 $"The image is {Length} bytes; ReadFully supports at most {int.MaxValue} bytes — "
-                + "stream it with ReadAt instead.");
+                + "stream it with CopyTo instead.");
         }
 
         var result = new byte[Length];
-        var position = 0;
-        while (position < result.Length)
-        {
-            var read = ReadAt(position, result.AsSpan(position));
-            if (read <= 0)
-            {
-                throw new RvzFormatException($"Decoding stopped at offset 0x{position:X}.");
-            }
-
-            position += read;
-        }
-
+        using var destination = new MemoryStream(result, writable: true);
+        CopyTo(destination, progress, cancellationToken);
         return result;
+    }
+
+    /// <summary>
+    /// Streams the decoded disc image into <paramref name="destination"/> in bounded blocks
+    /// (1 MiB per read), reporting progress and observing cancellation. Unlike
+    /// <see cref="ReadFully()"/>, this supports images of any size.
+    /// </summary>
+    /// <param name="destination">The stream that receives the decoded image bytes.</param>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the bytes decoded.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between reads.</param>
+    /// <returns>The number of bytes copied (the image length).</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="destination"/> is null.</exception>
+    /// <exception cref="RvzFormatException">Decoding stopped before the end of the image.</exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    long CopyTo(Stream destination, IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        return IO.BlobCopy.CopyTo(this, destination, progress, cancellationToken);
     }
 }

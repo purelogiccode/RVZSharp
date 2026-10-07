@@ -7,8 +7,8 @@ namespace RVZSharp.Tests;
 
 /// <summary>
 /// Tests for the package-facing API surface: path-based opening, the default
-/// <see cref="IBlobReader.ReadFully"/> implementation, and the writer's progress and
-/// cancellation support.
+/// <see cref="IBlobReader.ReadFully()"/> / <see cref="IBlobReader.CopyTo"/> implementations,
+/// disc validation, and the writer's progress and cancellation support.
 /// </summary>
 public class LibraryApiTests
 {
@@ -113,6 +113,133 @@ public class LibraryApiTests
         using IBlobReader blob = GczBlob.Open(new MemoryStream(gcz), leaveOpen: true);
         Assert.Equal(BlobType.Gcz, blob.Type);
         Assert.Equal(iso, blob.ReadFully());
+    }
+
+    [Fact]
+    public void ReadFully_WithProgress_WorksOnNonOverridingBlob()
+    {
+        var iso = MakeGcIso(0x10000);
+        var gcz = TestLegacyBuilders.BuildGcz(iso);
+        using IBlobReader blob = GczBlob.Open(new MemoryStream(gcz), leaveOpen: true);
+        var progress = new List<double>();
+        Assert.Equal(iso, blob.ReadFully(new SyncProgress<double>(progress.Add)));
+        Assert.NotEmpty(progress);
+        Assert.Equal(1.0, progress[^1]);
+    }
+
+    [Fact]
+    public void CopyTo_StreamsWholeImage_AndReportsMonotonicProgress()
+    {
+        var iso = MakeGcIso();
+        using IBlobReader blob = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+        using var destination = new MemoryStream();
+        var progress = new List<double>();
+
+        var copied = blob.CopyTo(destination, new SyncProgress<double>(progress.Add));
+
+        Assert.Equal(iso.Length, copied);
+        Assert.Equal(iso, destination.ToArray());
+        Assert.NotEmpty(progress);
+        Assert.True(progress[0] > 0, "progress should start above zero");
+        for (var i = 1; i < progress.Count; i++)
+        {
+            Assert.True(progress[i] >= progress[i - 1], "progress must be monotonic");
+        }
+
+        Assert.Equal(1.0, progress[^1]);
+    }
+
+    [Fact]
+    public void CopyTo_ObservesCancellation_MidStream()
+    {
+        var iso = MakeGcIso();
+        using IBlobReader blob = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+        using var destination = new MemoryStream();
+        var cts = new CancellationTokenSource();
+        try
+        {
+            var cancelOnFirstReport = true;
+            var progress = new SyncProgress<double>(_ =>
+            {
+                if (cancelOnFirstReport)
+                {
+                    cancelOnFirstReport = false;
+                    // ReSharper disable once AccessToDisposedClosure
+                    cts.Cancel();
+                }
+            });
+
+            Assert.ThrowsAny<OperationCanceledException>(() =>
+                blob.CopyTo(destination, progress, cts.Token));
+            Assert.True(destination.Length < iso.Length, "the copy should stop before the end");
+        }
+        finally
+        {
+            cts.Dispose();
+        }
+    }
+
+    [Fact]
+    public void RvzReader_ReadFully_WithProgress_AndCancellation()
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(
+            new RvzSpec { Compression = CompressionType.Zstd, RawSize = 0x8000 });
+        using var reader = RvzReader.Open(new MemoryStream(rvz), leaveOpen: true);
+
+        var progress = new List<double>();
+        Assert.Equal(iso, reader.ReadFully(new SyncProgress<double>(progress.Add)));
+        Assert.NotEmpty(progress);
+        Assert.Equal(1.0, progress[^1]);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        Assert.Throws<OperationCanceledException>(() => reader.ReadFully(null, cts.Token));
+    }
+
+    [Fact]
+    public void RvzReader_CopyTo_StreamsByteExact()
+    {
+        var (rvz, iso) = TestRvzBuilder.BuildWithIso(
+            new RvzSpec { Compression = CompressionType.None, RawSize = 0x8000 });
+        using var reader = RvzReader.Open(new MemoryStream(rvz), leaveOpen: true);
+        using var destination = new MemoryStream();
+
+        var copied = reader.CopyTo(destination);
+
+        Assert.Equal(iso.Length, copied);
+        Assert.Equal(iso, destination.ToArray());
+    }
+
+    [Fact]
+    public void Blob_DiscValidation_ClassifiesGameCubeWiiAndUnknown()
+    {
+        var gcIso = MakeGcIso();
+        using (IBlobReader gc = PlainBlob.Open(new MemoryStream(gcIso), leaveOpen: true))
+        {
+            Assert.Equal(DiscType.GameCube, Blob.GetDiscType(gc));
+            Assert.True(Blob.IsDisc(gc));
+        }
+
+        var (wiiRvz, _) = TestRvzBuilder.BuildWithIso(new RvzSpec
+        {
+            DiscType = DiscType.Wii,
+            Partition = new PartitionSpec()
+        });
+        using (var wii = RvzReader.Open(new MemoryStream(wiiRvz), leaveOpen: true))
+        {
+            Assert.Equal(DiscType.Wii, Blob.GetDiscType(wii));
+            Assert.True(Blob.IsDisc(wii));
+        }
+
+        var garbage = new byte[0x420000];
+        new Random(7).NextBytes(garbage);
+        using (IBlobReader unknown = PlainBlob.Open(new MemoryStream(garbage), leaveOpen: true))
+        {
+            Assert.Equal(DiscType.Unknown, Blob.GetDiscType(unknown));
+            Assert.False(Blob.IsDisc(unknown));
+        }
+
+        Assert.Throws<ArgumentNullException>(() => Blob.GetDiscType(null!));
     }
 
     [Fact]

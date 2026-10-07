@@ -1,5 +1,6 @@
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
+using RVZSharp.Wii;
 
 namespace RVZSharp.Blobs;
 
@@ -148,6 +149,35 @@ public static class Blob
         }
 
         return Open(stream, filePath: null, leaveOpen);
+    }
+
+    /// <summary>
+    /// Detects the disc type of an opened blob from the GameCube/Wii magic in the decoded
+    /// disc header (Wii at 0x18, GameCube at 0x1C; Dolphin: TryCreateDisc). Unlike the
+    /// container magic sniffing in <see cref="Open(Stream, string?, bool)"/>, this inspects
+    /// the decoded disc bytes, so it answers "is this actually a GameCube/Wii disc?" for
+    /// every input format. <see cref="RvzWriter.Write"/> uses the same check before writing.
+    /// </summary>
+    /// <param name="reader">The blob to inspect.</param>
+    /// <returns><see cref="DiscType.Wii"/>, <see cref="DiscType.GameCube"/>, or
+    /// <see cref="DiscType.Unknown"/> when the image carries neither disc magic.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reader"/> is null.</exception>
+    public static DiscType GetDiscType(IBlobReader reader)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        return WiiVolume.GetDiscType(reader);
+    }
+
+    /// <summary>
+    /// True when the decoded disc image carries a GameCube or Wii disc header magic
+    /// (the same check <see cref="RvzWriter.Write"/> performs before encoding).
+    /// </summary>
+    /// <param name="reader">The blob to inspect.</param>
+    /// <returns>True for a GameCube or Wii disc image; false otherwise.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reader"/> is null.</exception>
+    public static bool IsDisc(IBlobReader reader)
+    {
+        return GetDiscType(reader) != DiscType.Unknown;
     }
 
     /// <summary>Human-readable name of a blob type (Dolphin: GetName).</summary>

@@ -56,12 +56,16 @@ Console.WriteLine($"ISO size: {reader.Length} bytes");             // 1459978240
 Console.WriteLine($"Disc: {reader.Disc.DiscType}");                // Wii
 Console.WriteLine($"Compression: {reader.Disc.Compression}");      // Zstd
 
-// Decode everything (the full disc image, byte-for-byte):
+// Decode everything (the full disc image, byte-for-byte, up to 2 GiB):
 var iso = reader.ReadFully();
 
 // ...or stream any range without decoding the whole file:
 var buffer = new byte[0x80000];
 long read = reader.ReadAt(partitionStart, buffer);
+
+// ...or stream the whole image to a file (any size, with progress/cancellation):
+var progress = new Progress<double>(f => Console.Error.Write($"\r{f,6:P1}"));
+reader.CopyTo(File.Create(@"C:\games\game.iso"), progress);
 ```
 
 `RvzReader.Open` parses and validates the whole container (magic, versions, every SHA-1,
@@ -126,7 +130,9 @@ header magic (Wii `5D 1C 9E A3` at offset `0x18`, GameCube `C2 33 9F 3D` at offs
 like Dolphin's `TryCreateDisc`). Any other input throws `RvzFormatException` before a
 single byte is written — arbitrary data can never be wrapped into an unusable RVZ, so
 `Blob.Open` + `RvzWriter.Write` is a complete "is this a real disc?" pipeline for every
-input format.
+input format. To run the same check yourself, use `Blob.GetDiscType(blob)` /
+`Blob.IsDisc(blob)` (they inspect the decoded disc bytes of any blob, not just the
+container magic).
 
 ### CLI
 
@@ -167,7 +173,7 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
 - `RVZSharp.Cli` — the `header`/`verify`/`convert` tool (DolphinTool-compatible surface,
   plus the legacy `info`/`decode` commands).
-- `RVZSharp.Tests` — 324 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 330 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
   packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), package-facing API tests (path

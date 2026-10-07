@@ -16,9 +16,21 @@ namespace RVZSharp.Cli;
 /// </summary>
 internal static class Program
 {
+    /// <summary>
+    /// Cancellation source for the running command: Ctrl+C requests cancellation and the
+    /// command observes the token between reads instead of the process dying mid-write.
+    /// </summary>
+    private static readonly CancellationTokenSource Cancellation = new();
+
     private static int Main(string[] args)
     {
         LogSetup.Initialize();
+
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            Cancellation.Cancel();
+        };
 
         // Usage telemetry: fire-and-forget hit at launch so application usage can
         // be tracked on the ApplicationStats dashboard. Failures are silent.
@@ -43,6 +55,12 @@ internal static class Program
                 "decode" when args.Length >= 3 => Decode(args[1], args[2], args[3..]),
                 _ => PrintUsageAndFail()
             };
+        }
+        catch (OperationCanceledException)
+        {
+            ConsoleProgress.Clear();
+            Console.Error.WriteLine("Canceled.");
+            return 130;
         }
         catch (Exception e)
         {
@@ -85,9 +103,111 @@ internal static class Program
 
     private static int Fail(string message)
     {
+        ConsoleProgress.Clear();
         Log.Warning("Command failed: {Message}", message);
         Console.Error.WriteLine($"Error: {message}");
         return 1;
+    }
+
+    /// <summary>
+    /// Progress reporter that updates a single line on stderr. Nothing is written when
+    /// stderr is redirected, so scripts and logs stay clean.
+    /// </summary>
+    private sealed class ConsoleProgress : IProgress<double>
+    {
+        private readonly string _label;
+
+        public ConsoleProgress(string label)
+        {
+            _label = label;
+        }
+
+        public void Report(double value)
+        {
+            if (!Console.IsErrorRedirected)
+            {
+                Console.Error.Write($"\r{_label}{value,6:P1}");
+            }
+        }
+
+        /// <summary>Erases the progress line before a result is printed.</summary>
+        public static void Clear()
+        {
+            if (!Console.IsErrorRedirected)
+            {
+                Console.Error.Write("\r" + new string(' ', 40) + "\r");
+            }
+        }
+    }
+
+    /// <summary>Write-through stream that hashes everything written to it (SHA-1).</summary>
+    private sealed class HashingStream : Stream
+    {
+        private readonly Stream _inner;
+        private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
+
+        public HashingStream(Stream inner)
+        {
+            _inner = inner;
+        }
+
+        public byte[] GetHashAndReset()
+        {
+            return _hash.GetHashAndReset();
+        }
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+            _inner.Flush();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            _hash.AppendData(buffer, offset, count);
+            _inner.Write(buffer, offset, count);
+        }
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            _hash.AppendData(buffer);
+            _inner.Write(buffer);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _hash.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -232,7 +352,7 @@ internal static class Program
                     + "  -i, --input <FILE>         path to disc image FILE\n"
                     + "  -o, --output <FILE>        path to the destination FILE\n"
                     + "  -f, --format <format>      container format: iso, gcz, wia, rvz\n"
-                    + "  -s, --scrub                scrub junk data (not supported)\n"
+                    + "  -s, --scrub                scrub junk data as part of conversion\n"
                     + "  -b, --block_size <int>     block size in bytes (required for GCZ/WIA/RVZ)\n"
                     + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
                     + "  -l, --compression_level    level of compression for the selected method");
@@ -404,7 +524,19 @@ internal static class Program
                 };
 
                 using var output = File.Create(outputPath);
-                RvzWriter.Write(input, output, writeOptions);
+                var progress = new ConsoleProgress("Encoding ");
+                try
+                {
+                    RvzWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    ConsoleProgress.Clear();
+                    Console.Error.WriteLine("Canceled.");
+                    return 130;
+                }
+
+                ConsoleProgress.Clear();
                 return 0;
             }
         }
@@ -461,7 +593,19 @@ internal static class Program
             using var input = File.OpenRead(inputPath);
             using var blob = Blob.Open(input, filePath: inputPath, leaveOpen: true);
             using var output = File.Create(outputPath);
-            RvzWriter.Write(blob, output, options);
+            var progress = new ConsoleProgress("Encoding ");
+            try
+            {
+                RvzWriter.Write(blob, output, options, progress, Cancellation.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                ConsoleProgress.Clear();
+                Console.Error.WriteLine("Canceled.");
+                return 130;
+            }
+
+            ConsoleProgress.Clear();
             return 0;
         }
         catch (Exception e)
@@ -798,9 +942,11 @@ internal static class Program
                 var sha1 = wantSha1 ? SHA1.Create() : null;
 
                 var buffer = new byte[1 << 20];
+                var progress = new ConsoleProgress("Verifying ");
                 var position = 0L;
                 while (position < blob.Length)
                 {
+                    Cancellation.Token.ThrowIfCancellationRequested();
                     var read = blob.ReadAt(position, buffer);
                     if (read <= 0)
                     {
@@ -815,7 +961,10 @@ internal static class Program
                     md5?.TransformBlock(buffer, 0, read, null, 0);
                     sha1?.TransformBlock(buffer, 0, read, null, 0);
                     position += read;
+                    progress.Report((double)position / blob.Length);
                 }
+
+                ConsoleProgress.Clear();
 
                 md5?.TransformFinalBlock([], 0, 0);
                 sha1?.TransformFinalBlock([], 0, 0);
@@ -837,6 +986,12 @@ internal static class Program
                 Console.WriteLine($"SHA1: {ToLowerHex(sha1!.Hash!)}");
                 return 0;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            ConsoleProgress.Clear();
+            Console.Error.WriteLine("Canceled.");
+            return 130;
         }
         catch (Exception e)
         {
@@ -1345,27 +1500,24 @@ internal static class Program
         try
         {
             using var output = File.Create(outputPath);
-            using var sha1 = SHA1.Create();
-
-            var buffer = new byte[1 << 20];
-            var position = 0L;
-            while (position < reader.Length)
+            using var hashing = new HashingStream(output);
+            var progress = new ConsoleProgress("Decoding ");
+            try
             {
-                var read = reader.ReadAt(position, buffer);
-                if (read <= 0)
-                {
-                    throw new RvzFormatException($"Decoding stopped at offset 0x{position:X}.");
-                }
-
-                output.Write(buffer, 0, read);
-                sha1.TransformBlock(buffer, 0, read, null, 0);
-                position += read;
+                reader.CopyTo(hashing, progress, Cancellation.Token);
             }
+            catch (OperationCanceledException)
+            {
+                ConsoleProgress.Clear();
+                Console.Error.WriteLine("Canceled.");
+                return 130;
+            }
+
+            ConsoleProgress.Clear();
 
             if (expectedSha1 != null)
             {
-                sha1.TransformFinalBlock([], 0, 0);
-                var actual = Convert.ToHexString(sha1.Hash!).ToLowerInvariant();
+                var actual = Convert.ToHexString(hashing.GetHashAndReset()).ToLowerInvariant();
                 Console.WriteLine($"sha1: {actual}");
                 if (!string.Equals(actual, expectedSha1.Trim().ToLowerInvariant(), StringComparison.Ordinal))
                 {
@@ -1380,6 +1532,7 @@ internal static class Program
         }
         catch (Exception e)
         {
+            ConsoleProgress.Clear();
             Log.Error(e, "DecodeBlob failed");
             Console.Error.WriteLine($"Error: {e.Message}");
             return 1;

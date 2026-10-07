@@ -55,9 +55,9 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
 | `-u`, `--user` | user folder path; accepted for DolphinTool compatibility (RVZSharp needs no user directory). |
 | `-f`, `--format` | container format: `iso`, `gcz`, `wia`, `rvz`. Required. |
 | `-b`, `--block_size` | block size in **bytes**. Required for GCZ/WIA/RVZ. |
-| `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`. Required for WIA/RVZ. |
+| `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`. Required for WIA/RVZ; ignored for GCZ (always zlib deflate). |
 | `-l`, `--compression_level` | compression level. Required unless `-c none`. |
-| `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso` a warning notes that scrubbing gains little. |
+| `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso`/`-f gcz` a warning notes that scrubbing gains little. |
 | `--threads` | compression threads (RVZSharp extension). `0` (default) uses the processor count; the output is byte-identical for any value. |
 | `--verify` | after writing, decode the output and compare its CRC-32/MD5/SHA-1 with the input (RVZSharp extension); prints `Verification: OK (<sha1>)` or fails. With `-s` the scrubbed input is the reference. |
 
@@ -85,11 +85,15 @@ Notes:
   fully checksummed tables. `-b` must be a multiple of 2 MiB; `zstd` is rejected (WIA
   supports `none`, `bzip2`, `lzma` and `lzma2`; the library's `WiaWriter` also supports
   `CompressionType.Purge`, which DolphinTool's CLI does not expose).
-- **`-f gcz`** is not implemented yet — the command fails with a clear error (output
-  formats are `iso`, `rvz` and `wia`).
-- **`--threads`** (RVZSharp extension) controls the writer's group-compression pool
-  (packing included). The default `0` uses the processor count; results are appended in
-  group order, so the output file is byte-identical for any thread count.
+- **`-f gcz`** uses the GCZ writer: blocks of `-b` bytes (any power of two; 16 KiB is the
+  classic size, Dolphin's GUI defaults to 128 KiB), each block deflated at level 9 and stored
+  raw when compression saves fewer than 10 bytes, with a per-block Adler-32 of the stored
+  bytes. `-c`/`-l` are ignored (GCZ is always zlib). Converting a Wii disc without `-s`
+  prints Dolphin's "may not offer space advantages over ISO" warning.
+- **`--threads`** (RVZSharp extension) controls the writer's compression pool (RVZ/WIA
+  group compression and packing, GCZ block deflate). The default `0` uses the processor
+  count; results are appended in disc order, so the output file is byte-identical for any
+  thread count.
 - **`--verify`** (RVZSharp extension) hashes the input before writing and re-decodes the
   written file afterwards, comparing CRC-32, MD5 and SHA-1. It works for every `-f` value.
 - `-s` (scrub) requires a Wii disc with a game partition; other inputs fail with

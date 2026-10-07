@@ -13,6 +13,11 @@ WIA is the older container (Purge/Bzip2/LZMA/LZMA2, no Zstd, no junk packing, ve
 compatible 0x00080000). RVZ adds Zstd, chunk packing and the `rvz_packed_size` field, and
 drops Purge. RVZSharp reads both and writes both (`RvzWriter` / `WiaWriter`).
 
+**Can RVZSharp write the legacy formats too?**
+GCZ is supported as an output (`GczWriter`, CLI `convert -f gcz`): 16 KiB zlib blocks by
+default, power-of-two block sizes, Dolphin-compatible. CISO/WBFS/TGC/NFS are read-only —
+converting to ISO and back through RVZ/WIA/GCZ is the recommended path.
+
 **Can Dolphin open files created by RVZSharp?**
 The writer mirrors Dolphin's `ConvertToWIAOrRVZ` byte-for-byte at the container level
 (same headers, tables, exception offsets, group layout), so yes — Dolphin should open

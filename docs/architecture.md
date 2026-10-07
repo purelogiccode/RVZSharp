@@ -10,7 +10,8 @@
 │                         Library (RVZSharp)                         │
 │                                                                     │
 │  Blobs ── RvzReader ── Chunks/Compression/Packing/Wii  (read path)  │
-│  Blobs ── RvzWriter/WiaWriter ── WiaRvzWriter core      (write path) │
+│  Blobs ── RvzWriter/WiaWriter ── WiaRvzWriter core     (write path) │
+│  Blobs ── GczWriter ── zlib deflate blocks             (write path) │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -107,6 +108,10 @@ Key points:
 - The group table's compressed size depends on the offsets inside it, so the writer
   iterates the layout until the table size converges (typically 2 iterations), then emits
   the file with all offsets aligned to 4 bytes.
+- `GczWriter` is independent of this pipeline (Dolphin: `ConvertToGCZ`): the image is read
+  in power-of-two blocks, each block is deflated (stored raw when deflate does not fit or
+  saves fewer than 10 bytes), the per-block Adler-32 covers the stored bytes, and the
+  header/block tables are written last through a backward seek.
 
 ## Design decisions
 
@@ -114,7 +119,7 @@ Key points:
 |---|---|
 | Dolphin C++ is the layout truth | `References/dolphin-master/` — the RVZ/WIA formats were invented there; the Go reader and `docs/WiaAndRvz.md` are cross-checks |
 | Canonical ISO view for all formats | one consumer (CLI, writer) works for every container |
-| GCZ uses BCL `ZLibStream` | no extra dependency; GCZ is deflate |
+| GCZ uses BCL `ZLibStream` (read) and SharpZipLib `Deflater` (write) | GCZ is deflate; SharpZipLib is already a dependency for bzip2, and `Deflater` can be reset per block like Dolphin's `deflateReset` |
 | LZMA decoder is vendored 7-Zip | compact, self-contained, no external native code |
 | LZMA-SDK for encoding | pure-managed public-domain encoder (runtime dependency, version 22.1.1) |
 | Writer stores partitions decrypted + exceptions | the defining RVZ space optimization; identical to Dolphin |

@@ -15,6 +15,9 @@ artifacts/
 [Tt]est[Rr]esult*/
 *.trx
 
+# Benchmark results
+BenchmarkDotNet.Artifacts/
+
 # NuGet
 *.nupkg
 packages/

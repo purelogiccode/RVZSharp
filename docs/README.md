@@ -4,7 +4,8 @@ RVZSharp is a .NET 8 / 9 / 10 library and command-line tool for **GameCube and W
 images**.
 It reads the modern **RVZ** container (and its predecessor **WIA**), decodes the classic
 legacy formats (**GCZ, CISO/WBI, WBFS, TGC, NFS**) into a canonical ISO view, and **writes
-RVZ files** from any of them — mirroring the behaviour of the reference implementations in
+RVZ, WIA and GCZ files** from any of them — mirroring the behaviour of the reference
+implementations in
 [Dolphin](https://github.com/dolphin-emu/dolphin) (C++) and the Go
 [rvz](https://github.com/Vali0004/rev/raw) reader.
 
@@ -12,9 +13,9 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 361 fast (every framework, ~30 s) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 373 fast (every framework, ~30 s) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
-| Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing) and WIA (None, PURGE, Bzip2, LZMA1, LZMA2) |
+| Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing), WIA (None, PURGE, Bzip2, LZMA1, LZMA2) and GCZ (zlib deflate) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
 
 ## Documentation map
@@ -24,7 +25,7 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
 | [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
 | [CLI reference](usage-cli.md) | `info`, `decode`, `convert` — options and examples |
-| [Library API](usage-library.md) | `Blob`, `RvzReader`, `RvzWriter`, `WiaWriter`, `DiscHasher`, codecs, packing API |
+| [Library API](usage-library.md) | `Blob`, `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `DiscHasher`, codecs, packing API |
 | [Architecture](architecture.md) | Module map, read/write pipelines, design decisions |
 | [RVZ container format](format/rvz.md) | File head, disc struct, tables, groups, chunking |
 | [Compression & packing](format/compression-packing.md) | Codec details and the Lagged-Fibonacci junk packing |
@@ -49,9 +50,10 @@ RVZ files** from any of them — mirroring the behaviour of the reference implem
   `decode` and `convert` accept any supported file.
 - **Canonical ISO view** — all readers expose the decoded disc as a random-access stream of
   ISO bytes, so a GCZ, a WIA and an RVZ of the same disc are interchangeable inputs.
-- **RVZ/WIA writing** — the writer stores Wii partition data *decrypted* with hash exceptions
-  (the same space-saving trick Dolphin uses), detects and packs PRNG junk with a recovered
-  seed (RVZ), and emits fully checksummed tables (SHA-1 everywhere Dolphin puts them).
+- **RVZ/WIA/GCZ writing** — the RVZ/WIA writer stores Wii partition data *decrypted* with
+  hash exceptions (the same space-saving trick Dolphin uses), detects and packs PRNG junk
+  with a recovered seed (RVZ), and emits fully checksummed tables (SHA-1 everywhere Dolphin
+  puts them); GCZ is written as Dolphin-compatible zlib blocks with per-block Adler-32s.
 - **Verifiable** — every conversion is byte-exact: the test suite round-trips synthetic
   discs through every codec, packing setting and chunk size, decodes **30 real GameCube/Wii
   RVZ files** byte-for-byte against their official No-Intro SHA-1s, re-encodes real GC/Wii

@@ -420,12 +420,6 @@ internal static class Program
             using (blob)
             {
                 var input = blob;
-                if (format == "gcz")
-                {
-                    return Fail(
-                        "Converting to GCZ is not supported by this implementation (supported: iso, rvz, wia).");
-                }
-
                 if (options.HasFlag("scrub"))
                 {
                     var scrubbed = ScrubbedBlob.Create(blob);
@@ -557,7 +551,23 @@ internal static class Program
                     var progress = new ConsoleProgress("Encoding ");
                     try
                     {
-                        if (format == "wia")
+                        if (format == "gcz")
+                        {
+                            if (!options.HasFlag("scrub") &&
+                                Blob.GetDiscType(input) == DiscType.Wii)
+                            {
+                                Log.Warning(
+                                    "Converting Wii disc images to GCZ without scrubbing may not "
+                                    + "offer space advantages over ISO. Continuing anyway.");
+                            }
+
+                            GczWriter.Write(input, output, new GczWriteOptions
+                            {
+                                BlockSize = blockSize,
+                                MaxThreads = maxThreads
+                            }, progress, Cancellation.Token);
+                        }
+                        else if (format == "wia")
                         {
                             WiaWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
                         }

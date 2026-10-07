@@ -1,9 +1,9 @@
 # Library usage guide
 
 `RVZSharp` is a pure managed library (no native code) for **.NET 8, .NET 9 and .NET 10**.
-It reads and writes Dolphin **RVZ** and **WIA** disc images, reads the legacy GameCube/Wii
-formats (**GCZ, CISO/WBI, WBFS, TGC, NFS**), and exposes every format through one interface
-that serves the original disc bytes.
+It reads and writes Dolphin **RVZ** and **WIA** disc images, writes the legacy **GCZ** format,
+reads the remaining legacy GameCube/Wii formats (**CISO/WBI, WBFS, TGC, NFS**), and exposes
+every format through one interface that serves the original disc bytes.
 
 ```
 Install-Package RVZSharp          # Package Manager
@@ -15,7 +15,7 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 | Namespace | Contents |
 |---|---|
 | `RVZSharp.Blobs` | `IBlobReader`, `Blob` (factory), `BlobType`, per-format readers |
-| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `DiscHasher`, `RvzWriteOptions` |
+| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `DiscHasher`, `RvzWriteOptions`, `GczWriteOptions` |
 | `RVZSharp.Models` | container structs: `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`, `CompressionType` |
 | `RVZSharp.Chunks` | `ChunkDecoder`, `ExceptionListParser` |
 | `RVZSharp.Compression` | codec factories: `CompressionCodecFactory`, `CompressionEncoderFactory` (the vendored 7-Zip LZMA port is internal) |
@@ -350,6 +350,34 @@ WiaWriter.Write(input, output, new RvzWriteOptions
 - The chunk size must be a multiple of 2 MiB (Dolphin's `IsDiscImageBlockSizeValid`).
 - `options` defaults to `RvzWriteOptions.WiaDefault` (LZMA2, level 3, 2 MiB chunks).
 - Input validation, progress and cancellation behave exactly like `RvzWriter.Write`.
+
+---
+
+## Writing GCZ
+
+`GczWriter` mirrors Dolphin's `ConvertToGCZ`: the image is split into blocks, each block is
+deflated (level 9) and stored compressed unless that saves fewer than 10 bytes, and the block
+table carries a per-block Adler-32 of the stored bytes. GCZ has no compression choice — it is
+always zlib deflate.
+
+```csharp
+using var input = Blob.Open(@"C:\games\game.iso");
+using var output = File.Create(@"C:\games\game.gcz");
+
+GczWriter.Write(input, output, new GczWriteOptions
+{
+    BlockSize = 0x4000,   // power of two; 16 KiB classic, Dolphin's GUI defaults to 128 KiB
+    MaxThreads = 0,       // 0 = processor count; output is byte-identical for any value
+});
+```
+
+- The output stream **must be seekable**: like Dolphin, the header and the block tables are
+  written after the block data (a `FileStream` or `MemoryStream` works; a network stream does
+  not).
+- Input validation, progress and cancellation behave like `RvzWriter.Write`; the Wii-disc
+  GCZ-specific warning ("may not offer space advantages") is a CLI concern.
+- Unlike WIA/RVZ, GCZ stores the image as-is (no partition decryption or packing): Wii
+  discs compress poorly unless scrubbed first.
 
 ---
 

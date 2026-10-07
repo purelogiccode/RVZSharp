@@ -1,0 +1,15 @@
+<Project>
+
+  <!-- Replaces the repo-wide Directory.Build.props for this subtree (MSBuild stops at the
+       nearest Directory.Build.props), including BenchmarkDotNet's generated project under
+       bin/. The library's multi-targeting and analyzer rules must not apply there: the
+       generated project pins one target framework and the benchmark classes use shapes the
+       analyzers reject. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

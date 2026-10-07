@@ -11,14 +11,15 @@
 | 5 — Reference alignment | audit against dolphin-master + rvz-1.0.3; every finding fixed or documented | ✅ done |
 | 6 — Real-world validation | 97 real-file tests (`RVZSharp.Slow.Tests`) against 30 GameCube/Wii RVZ games (No-Intro SHA-1) incl. writer round-trips — found & fixed the 2 MiB ticket-key writer bug | ✅ done |
 | 7 — Writer performance | parallel group compression (`MaxThreads` / `--threads`, Dolphin's worker-pool model), `convert --verify` hash comparison | ✅ done |
+| 8 — GCZ writer | `GczWriter` / `convert -f gcz`: 16 KiB zlib blocks, raw-block fallback, per-block Adler-32, parallel block deflate | ✅ done |
 
 ## Supported
 
 - Read: RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO — auto-detected, random-access.
-- Write: RVZ and WIA from any of the above (None/Zstd/Bzip2/LZMA1/LZMA2 with Dolphin's
+- Write: RVZ, WIA and GCZ from any of the above (None/Zstd/Bzip2/LZMA1/LZMA2 with Dolphin's
   level rules incl. negative Zstd "fast" levels; PURGE for WIA; chunk sizes 32 KiB–2 MiB
-  powers of two or multiples of 2 MiB above that for RVZ, multiples of 2 MiB for WIA;
-  optional RVZ packing; `--sha1`-verifiable output).
+  powers of two or multiples of 2 MiB above that for RVZ, multiples of 2 MiB for WIA; GCZ
+  with power-of-two block sizes; optional RVZ packing; `--sha1`-verifiable output).
 - `--scrub`: zeroes the data of non-game Wii partitions (update/channel) before converting.
 - Wii partition optimization with hash exceptions, FST split, zero groups, PRNG-junk
   packing with seed recovery.
@@ -36,7 +37,6 @@
 |---|---|
 | WBFS conversion is slow | WBFS reports a fixed 9.4 GiB logical image; converting reads all of it (mostly zero clusters). `decode` + `convert` on the ISO is faster in practice. |
 | PURGE output | PURGE is WIA-only; `WiaWriter` supports it (`CompressionType.Purge`), but the CLI's `-c` choices mirror DolphinTool and do not expose it. RVZ readers reject PURGE containers. |
-| No GCZ writer | `convert -f gcz` fails with a clear error (output formats are `iso`, `rvz` and `wia`). |
 | No `extract` command | DolphinTool's `extract` requires a disc filesystem (FST) implementation; the CLI validates the arguments and reports it as unsupported. |
 | NFS key location | the AES key must come from `code/htk.bin` next to the `content/hif_000000.nfs` file (or be supplied via the library API). |
 | Single-threaded reads | decoding is sequential; only the writer compresses groups in parallel (`MaxThreads`). |
@@ -52,7 +52,6 @@
 
 ## Possible next steps
 
-- GCZ writer.
 - `extract` command: FST parser + file/directory extraction, listing, and game-only mode.
 - Async API surface (`CopyToAsync`, `WriteAsync`) for UI consumers.
 - Cross-checks against `wit`/`wwt` output for shared formats.

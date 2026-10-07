@@ -6,9 +6,9 @@
 # RVZSharp
 
 A pure managed C# library and CLI (**.NET 8 / 9 / 10**) for decoding and encoding **Dolphin
-RVZ/WIA** disc images (GameCube/Wii) and decoding the legacy formats (GCZ, CISO/WBI, WBFS,
-TGC, NFS). RVZSharp decodes RVZ/WIA files back to the original disc image (`.iso`)
-**byte-for-byte**, including:
+RVZ/WIA** disc images (GameCube/Wii), encoding the legacy **GCZ** format, and decoding the
+remaining legacy formats (CISO/WBI, WBFS, TGC, NFS). RVZSharp decodes RVZ/WIA files back to
+the original disc image (`.iso`) **byte-for-byte**, including:
 
 ```
 dotnet add package RVZSharp
@@ -107,7 +107,14 @@ using var wia = File.Create(@"C:\games\game.wia");
 WiaWriter.Write(input, wia, new RvzWriteOptions { Compression = CompressionType.Lzma2 });
 ```
 
-**5. Progress and cancellation** for long conversions (encode *and* decode):
+**5. Write GCZ** (`GczWriter`; 16 KiB zlib blocks by default, per-block Adler-32, parallel):
+
+```csharp
+using var gcz = File.Create(@"C:\games\game.gcz");
+GczWriter.Write(input, gcz, new GczWriteOptions { BlockSize = 0x4000 });
+```
+
+**6. Progress and cancellation** for long conversions (encode *and* decode):
 
 ```csharp
 using var cts = new CancellationTokenSource();
@@ -120,7 +127,7 @@ RvzWriter.Write(input: input, output: output, options: options,
 blob.CopyTo(isoStream, progress, cts.Token);
 ```
 
-**6. Verify a decode** without materializing the ISO — `DiscHasher.Compute(blob)` returns
+**7. Verify a decode** without materializing the ISO — `DiscHasher.Compute(blob)` returns
 the CRC-32, MD5 and SHA-1 in one streaming pass (the digests Dolphin's verifier reports):
 
 ```csharp
@@ -128,7 +135,7 @@ var hashes = DiscHasher.Compute(blob);
 Console.WriteLine(Convert.ToHexString(hashes.Sha1));
 ```
 
-**7. Handling errors** — every format problem raises `RvzException` subclasses:
+**8. Handling errors** — every format problem raises `RvzException` subclasses:
 
 ```csharp
 try
@@ -170,13 +177,13 @@ dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz|wia \
 The CLI accepts the same command arguments as Dolphin's `dolphin-tool` (`convert`,
 `verify`, `header`; `extract` is recognized but not implemented). `convert` accepts
 **any** readable blob (a plain ISO or one of the legacy formats, including **split WBFS**
-`.wbfs`+`.wbf1…` parts) and writes an RVZ or WIA file, mirroring Dolphin's converter: Wii
-partitions are stored decrypted with hash exceptions, raw data as-is, PRNG junk is packed
-with a recovered seed (Lagged Fibonacci `GetSeed`, RVZ only), and the tables carry all
-SHA-1 checksums. `--scrub` zeroes the data of non-game Wii partitions (update/channel)
-before converting. `-f iso` decodes back to a plain ISO. Two RVZSharp extensions:
-`--threads <n>` sets the compression worker count (output is byte-identical for any
-value), and `--verify` re-decodes the written file and compares CRC-32/MD5/SHA-1 with the
+`.wbfs`+`.wbf1…` parts) and writes an RVZ, WIA or GCZ file, mirroring Dolphin's converter:
+Wii partitions are stored decrypted with hash exceptions (RVZ/WIA), raw data as-is, PRNG
+junk is packed with a recovered seed (Lagged Fibonacci `GetSeed`, RVZ only), and the tables
+carry all SHA-1 checksums. `--scrub` zeroes the data of non-game Wii partitions
+(update/channel) before converting. `-f iso` decodes back to a plain ISO. Two RVZSharp
+extensions: `--threads <n>` sets the compression worker count (output is byte-identical for
+any value), and `--verify` re-decodes the written file and compares CRC-32/MD5/SHA-1 with the
 input.
 
 ## Documentation
@@ -196,19 +203,23 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   codec contracts), `IO` (big-endian reading, section streams), `Compression` (codecs +
   factories), `Chunks` (group decoding, exception lists), `Packing` (RVZ packing + PRNG,
   encoder and decoder), `Wii` (hash tree + region rebuild, partition extraction for the
-  writer), `RvzReader`, `RvzWriter`. Every public and internal type and member carries XML
-  documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
+  writer), `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`. Every public and internal type
+  and member carries XML documentation (shipped in the package as `RVZSharp.xml` for
+  IntelliSense).
 - `RVZSharp.Cli` — the `header`/`verify`/`convert` tool (DolphinTool-compatible surface,
   plus the legacy `info`/`decode` commands).
-- `RVZSharp.Tests` — 361 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 373 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
-  packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), parallel-writer determinism
-  tests, package-facing API tests (path open, ReadFully, progress, cancellation).
+  packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), GCZ writer tests, parallel-writer
+  determinism tests, package-facing API tests (path open, ReadFully, progress, cancellation).
 - `RVZSharp.Slow.Tests` — 97 real-file tests (`RealRvzFileTests`) that decode real
   GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
   Kept out of the solution, so a plain `dotnet test` never runs them (~12 min); run
   explicitly with `dotnet test RVZSharp.Slow.Tests` (details in [docs/testing.md](docs/testing.md)).
+- `RVZSharp.Benchmarks` — BenchmarkDotNet suite (net10.0): encode/decode throughput per
+  codec and writer thread scaling, on a synthetic 16 MiB GameCube image
+  (`dotnet run -c Release --project RVZSharp.Benchmarks`).
 
 ## Real-world validation
 
@@ -233,11 +244,12 @@ the games. The real Wii round-trip exposed and pinned a writer bug (see Status b
 
 RVZ **and** the legacy disc formats (WIA, GCZ, CISO/WBI, WBFS incl. split files, TGC, NFS)
 are decoded byte-for-byte and covered by tests; the CLI `info`/`decode` commands accept any
-of them (auto-detected by magic). The writers (`rvzsharp convert -f rvz|wia`) encode any of
-them back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules — including
+of them (auto-detected by magic). The writers (`rvzsharp convert -f rvz|wia|gcz`) encode any
+of them back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules — including
 negative Zstd "fast" levels — optional packing, chunks of 32 KiB–2 MiB powers of two or
-multiples of 2 MiB) or WIA (None/PURGE/Bzip2/LZMA1/LZMA2, chunks that are multiples of
-2 MiB), with the same SHA-1s Dolphin produces. Decode supports progress/cancellation and
+multiples of 2 MiB), WIA (None/PURGE/Bzip2/LZMA1/LZMA2, chunks that are multiples of
+2 MiB) or GCZ (16 KiB zlib blocks by default, power-of-two sizes), with the same SHA-1s
+Dolphin produces. Decode supports progress/cancellation and
 `DiscHasher` computes CRC-32/MD5/SHA-1 in one pass. The codebase was audited against the
 reference implementations (Dolphin `WIABlob`/`WIACompression` and the Go `rvz-1.0.3` tool)
 and every finding was fixed or explicitly documented.

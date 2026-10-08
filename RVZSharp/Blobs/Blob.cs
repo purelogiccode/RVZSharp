@@ -108,7 +108,7 @@ public static class Blob
         var parts = new List<Stream> { firstPart };
         try
         {
-            for (var index = 1; ; index++)
+            for (var index = 1;; index++)
             {
                 var partPath = $"{basePath}.part{index}.iso";
                 if (!File.Exists(partPath))

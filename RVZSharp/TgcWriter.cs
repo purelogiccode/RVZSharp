@@ -178,7 +178,7 @@ public static class TgcWriter
     private static bool TryReadExactly(IBlobReader input, long offset, Span<byte> buffer)
     {
         return offset >= 0 && offset + buffer.Length <= input.Length
-            && input.ReadAt(offset, buffer) == buffer.Length;
+                           && input.ReadAt(offset, buffer) == buffer.Length;
     }
 
     private static uint ReadBe32(ReadOnlySpan<byte> data, int offset)

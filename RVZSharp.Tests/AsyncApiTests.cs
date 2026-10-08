@@ -78,7 +78,6 @@ public class AsyncApiTests
     [Fact]
     public async Task RvzWriteAsync_MatchesWrite()
     {
-        var iso = BuildGcIso();
         var options = new RvzWriteOptions { Compression = CompressionType.Lzma2, ChunkSize = 0x8000 };
 
         var expected = EncodeSync((input, output) => RvzWriter.Write(input, output, options));

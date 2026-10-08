@@ -39,7 +39,7 @@ internal sealed class CodecErrorStream : Stream
             throw;
         }
         catch (Exception e) when (e is not (IOException or OperationCanceledException
-                                              or ObjectDisposedException))
+                                      or ObjectDisposedException))
         {
             throw new RvzFormatException(
                 $"Failed to initialize a {codecName} stream: {e.Message}", e);
@@ -83,7 +83,7 @@ internal sealed class CodecErrorStream : Stream
             throw;
         }
         catch (Exception e) when (e is not (IOException or OperationCanceledException
-                                              or ObjectDisposedException))
+                                      or ObjectDisposedException))
         {
             throw new RvzFormatException($"Failed to decompress a {_codecName} stream: {e.Message}", e);
         }
@@ -140,7 +140,7 @@ internal sealed class CodecErrorStream : Stream
             throw;
         }
         catch (Exception e) when (e is not (IOException or OperationCanceledException
-                                              or ObjectDisposedException))
+                                      or ObjectDisposedException))
         {
             throw new RvzFormatException($"Failed to decompress a {_codecName} stream: {e.Message}", e);
         }

@@ -9,9 +9,7 @@ namespace RVZSharp;
 /// </summary>
 public sealed class BlobStream : Stream
 {
-    private readonly IBlobReader _reader;
     private readonly bool _leaveOpen;
-    private long _position;
 
     /// <summary>Wraps <paramref name="reader"/> in a seekable stream.</summary>
     /// <param name="reader">The blob to expose.</param>
@@ -22,12 +20,12 @@ public sealed class BlobStream : Stream
     public BlobStream(IBlobReader reader, bool leaveOpen = false)
     {
         ArgumentNullException.ThrowIfNull(reader);
-        _reader = reader;
+        Blob = reader;
         _leaveOpen = leaveOpen;
     }
 
     /// <summary>The wrapped blob.</summary>
-    public IBlobReader Blob => _reader;
+    public IBlobReader Blob { get; }
 
     /// <summary>True; the decoded image is readable.</summary>
     public override bool CanRead => true;
@@ -39,14 +37,10 @@ public sealed class BlobStream : Stream
     public override bool CanWrite => false;
 
     /// <summary>Size of the decoded disc image in bytes.</summary>
-    public override long Length => _reader.Length;
+    public override long Length => Blob.Length;
 
     /// <summary>Current position in the decoded disc image.</summary>
-    public override long Position
-    {
-        get => _position;
-        set => _position = value;
-    }
+    public override long Position { get; set; }
 
     /// <summary>Reads decoded disc bytes at the current position.</summary>
     public override int Read(byte[] buffer, int offset, int count)
@@ -57,21 +51,21 @@ public sealed class BlobStream : Stream
     /// <summary>Reads decoded disc bytes at the current position.</summary>
     public override int Read(Span<byte> buffer)
     {
-        var read = _reader.ReadAt(_position, buffer);
-        _position += read;
+        var read = Blob.ReadAt(Position, buffer);
+        Position += read;
         return read;
     }
 
     /// <summary>Moves the position within the decoded disc image.</summary>
     public override long Seek(long offset, SeekOrigin origin)
     {
-        _position = origin switch
+        Position = origin switch
         {
             SeekOrigin.Begin => offset,
-            SeekOrigin.Current => _position + offset,
+            SeekOrigin.Current => Position + offset,
             _ => Length + offset
         };
-        return _position;
+        return Position;
     }
 
     /// <summary>No-op; decoded images have no write buffer.</summary>
@@ -96,7 +90,7 @@ public sealed class BlobStream : Stream
     {
         if (disposing && !_leaveOpen)
         {
-            _reader.Dispose();
+            Blob.Dispose();
         }
 
         base.Dispose(disposing);

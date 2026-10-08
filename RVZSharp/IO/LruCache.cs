@@ -13,7 +13,7 @@ internal sealed class LruCache<TKey, TValue>
     private readonly record struct Entry(TKey Key, TValue Value, int Size);
 
 #if NET9_0_OR_GREATER
-    private readonly System.Threading.Lock _gate = new();
+    private readonly Lock _gate = new();
 #else
     private readonly object _gate = new();
 #endif

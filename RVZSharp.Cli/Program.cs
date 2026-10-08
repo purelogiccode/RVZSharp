@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -259,11 +260,9 @@ internal static class Program
         public static TemporaryFile SpoolStdin()
         {
             var file = Create();
-            using (var stdin = Console.OpenStandardInput())
-            using (var output = File.Create(file.Path))
-            {
-                stdin.CopyTo(output);
-            }
+            using var stdin = Console.OpenStandardInput();
+            using var output = File.Create(file.Path);
+            stdin.CopyTo(output);
 
             return file;
         }
@@ -338,7 +337,7 @@ internal static class Program
                 if (!spec.TryGetValue(longName, out var option) &&
                     !spec.TryGetValue(longName[2..], out option))
                 {
-                    throw new CliError($"no such option: {arg}");
+                    throw new CliErrorException($"no such option: {arg}");
                 }
 
                 name = longName[2..];
@@ -350,7 +349,7 @@ internal static class Program
             {
                 var match = spec.FirstOrDefault(pair => pair.Value.Short == arg);
 
-                name = match.Key ?? throw new CliError($"no such option: {arg}");
+                name = match.Key ?? throw new CliErrorException($"no such option: {arg}");
                 takesValue = match.Value.TakesValue;
                 choices = match.Value.Choices;
             }
@@ -369,12 +368,12 @@ internal static class Program
             string value = inlineValue ?? (i + 1 < args.Count ? args[++i] : string.Empty);
             if (value.Length == 0)
             {
-                throw new CliError($"option {arg} requires an argument");
+                throw new CliErrorException($"option {arg} requires an argument");
             }
 
             if (choices is { Length: > 0 } && !choices.Contains(value))
             {
-                throw new CliError(
+                throw new CliErrorException(
                     $"option {arg}: invalid choice: '{value}' (choose from {string.Join(", ", choices)})");
             }
 
@@ -384,18 +383,11 @@ internal static class Program
         return result;
     }
 
-    private sealed class CliError : Exception
+    [SuppressMessage("Roslynator", "RCS1194", Justification = "Only the message constructor is used.")]
+    private sealed class CliErrorException : Exception
     {
-        public CliError(string message)
+        public CliErrorException(string message)
             : base(message)
-        {
-        }
-
-        public CliError()
-        {
-        }
-
-        public CliError(string? message, Exception? innerException) : base(message, innerException)
         {
         }
     }
@@ -471,7 +463,7 @@ internal static class Program
             {
                 options = ParseArgs(args, ConvertSpec);
             }
-            catch (CliError e)
+            catch (CliErrorException e)
             {
                 Log.Warning(e, "CLI parse error in ConvertCommand");
                 return Fail(e.Message);
@@ -631,7 +623,8 @@ internal static class Program
                             if (!options.IsSet("compression_level") ||
                                 !int.TryParse(options.Get("compression_level"), out level))
                             {
-                                return Fail("Compression level must be set when compression type is not 'none' or 'purge'");
+                                return Fail(
+                                    "Compression level must be set when compression type is not 'none' or 'purge'");
                             }
 
                             var (min, max) = GetAllowedCompressionLevels(compression);
@@ -934,7 +927,7 @@ internal static class Program
             "lzma" => CompressionType.Lzma,
             "lzma2" => CompressionType.Lzma2,
             "zstd" or "zstandard" => CompressionType.Zstd,
-            _ => throw new CliError(
+            _ => throw new CliErrorException(
                 $"unknown compression method '{name}' (expected none, zstd, bzip2, lzma or lzma2)")
         };
     }
@@ -973,7 +966,7 @@ internal static class Program
             {
                 options = ParseArgs(args, HeaderSpec);
             }
-            catch (CliError e)
+            catch (CliErrorException e)
             {
                 Log.Warning(e, "CLI parse error in HeaderCommand");
                 return Fail(e.Message);
@@ -1171,7 +1164,7 @@ internal static class Program
             {
                 options = ParseArgs(args, VerifySpec);
             }
-            catch (CliError e)
+            catch (CliErrorException e)
             {
                 Log.Warning(e, "CLI parse error in VerifyCommand");
                 return Fail(e.Message);
@@ -1396,7 +1389,7 @@ internal static class Program
             {
                 options = ParseArgs(args, ExtractSpec);
             }
-            catch (CliError e)
+            catch (CliErrorException e)
             {
                 Log.Warning(e, "CLI parse error in ExtractCommand");
                 return Fail(e.Message);
@@ -1712,13 +1705,13 @@ internal static class Program
             Directory.CreateDirectory(sys);
             CopyData(view, 0x0, 0x440, Path.Combine(sys, "boot.bin"));
             CopyData(view, 0x440, 0x2000, Path.Combine(sys, "bi2.bin"));
-            if (WiiVolume.GetApploaderSize(view) is ulong apploaderSize)
+            if (WiiVolume.GetApploaderSize(view) is { } apploaderSize)
             {
                 CopyData(view, 0x2440, (long)apploaderSize, Path.Combine(sys, "apploader.img"));
             }
 
-            if (WiiVolume.GetBootDolOffset(view) is ulong dolOffset &&
-                WiiVolume.GetBootDolSize(view, dolOffset) is uint dolSize)
+            if (WiiVolume.GetBootDolOffset(view) is { } dolOffset &&
+                WiiVolume.GetBootDolSize(view, dolOffset) is { } dolSize)
             {
                 CopyData(view, (long)dolOffset, dolSize, Path.Combine(sys, "main.dol"));
             }
@@ -1763,7 +1756,7 @@ internal static class Program
             return;
         }
 
-        if (offsetAddress is long offsetAddressValue)
+        if (offsetAddress is { } offsetAddressValue)
         {
             if (!TryReadBe32(blob, offsetAddressValue, out var offset))
             {

@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using RVZSharp.Blobs;
 using RVZSharp.Models;
-using RVZSharp.Tests.Helpers;
 using RVZSharp.Verification;
 using RVZSharp.Wii;
 
@@ -350,6 +349,7 @@ public class DiscVerifierTests
     /// <summary>Reports progress synchronously (Progress&lt;T&gt; posts asynchronously).</summary>
     private sealed class InlineProgress(Action<double> report) : IProgress<double>
     {
-        public void Report(double value) => report(value);
+        private readonly Action<double> Report1 = report;
+        public void Report(double value) => Report1(value);
     }
 }

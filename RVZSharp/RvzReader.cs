@@ -53,7 +53,7 @@ public sealed class RvzReader : IBlobReader
 
     /// <summary>Serializes file reads; decompression itself runs lock-free on worker threads.</summary>
 #if NET9_0_OR_GREATER
-    private readonly System.Threading.Lock _fileLock = new();
+    private readonly Lock _fileLock = new();
 #else
     private readonly object _fileLock = new();
 #endif
@@ -592,13 +592,14 @@ public sealed class RvzReader : IBlobReader
                 }
                 else
                 {
+                    var First = first;
                     Parallel.For(0, count,
                         new ParallelOptions
                         {
                             MaxDegreeOfParallelism = threads,
                             CancellationToken = cancellationToken
                         },
-                        i => results[i] = DecodeUnit(area, first + i, unitSize));
+                        i => results[i] = DecodeUnit(area, First + i, unitSize));
                 }
 
                 for (var i = 0; i < count; i++)

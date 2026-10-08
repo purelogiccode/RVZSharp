@@ -14,8 +14,7 @@ public class ThreadScalingBenchmarks
 {
     private byte[] _iso = null!;
 
-    [Params(1, 2, 4, 8, 0)]
-    public int Threads { get; set; }
+    [Params(1, 2, 4, 8, 0)] public int Threads { get; set; }
 
     [GlobalSetup]
     public void Setup() => _iso = BenchmarkDisc.BuildGameCubeImage();

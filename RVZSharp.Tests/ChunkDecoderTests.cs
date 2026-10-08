@@ -6,6 +6,7 @@ using ChunkDecodeResult = RVZSharp.Models.ChunkDecodeResult;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for chunk decoder.</summary>
 public class ChunkDecoderTests
 {
     private static byte[] Payload(int size, int seed)
@@ -20,6 +21,7 @@ public class ChunkDecoderTests
         return data;
     }
 
+    /// <summary>Verifies that chunk with extra stored bytes throws.</summary>
     [Fact]
     public void Chunk_WithExtraStoredBytes_Throws()
     {
@@ -34,6 +36,7 @@ public class ChunkDecoderTests
         Assert.Contains("more than", ex.Message);
     }
 
+    /// <summary>Verifies that chunk corrupt bzip 2 throws format exception.</summary>
     [Fact]
     public void Chunk_CorruptBzip2_ThrowsFormatException()
     {
@@ -91,6 +94,7 @@ public class ChunkDecoderTests
             });
     }
 
+    /// <summary>Verifies that raw chunk no packing every codec.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Zstd)]
@@ -111,6 +115,7 @@ public class ChunkDecoderTests
         }
     }
 
+    /// <summary>Verifies that zero group returns zeroes.</summary>
     [Fact]
     public void ZeroGroup_ReturnsZeroes()
     {

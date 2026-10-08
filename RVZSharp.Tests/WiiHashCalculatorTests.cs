@@ -4,6 +4,7 @@ using RVZSharp.Wii;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for Wii hash calculator.</summary>
 public class WiiHashCalculatorTests
 {
     private static byte[] SectorData(int seed = 1)
@@ -20,6 +21,7 @@ public class WiiHashCalculatorTests
         return hashArea;
     }
 
+    /// <summary>Verifies that hash area layout matches the Wii hash tree.</summary>
     [Fact]
     public void HashAreaLayout_MatchesTheWiiHashTree()
     {
@@ -51,6 +53,7 @@ public class WiiHashCalculatorTests
         Assert.All(hashArea.AsSpan(0x3E0, 0x20).ToArray(), b => Assert.Equal(0, b));
     }
 
+    /// <summary>Verifies that zero sector h 0 area is 31 times the zero block hash.</summary>
     [Fact]
     public void ZeroSectorH0Area_Is31TimesTheZeroBlockHash()
     {
@@ -64,6 +67,7 @@ public class WiiHashCalculatorTests
         Assert.Equal(expected, WiiHashCalculator.ZeroSectorH0Area);
     }
 
+    /// <summary>Verifies that build hash area rejects wrong lengths.</summary>
     [Fact]
     public void BuildHashArea_RejectsWrongLengths()
     {
@@ -75,6 +79,7 @@ public class WiiHashCalculatorTests
             WiiHashCalculator.BuildHashArea(new byte[WiiHashCalculator.SectorDataSize], new byte[0x3FF]));
     }
 
+    /// <summary>Verifies that apply hash exceptions writes the given hashes.</summary>
     [Fact]
     public void ApplyHashExceptions_WritesTheGivenHashes()
     {
@@ -93,6 +98,7 @@ public class WiiHashCalculatorTests
         Assert.Equal(hashB, hashArea.AsSpan(0x104, 20).ToArray());
     }
 
+    /// <summary>Verifies that apply hash exceptions chunk base offset shifts the offsets.</summary>
     [Fact]
     public void ApplyHashExceptions_ChunkBaseOffset_ShiftsTheOffsets()
     {
@@ -106,6 +112,7 @@ public class WiiHashCalculatorTests
         Assert.Equal(hash, hashArea.AsSpan(0x200, 20).ToArray());
     }
 
+    /// <summary>Verifies that apply hash exceptions out of range throws.</summary>
     [Theory]
     [InlineData(0x3F0)] // starts at the very end: 20 bytes would overflow the 0x400 area
     [InlineData(0x400)] // beyond the sector hash area entirely
@@ -118,6 +125,7 @@ public class WiiHashCalculatorTests
         Assert.Throws<RvzFormatException>(() => WiiHashCalculator.ApplyHashExceptions(exceptions, hashArea));
     }
 
+    /// <summary>Verifies that apply hash exceptions chunk base pushes offsets out of range.</summary>
     [Fact]
     public void ApplyHashExceptions_ChunkBase_PushesOffsetsOutOfRange()
     {

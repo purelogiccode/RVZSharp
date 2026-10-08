@@ -1,8 +1,8 @@
 [![CI](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-8.0_%7C_9.0_%7C_10.0-blueviolet)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
-[![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-xUnit-brightgreen)](docs/testing.md)
+[![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green)](https://github.com/purelogiccode/RVZSharp/blob/master/LICENSE)
+[![Tests](https://img.shields.io/badge/tests-xUnit-brightgreen)](https://github.com/purelogiccode/RVZSharp/blob/master/docs/testing.md)
 
 # RVZSharp
 
@@ -242,16 +242,16 @@ disc header/region, ticket/TMD/cert/H3) per partition.
 
 ## Documentation
 
-The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki (also
+The full documentation lives in [`docs/`](https://github.com/purelogiccode/RVZSharp/blob/master/docs/README.md) — a multi-page wiki (also
 published as the GitHub Pages site, with a side menu in both) covering
-[what's new](docs/whats-new.md), the [CLI](docs/usage-cli.md), the
-[library API](docs/usage-library.md), [architecture](docs/architecture.md), the
-[RVZ container format](docs/format/rvz.md),
-[compression & packing](docs/format/compression-packing.md),
-[Wii partitions](docs/format/wii-partitions.md), the
-[legacy formats](docs/format/legacy.md), [testing](docs/testing.md),
-[packaging & distribution](docs/packaging.md), [roadmap](docs/roadmap.md) and a
-[FAQ](docs/faq.md). Release highlights are summarized in [WhatsNew.md](WhatsNew.md).
+[what's new](https://github.com/purelogiccode/RVZSharp/blob/master/docs/whats-new.md), the [CLI](https://github.com/purelogiccode/RVZSharp/blob/master/docs/usage-cli.md), the
+[library API](https://github.com/purelogiccode/RVZSharp/blob/master/docs/usage-library.md), [architecture](https://github.com/purelogiccode/RVZSharp/blob/master/docs/architecture.md), the
+[RVZ container format](https://github.com/purelogiccode/RVZSharp/blob/master/docs/format/rvz.md),
+[compression & packing](https://github.com/purelogiccode/RVZSharp/blob/master/docs/format/compression-packing.md),
+[Wii partitions](https://github.com/purelogiccode/RVZSharp/blob/master/docs/format/wii-partitions.md), the
+[legacy formats](https://github.com/purelogiccode/RVZSharp/blob/master/docs/format/legacy.md), [testing](https://github.com/purelogiccode/RVZSharp/blob/master/docs/testing.md),
+[packaging & distribution](https://github.com/purelogiccode/RVZSharp/blob/master/docs/packaging.md), [roadmap](https://github.com/purelogiccode/RVZSharp/blob/master/docs/roadmap.md) and a
+[FAQ](https://github.com/purelogiccode/RVZSharp/blob/master/docs/faq.md). Release highlights are summarized in [WhatsNew.md](https://github.com/purelogiccode/RVZSharp/blob/master/WhatsNew.md).
 
 ## Project layout
 
@@ -275,7 +275,7 @@ published as the GitHub Pages site, with a side menu in both) covering
 - `RVZSharp.Slow.Tests` — 97 real-file tests (`RealRvzFileTests`) that decode real
   GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
   Kept out of the solution, so a plain `dotnet test` never runs them (~12 min); run
-  explicitly with `dotnet test RVZSharp.Slow.Tests` (details in [docs/testing.md](docs/testing.md)).
+  explicitly with `dotnet test RVZSharp.Slow.Tests` (details in [docs/testing.md](https://github.com/purelogiccode/RVZSharp/blob/master/docs/testing.md)).
 - `RVZSharp.Benchmarks` — BenchmarkDotNet suite (net10.0): encode/decode throughput per
   codec and writer thread scaling, on a synthetic 16 MiB GameCube image
   (`dotnet run -c Release --project RVZSharp.Benchmarks`).
@@ -329,14 +329,14 @@ GitHub Actions (`.github/workflows/ci.yml`) builds and tests on `net8.0`/`net9.0
 with coverage, packs, and publishes a smoke-tested ReadyToRun CLI artifact. Dependabot
 keeps NuGet and Actions dependencies current.
 
-**1.0.1 (unreleased)** adds the legacy writers (CISO/WBFS/TGC), `DiscVerifier`, the CI and
+**1.1.0 (unreleased)** adds the legacy writers (CISO/WBFS/TGC), `DiscVerifier`, the CI and
 packaging gates above, and the CLI conveniences (`--json`, `-` stdin/stdout, completions).
 A post-release review also fixed a set of correctness bugs: retail ticket title keys are
 now common-key decrypted (so `verify --partitions`, `extract` and RVZ writing work on real
 encrypted discs), extract's `tmd.bin`/`cert.bin`/`h3.bin` use partition-relative offsets,
 the WBFS header declares the file size correctly and carries the disc-header copy,
 `convert --verify` honors Ctrl+C (exit 130), writer progress is monotonic, and parallel
-decode/encode failures surface the original exception. See [WhatsNew.md](WhatsNew.md).
+decode/encode failures surface the original exception. See [WhatsNew.md](https://github.com/purelogiccode/RVZSharp/blob/master/WhatsNew.md).
 
 ## License
 
@@ -347,9 +347,9 @@ Code** ([github.com/purelogiccode](https://github.com/purelogiccode)).
 The RVZ/WIA format logic in this library is derived from
 [Dolphin](https://github.com/dolphin-emu/dolphin), which is licensed under the
 **GNU General Public License, version 2 or later**. To stay fully compliant, RVZSharp is
-distributed under the **same license (GPL-2.0-or-later)** — see [LICENSE](LICENSE).
+distributed under the **same license (GPL-2.0-or-later)** — see [LICENSE](https://github.com/purelogiccode/RVZSharp/blob/master/LICENSE).
 
 All third-party code and dependencies are listed in
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) (MIT SharpCompress LZMA decoder port,
+[THIRD-PARTY-NOTICES.md](https://github.com/purelogiccode/RVZSharp/blob/master/THIRD-PARTY-NOTICES.md) (MIT SharpCompress LZMA decoder port,
 MIT/public-domain runtime dependencies, GPL Dolphin as the format source, BSD Go reader as
 validation reference).

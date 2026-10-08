@@ -9,6 +9,7 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class ConcurrentReadTests
 {
+    /// <summary>Verifies that concurrent read at game cube matches reference.</summary>
     [Fact]
     public void ConcurrentReadAt_GameCube_MatchesReference()
     {
@@ -25,6 +26,7 @@ public class ConcurrentReadTests
         AssertConcurrentReadsMatch(rvz, iso);
     }
 
+    /// <summary>Verifies that concurrent read at Wii matches reference.</summary>
     [Fact]
     public void ConcurrentReadAt_Wii_MatchesReference()
     {
@@ -43,6 +45,7 @@ public class ConcurrentReadTests
         AssertConcurrentReadsMatch(rvz, iso);
     }
 
+    /// <summary>Verifies that concurrent read at and read fully interleave safely.</summary>
     [Fact]
     public void ConcurrentReadAt_And_ReadFully_InterleaveSafely()
     {

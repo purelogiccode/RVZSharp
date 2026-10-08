@@ -14,6 +14,7 @@ public class GczWriterTests
 {
     private const ulong UncompressedFlag = 1UL << 63;
 
+    /// <summary>Verifies that game cube ISO round trips.</summary>
     [Fact]
     public void GameCubeIso_RoundTrips()
     {
@@ -22,6 +23,7 @@ public class GczWriterTests
         Assert.Equal(iso, Decode(gcz));
     }
 
+    /// <summary>Verifies that Wii ISO round trips.</summary>
     [Fact]
     public void WiiIso_RoundTrips()
     {
@@ -32,6 +34,7 @@ public class GczWriterTests
         Assert.Equal(iso, Decode(gcz));
     }
 
+    /// <summary>Verifies that last partial block is zero padded and round trips.</summary>
     [Fact]
     public void LastPartialBlock_IsZeroPaddedAndRoundTrips()
     {
@@ -44,6 +47,7 @@ public class GczWriterTests
         Assert.Equal(iso, Decode(gcz));
     }
 
+    /// <summary>Verifies that header has expected fields.</summary>
     [Fact]
     public void Header_HasExpectedFields()
     {
@@ -61,6 +65,7 @@ public class GczWriterTests
         Assert.Equal(32 + 12L * numBlocks + (long)compressedDataSize, gcz.Length);
     }
 
+    /// <summary>Verifies that Wii ISO header sub type is one.</summary>
     [Fact]
     public void WiiIso_HeaderSubTypeIsOne()
     {
@@ -71,6 +76,7 @@ public class GczWriterTests
         Assert.Equal(1u, ReadLe32(gcz, 4)); // sub_type: 1 = Wii
     }
 
+    /// <summary>Verifies that incompressible data stores raw blocks.</summary>
     [Fact]
     public void IncompressibleData_StoresRawBlocks()
     {
@@ -88,6 +94,7 @@ public class GczWriterTests
         Assert.Equal(iso, Decode(gcz));
     }
 
+    /// <summary>Verifies that compressible data stores compressed blocks.</summary>
     [Fact]
     public void CompressibleData_StoresCompressedBlocks()
     {
@@ -105,6 +112,7 @@ public class GczWriterTests
         Assert.Equal(iso, Decode(gcz));
     }
 
+    /// <summary>Verifies that max threads output is identical to sequential.</summary>
     [Fact]
     public void MaxThreads_OutputIsIdenticalToSequential()
     {
@@ -116,6 +124,7 @@ public class GczWriterTests
         Assert.Equal(sequential, parallel);
     }
 
+    /// <summary>Verifies that non power of two block size is rejected.</summary>
     [Fact]
     public void NonPowerOfTwoBlockSize_IsRejected()
     {
@@ -126,6 +135,7 @@ public class GczWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that negative max threads is rejected.</summary>
     [Fact]
     public void NegativeMaxThreads_IsRejected()
     {
@@ -136,6 +146,7 @@ public class GczWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that non seekable output is rejected.</summary>
     [Fact]
     public void NonSeekableOutput_IsRejected()
     {
@@ -146,6 +157,7 @@ public class GczWriterTests
         Assert.Equal(0, output.Length);
     }
 
+    /// <summary>Verifies that disc without magic is rejected.</summary>
     [Fact]
     public void DiscWithoutMagic_IsRejected()
     {

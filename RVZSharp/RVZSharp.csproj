@@ -5,8 +5,8 @@
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Company>PureLogicCode.com</Company>
-        <AssemblyVersion>1.0.1</AssemblyVersion>
-        <FileVersion>1.0.1</FileVersion>
+        <AssemblyVersion>1.1.0</AssemblyVersion>
+        <FileVersion>1.1.0</FileVersion>
         <NeutralLanguage>en</NeutralLanguage>
         <!-- Native AOT / trimming: the library is fully reflection-free, so the trim and AOT
          analyzers must stay clean for every target framework. -->
@@ -30,11 +30,14 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageReleaseNotes>
-            1.0.1: RvzWriter now validates the input's GameCube/Wii disc header magic (Wii at
-            0x18, GameCube at 0x1C) and rejects anything else with RvzFormatException, so
-            arbitrary data can never be wrapped into an unusable RVZ; corrupt containers with a
-            recognized magic are documented to fail loudly (no PlainBlob fallback). Also fixes
-            GameCube disc_type classification (the GC magic is at 0x1C, not 0x18).
+            1.1.0: legacy writers (CisoWriter, WbfsWriter, TgcWriter), the DiscVerifier Wii
+            hash-tree/TMD/H3 verifier, thread-safe ReadAt with an LRU cache, the async API,
+            split plain ISO, DiscInfo, BlobStream and scrub options; CLI --json output, -
+            stdin/stdout piping and shell completions; CI with API-compat validation and an
+            embedded SPDX SBOM. Fixes: partition keys are common-key decrypted from the ticket
+            (verify/extract work on real encrypted discs), extract TMD/cert/H3 offsets, WBFS
+            header size/disc-header copy, convert --json stdout hygiene, Ctrl+C exit 130 and
+            monotonic writer progress. Public API stays compatible with 1.0.0.
         </PackageReleaseNotes>
         <RepositoryUrl>https://github.com/purelogiccode/RVZSharp</RepositoryUrl>
         <RepositoryType>git</RepositoryType>

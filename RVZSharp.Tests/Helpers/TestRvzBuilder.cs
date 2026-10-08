@@ -7,8 +7,13 @@ namespace RVZSharp.Tests.Helpers;
 /// <summary>Specification for a synthetic disc image encoded by <see cref="TestRvzBuilder"/>.</summary>
 public sealed class RvzSpec
 {
+    /// <summary>Compression method for the encoded groups.</summary>
     public CompressionType Compression { get; set; } = CompressionType.None;
+
+    /// <summary>Chunk size (2 MiB by default).</summary>
     public uint ChunkSize { get; set; } = WiaDisc.GroupSize; // 2 MiB
+
+    /// <summary>Disc type (GameCube by default; Wii enables partition encoding).</summary>
     public DiscType DiscType { get; set; } = DiscType.GameCube;
 
     /// <summary>Bytes of raw data after the first 0x80 bytes and before any partition.</summary>
@@ -26,14 +31,17 @@ public sealed class RvzSpec
     /// <summary>When true, builds a WIA file instead of an RVZ file (8-byte groups, no packing).</summary>
     public bool IsWia { get; set; }
 
+    /// <summary>Seed for the deterministic random payloads.</summary>
     public int Seed { get; set; } = 1;
 }
 
 /// <summary>A Wii partition to encode.</summary>
 public sealed class PartitionSpec
 {
+    /// <summary>Number of 0x8000-byte sectors in the partition (70 by default).</summary>
     public int SectorCount { get; set; } = 70;
 
+    /// <summary>The partition's AES-128 key (a fixed test key by default).</summary>
     public byte[] Key { get; set; } = [.. Enumerable.Range(0, 16).Select(i => (byte)(0x40 + i))];
 
     /// <summary>Hash exceptions per 2 MiB region (region-relative offsets).</summary>
@@ -47,11 +55,17 @@ public sealed class PartitionSpec
 /// </summary>
 public static class TestRvzBuilder
 {
+    /// <summary>Builds the RVZ file described by <paramref name="spec"/>.</summary>
+    /// <param name="spec">The image specification.</param>
+    /// <returns>The encoded RVZ (or WIA when <see cref="RvzSpec.IsWia"/> is set) bytes.</returns>
     public static byte[] Build(RvzSpec spec)
     {
         return BuildWithIso(spec).Rvz;
     }
 
+    /// <summary>Builds the container described by <paramref name="spec"/> together with the ISO it decodes to.</summary>
+    /// <param name="spec">The image specification.</param>
+    /// <returns>The encoded container bytes and the decoded ISO image.</returns>
     public static (byte[] Rvz, byte[] Iso) BuildWithIso(RvzSpec spec)
     {
         var rng = new Random(spec.Seed);

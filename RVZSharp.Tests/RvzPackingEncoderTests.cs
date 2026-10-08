@@ -9,6 +9,7 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class RvzPackingEncoderTests
 {
+    /// <summary>Verifies that pack with junk round trips.</summary>
     [Fact]
     public void Pack_WithJunk_RoundTrips()
     {
@@ -22,6 +23,7 @@ public class RvzPackingEncoderTests
         AssertRoundTrip(payload, dataOffset: 0x8000);
     }
 
+    /// <summary>Verifies that pack with junk at unaligned offset round trips.</summary>
     [Fact]
     public void Pack_WithJunkAtUnalignedOffset_RoundTrips()
     {
@@ -34,6 +36,7 @@ public class RvzPackingEncoderTests
         AssertRoundTrip(payload, dataOffset: 0x8000);
     }
 
+    /// <summary>Verifies that pack no junk stores chunk without headers.</summary>
     [Fact]
     public void Pack_NoJunk_StoresChunkWithoutHeaders()
     {
@@ -50,6 +53,7 @@ public class RvzPackingEncoderTests
         Assert.Equal(payload, mainData);
     }
 
+    /// <summary>Verifies that pack all zeroes stores zero junk when uncompressed.</summary>
     [Fact]
     public void Pack_AllZeroes_StoresZeroJunkWhenUncompressed()
     {
@@ -67,6 +71,7 @@ public class RvzPackingEncoderTests
         Assert.Equal(0x8000_0000u | 0x20000u, header);
     }
 
+    /// <summary>Verifies that pack multipart chunks always write size headers.</summary>
     [Fact]
     public void Pack_MultipartChunks_AlwaysWriteSizeHeaders()
     {
@@ -102,6 +107,7 @@ public class RvzPackingEncoderTests
         Assert.Equal(payload, decoded);
     }
 
+    /// <summary>Verifies that truncated size header throws.</summary>
     [Fact]
     public void TruncatedSizeHeader_Throws()
     {

@@ -4,14 +4,17 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for Adler-32.</summary>
 public class Adler32Tests
 {
+    /// <summary>Verifies that empty input returns one.</summary>
     [Fact]
     public void EmptyInput_ReturnsOne()
     {
         Assert.Equal(1u, Adler32.Compute([]));
     }
 
+    /// <summary>Verifies that known vectors match zlib.</summary>
     [Theory]
     [InlineData("Wikipedia", 0x11E60398u)]
     [InlineData("123456789", 0x091E01DEu)]
@@ -20,6 +23,7 @@ public class Adler32Tests
         Assert.Equal(expected, Adler32.Compute(Encoding.ASCII.GetBytes(text)));
     }
 
+    /// <summary>Verifies that single byte zero.</summary>
     [Fact]
     public void SingleByte_Zero()
     {
@@ -27,6 +31,7 @@ public class Adler32Tests
         Assert.Equal(0x00010001u, Adler32.Compute([0]));
     }
 
+    /// <summary>Verifies that single byte 255.</summary>
     [Fact]
     public void SingleByte_255()
     {
@@ -34,6 +39,7 @@ public class Adler32Tests
         Assert.Equal(0x01000100u, Adler32.Compute([255]));
     }
 
+    /// <summary>Verifies that modulus wrap resets the accumulators.</summary>
     [Fact]
     public void ModulusWrap_ResetsTheAccumulators()
     {
@@ -42,6 +48,7 @@ public class Adler32Tests
         Assert.Equal(1u, Adler32.Compute(new byte[65521]));
     }
 
+    /// <summary>Verifies that one byte before the wrap is not wrapped.</summary>
     [Fact]
     public void OneByteBeforeTheWrap_IsNotWrapped()
     {
@@ -49,6 +56,7 @@ public class Adler32Tests
         Assert.Equal(0xFFF00001u, Adler32.Compute(new byte[65520]));
     }
 
+    /// <summary>Verifies that large random data matches reference.</summary>
     [Fact]
     public void LargeRandomData_MatchesReference()
     {
@@ -58,6 +66,7 @@ public class Adler32Tests
         Assert.Equal(TestLegacyBuilders.Adler32ForTest(data), Adler32.Compute(data));
     }
 
+    /// <summary>Verifies that last byte alone changes checksum.</summary>
     [Fact]
     public void LastByteAlone_ChangesChecksum()
     {

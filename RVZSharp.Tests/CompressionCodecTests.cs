@@ -4,6 +4,7 @@ using RVZSharp.Models;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for compression codec.</summary>
 public class CompressionCodecTests
 {
     private static byte[] MakePayload(int size, int seed = 1)
@@ -42,6 +43,7 @@ public class CompressionCodecTests
         return ms.ToArray();
     }
 
+    /// <summary>Verifies that none passthrough.</summary>
     [Fact]
     public void None_Passthrough()
     {
@@ -53,6 +55,7 @@ public class CompressionCodecTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
+    /// <summary>Verifies that none with properties throws.</summary>
     [Fact]
     public void None_WithProperties_Throws()
     {
@@ -61,6 +64,7 @@ public class CompressionCodecTests
             decoder.CreateDecompressor(new MemoryStream(), [1], -1, -1));
     }
 
+    /// <summary>Verifies that Zstd round trip.</summary>
     [Fact]
     public void Zstd_RoundTrip()
     {
@@ -83,6 +87,7 @@ public class CompressionCodecTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
+    /// <summary>Verifies that Zstd negative fast level round trip.</summary>
     [Fact]
     public void Zstd_NegativeFastLevel_RoundTrip()
     {
@@ -99,6 +104,7 @@ public class CompressionCodecTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
+    /// <summary>Verifies that Zstd with properties throws.</summary>
     [Fact]
     public void Zstd_WithProperties_Throws()
     {
@@ -107,6 +113,7 @@ public class CompressionCodecTests
             decoder.CreateDecompressor(new MemoryStream(), [1], -1, -1));
     }
 
+    /// <summary>Verifies that bzip 2 round trip.</summary>
     [Fact]
     public void Bzip2_RoundTrip()
     {
@@ -129,6 +136,7 @@ public class CompressionCodecTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
+    /// <summary>Verifies that bzip 2 with properties throws.</summary>
     [Fact]
     public void Bzip2_WithProperties_Throws()
     {
@@ -137,6 +145,7 @@ public class CompressionCodecTests
             decoder.CreateDecompressor(new MemoryStream(), [1], -1, -1));
     }
 
+    /// <summary>Verifies that bzip 2 corrupt stream throws format exception.</summary>
     [Fact]
     public void Bzip2_CorruptStream_ThrowsFormatException()
     {

@@ -26,6 +26,7 @@ public class DiscVerifierTests
     private const int ClusterSectors = 64;
     private const int H3Size = 0x18000;
 
+    /// <summary>Verifies that valid Wii disc is valid.</summary>
     [Fact]
     public void ValidWiiDisc_IsValid()
     {
@@ -45,6 +46,7 @@ public class DiscVerifierTests
         Assert.Equal(ClusterSectors, report.VerifiedBlocks);
     }
 
+    /// <summary>Verifies that encrypted Wii disc is valid.</summary>
     [Fact]
     public void EncryptedWiiDisc_IsValid()
     {
@@ -57,6 +59,7 @@ public class DiscVerifierTests
         Assert.Equal(ClusterSectors, partition.VerifiedBlocks);
     }
 
+    /// <summary>Verifies that multiple clusters are all verified.</summary>
     [Fact]
     public void MultipleClusters_AreAllVerified()
     {
@@ -69,6 +72,7 @@ public class DiscVerifierTests
         Assert.Equal(2 * ClusterSectors, report.TotalBlocks);
     }
 
+    /// <summary>Verifies that corrupt data block is reported as high.</summary>
     [Fact]
     public void CorruptDataBlock_IsReportedAsHigh()
     {
@@ -85,6 +89,7 @@ public class DiscVerifierTests
         Assert.Contains("data block 0", issue.Message);
     }
 
+    /// <summary>Verifies that corrupt hash area is reported as high.</summary>
     [Fact]
     public void CorruptHashArea_IsReportedAsHigh()
     {
@@ -98,6 +103,7 @@ public class DiscVerifierTests
         Assert.Contains("block 0x3", partition.Issues[0].Message);
     }
 
+    /// <summary>Verifies that h 3 table not matching TMD is reported as medium.</summary>
     [Fact]
     public void H3TableNotMatchingTmd_IsReportedAsMedium()
     {
@@ -113,6 +119,7 @@ public class DiscVerifierTests
             issue.Severity == VerificationSeverity.Medium && issue.Message.Contains("H3"));
     }
 
+    /// <summary>Verifies that bad TMD signature is reported as medium.</summary>
     [Fact]
     public void BadTmdSignature_IsReportedAsMedium()
     {
@@ -129,6 +136,7 @@ public class DiscVerifierTests
             issue.Severity == VerificationSeverity.Medium && issue.Message.Contains("signature"));
     }
 
+    /// <summary>Verifies that truncated partition data is reported as high.</summary>
     [Fact]
     public void TruncatedPartitionData_IsReportedAsHigh()
     {
@@ -144,6 +152,7 @@ public class DiscVerifierTests
         Assert.Contains(partition.Issues, issue => issue.Severity == VerificationSeverity.High);
     }
 
+    /// <summary>Verifies that game cube disc is valid.</summary>
     [Fact]
     public void GameCubeDisc_IsValid()
     {
@@ -161,6 +170,7 @@ public class DiscVerifierTests
         Assert.Empty(report.Issues);
     }
 
+    /// <summary>Verifies that non disc is reported as high.</summary>
     [Fact]
     public void NonDisc_IsReportedAsHigh()
     {
@@ -174,6 +184,7 @@ public class DiscVerifierTests
         Assert.Equal(VerificationSeverity.High, Assert.Single(report.Issues).Severity);
     }
 
+    /// <summary>Verifies that progress reports completion.</summary>
     [Fact]
     public void Progress_ReportsCompletion()
     {

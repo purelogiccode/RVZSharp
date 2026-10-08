@@ -3,8 +3,10 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for WIA disc.</summary>
 public class WiaDiscTests
 {
+    /// <summary>Verifies that parse valid disc returns all fields.</summary>
     [Fact]
     public void Parse_ValidDisc_ReturnsAllFields()
     {
@@ -49,6 +51,7 @@ public class WiaDiscTests
         Assert.Equal(0, disc.ComprDataLen);
     }
 
+    /// <summary>Verifies that parse truncated throws format exception.</summary>
     [Fact]
     public void Parse_Truncated_ThrowsFormatException()
     {
@@ -56,6 +59,7 @@ public class WiaDiscTests
         Assert.Throws<RvzFormatException>(() => WiaDisc.Parse(bytes.AsSpan(0, 0xD4)));
     }
 
+    /// <summary>Verifies that parse zero fills missing compr data.</summary>
     [Fact]
     public void Parse_ZeroFillsMissingComprData()
     {
@@ -65,6 +69,7 @@ public class WiaDiscTests
         Assert.All(disc.ComprData, b => Assert.Equal(0, b));
     }
 
+    /// <summary>Verifies that validate valid disc passes.</summary>
     [Fact]
     public void Validate_ValidDisc_Passes()
     {
@@ -75,6 +80,7 @@ public class WiaDiscTests
         disc.Validate((uint)bytes.Length, bytes, builder.GetDiscHash());
     }
 
+    /// <summary>Verifies that validate bad disc hash throws hash mismatch exception.</summary>
     [Fact]
     public void Validate_BadDiscHash_ThrowsHashMismatchException()
     {
@@ -86,6 +92,7 @@ public class WiaDiscTests
             disc.Validate((uint)bytes.Length, bytes, new byte[WiaDisc.HashSize]));
     }
 
+    /// <summary>Verifies that validate nonstandard disc type is accepted.</summary>
     [Fact]
     public void Validate_NonstandardDiscType_IsAccepted()
     {
@@ -99,6 +106,7 @@ public class WiaDiscTests
         Assert.Equal((DiscType)99, disc.DiscType);
     }
 
+    /// <summary>Verifies that validate PURGE compression throws unsupported exception.</summary>
     [Fact]
     public void Validate_PurgeCompression_ThrowsUnsupportedException()
     {
@@ -110,6 +118,7 @@ public class WiaDiscTests
             disc.Validate((uint)bytes.Length, bytes, builder.GetDiscHash()));
     }
 
+    /// <summary>Verifies that validate unknown compression throws unsupported exception.</summary>
     [Fact]
     public void Validate_UnknownCompression_ThrowsUnsupportedException()
     {
@@ -121,6 +130,7 @@ public class WiaDiscTests
             disc.Validate((uint)bytes.Length, bytes, builder.GetDiscHash()));
     }
 
+    /// <summary>Verifies that validate chunk sizes valid.</summary>
     [Theory]
     [InlineData(0x8000)] // 32 KiB — min power of two, valid
     [InlineData(0x10000)] // 64 KiB
@@ -135,6 +145,7 @@ public class WiaDiscTests
         disc.Validate((uint)bytes.Length, bytes, builder.GetDiscHash());
     }
 
+    /// <summary>Verifies that validate chunk sizes invalid.</summary>
     [Theory]
     [InlineData(0x1000)] // too small
     [InlineData(0x18000)] // not a power of two and not a multiple of 2 MiB
@@ -149,6 +160,7 @@ public class WiaDiscTests
             disc.Validate((uint)bytes.Length, bytes, builder.GetDiscHash()));
     }
 
+    /// <summary>Verifies that validate disc size too small throws format exception.</summary>
     [Fact]
     public void Validate_DiscSizeTooSmall_ThrowsFormatException()
     {
@@ -160,6 +172,7 @@ public class WiaDiscTests
             disc.Validate(WiaDisc.MinSize - 1, bytes, builder.GetDiscHash()));
     }
 
+    /// <summary>Verifies that validate compr data overflow throws format exception.</summary>
     [Fact]
     public void Validate_ComprDataOverflow_ThrowsFormatException()
     {

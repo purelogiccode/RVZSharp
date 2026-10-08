@@ -22,7 +22,7 @@ implementations in
 
 | Page | What it covers |
 |---|---|
-| [What's new](whats-new.md) | Release highlights (1.0.1 unreleased, 1.0.0) |
+| [What's new](whats-new.md) | Release highlights (1.1.0 unreleased, 1.0.0) |
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
 | [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
 | [CLI reference](usage-cli.md) | `convert`, `header`, `verify`, `extract` (+ legacy `info`/`decode`) — options and examples |

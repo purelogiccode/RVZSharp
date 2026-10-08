@@ -3,6 +3,7 @@ using RVZSharp.Wii;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for Wii partition extractor.</summary>
 public class WiiPartitionExtractorTests
 {
     private static byte[] RegionData(int sectorCount, int seedBase = 3)
@@ -50,6 +51,7 @@ public class WiiPartitionExtractorTests
         return key;
     }
 
+    /// <summary>Verifies that pristine region decrypts data and finds no exceptions.</summary>
     [Fact]
     public void PristineRegion_DecryptsData_And_FindsNoExceptions()
     {
@@ -65,6 +67,7 @@ public class WiiPartitionExtractorTests
         Assert.Empty(exceptions);
     }
 
+    /// <summary>Verifies that partial region round trips with zero filled tail convention.</summary>
     [Fact]
     public void PartialRegion_RoundTrips_WithZeroFilledTailConvention()
     {
@@ -82,6 +85,7 @@ public class WiiPartitionExtractorTests
         Assert.Empty(exceptions);
     }
 
+    /// <summary>Verifies that region at disc offset reads from the right position.</summary>
     [Fact]
     public void RegionAtDiscOffset_ReadsFromTheRightPosition()
     {
@@ -97,6 +101,7 @@ public class WiiPartitionExtractorTests
         Assert.Empty(exceptions);
     }
 
+    /// <summary>Verifies that corrupted hash bytes produce exceptions without touching data.</summary>
     [Fact]
     public void CorruptedHashBytes_ProduceExceptions_WithoutTouchingData()
     {
@@ -125,6 +130,7 @@ public class WiiPartitionExtractorTests
         Assert.All(exceptions, e => Assert.Equal(20, e.Hash.Length));
     }
 
+    /// <summary>Verifies that wrong key decrypts to different data.</summary>
     [Fact]
     public void WrongKey_DecryptsToDifferentData()
     {
@@ -139,6 +145,7 @@ public class WiiPartitionExtractorTests
         Assert.NotEmpty(exceptions);
     }
 
+    /// <summary>Verifies that short input throws.</summary>
     [Fact]
     public void ShortInput_Throws()
     {

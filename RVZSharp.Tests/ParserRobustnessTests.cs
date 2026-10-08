@@ -84,6 +84,7 @@ public class ParserRobustnessTests
         return iso;
     }
 
+    /// <summary>Verifies that mutated files fail only with RVZ exceptions.</summary>
     [Fact]
     public void MutatedFiles_FailOnlyWithRvzExceptions()
     {
@@ -102,6 +103,7 @@ public class ParserRobustnessTests
         Assert.Empty(failures);
     }
 
+    /// <summary>Verifies that garbage with container magic fails only with RVZ exceptions.</summary>
     [Fact]
     public void GarbageWithContainerMagic_FailsOnlyWithRvzExceptions()
     {
@@ -133,6 +135,7 @@ public class ParserRobustnessTests
         Assert.Empty(failures);
     }
 
+    /// <summary>Verifies that plain ISO with huge Wii partition count fails with format exception.</summary>
     [Fact]
     public void PlainIso_WithHugeWiiPartitionCount_FailsWithFormatException()
     {
@@ -147,6 +150,7 @@ public class ParserRobustnessTests
         Assert.Throws<RvzFormatException>(() => WiiVolume.GetPartitions(blob));
     }
 
+    /// <summary>Verifies that RVZ with huge table counts is rejected before allocating.</summary>
     [Fact]
     public void Rvz_WithHugeTableCounts_IsRejectedBeforeAllocating()
     {

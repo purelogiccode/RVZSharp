@@ -4,6 +4,7 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for table parser.</summary>
 public class TableParserTests
 {
     private static (MemoryStream File, byte[] DiscBytes) BuildFile(
@@ -104,6 +105,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse partitions valid table returns entries.</summary>
     [Fact]
     public void ParsePartitions_ValidTable_ReturnsEntries()
     {
@@ -131,6 +133,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse partitions no partitions returns empty.</summary>
     [Fact]
     public void ParsePartitions_NoPartitions_ReturnsEmpty()
     {
@@ -148,6 +151,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse partitions no partitions bad hash throws.</summary>
     [Fact]
     public void ParsePartitions_NoPartitions_BadHash_Throws()
     {
@@ -162,6 +166,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse partitions hash mismatch throws.</summary>
     [Fact]
     public void ParsePartitions_HashMismatch_Throws()
     {
@@ -180,6 +185,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse partitions entry size smaller than 030 zero fills.</summary>
     [Fact]
     public void ParsePartitions_EntrySizeSmallerThan030_ZeroFills()
     {
@@ -209,6 +215,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse partitions larger entry size extra bytes ignored.</summary>
     [Fact]
     public void ParsePartitions_LargerEntrySize_ExtraBytesIgnored()
     {
@@ -230,6 +237,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse raw data entries every codec.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Zstd)]
@@ -259,6 +267,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse raw data entries no entries returns empty.</summary>
     [Fact]
     public void ParseRawDataEntries_NoEntries_ReturnsEmpty()
     {
@@ -270,6 +279,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse group entries every codec.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Zstd)]
@@ -301,6 +311,7 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that parse group entries truncated decompression throws.</summary>
     [Fact]
     public void ParseGroupEntries_TruncatedDecompression_Throws()
     {

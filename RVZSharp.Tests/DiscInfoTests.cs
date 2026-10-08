@@ -54,6 +54,7 @@ public class DiscInfoTests
         }
     }
 
+    /// <summary>Verifies that try read game cube reads metadata.</summary>
     [Fact]
     public void TryRead_GameCube_ReadsMetadata()
     {
@@ -72,6 +73,7 @@ public class DiscInfoTests
         Assert.Null(info.TitleId);
     }
 
+    /// <summary>Verifies that try read Wii reads title ID and region.</summary>
     [Fact]
     public void TryRead_Wii_ReadsTitleIdAndRegion()
     {
@@ -87,6 +89,7 @@ public class DiscInfoTests
         Assert.Equal(0x00010000534D4E45UL, info.TitleId);
     }
 
+    /// <summary>Verifies that try read region fallback uses typical country when country byte contradicts region.</summary>
     [Fact]
     public void TryRead_RegionFallback_UsesTypicalCountry_WhenCountryByteContradictsRegion()
     {
@@ -102,6 +105,7 @@ public class DiscInfoTests
         Assert.Equal("USA", info.Country); // TypicalCountryForRegion fallback
     }
 
+    /// <summary>Verifies that try read non disc returns null.</summary>
     [Fact]
     public void TryRead_NonDisc_ReturnsNull()
     {
@@ -112,6 +116,7 @@ public class DiscInfoTests
         Assert.Null(DiscInfo.TryRead(blob));
     }
 
+    /// <summary>Verifies that try read too short returns null.</summary>
     [Fact]
     public void TryRead_TooShort_ReturnsNull()
     {
@@ -120,6 +125,7 @@ public class DiscInfoTests
         Assert.Null(DiscInfo.TryRead(blob));
     }
 
+    /// <summary>Verifies that read non disc throws format exception.</summary>
     [Fact]
     public void Read_NonDisc_ThrowsFormatException()
     {

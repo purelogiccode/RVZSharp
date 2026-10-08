@@ -12,6 +12,7 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class DiscFileSystemTests
 {
+    /// <summary>Verifies that game cube parses tree and reads files.</summary>
     [Fact]
     public void GameCube_ParsesTreeAndReadsFiles()
     {
@@ -36,6 +37,7 @@ public class DiscFileSystemTests
         Assert.Equal(HelloText, contents.ToArray());
     }
 
+    /// <summary>Verifies that game cube find is case insensitive and accepts leading slash.</summary>
     [Fact]
     public void GameCube_FindIsCaseInsensitiveAndAcceptsLeadingSlash()
     {
@@ -49,6 +51,7 @@ public class DiscFileSystemTests
         Assert.Null(fs.Find("missing/hello.txt"));
     }
 
+    /// <summary>Verifies that Wii partition parses tree and reads files.</summary>
     [Fact]
     public void Wii_Partition_ParsesTreeAndReadsFiles()
     {
@@ -92,6 +95,7 @@ public class DiscFileSystemTests
         Assert.Equal(DataBytes, dataContents.ToArray());
     }
 
+    /// <summary>Verifies that partition reader decrypts boot sector.</summary>
     [Fact]
     public void PartitionReader_DecryptsBootSector()
     {
@@ -111,6 +115,7 @@ public class DiscFileSystemTests
         Assert.Equal(data.AsSpan(0, 0x7C00).ToArray(), firstSector.AsSpan(0, 0x7C00).ToArray());
     }
 
+    /// <summary>Verifies that disc without file system throws.</summary>
     [Fact]
     public void DiscWithoutFileSystem_Throws()
     {

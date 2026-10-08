@@ -6,24 +6,58 @@ namespace RVZSharp.Tests.Helpers;
 /// <summary>Builds a structurally valid WiaDisc struct (0xDC bytes) for tests.</summary>
 public sealed class TestDiscBuilder
 {
+    /// <summary>Disc type written to the disc struct (GameCube by default).</summary>
     public DiscType DiscType { get; set; } = DiscType.GameCube;
+
+    /// <summary>Compression method written to the disc struct.</summary>
     public CompressionType Compression { get; set; } = CompressionType.None;
+
+    /// <summary>Compression level written to the disc struct.</summary>
     public int ComprLevel { get; set; } = 3;
+
+    /// <summary>Chunk size written to the disc struct (2 MiB by default).</summary>
     public uint ChunkSize { get; set; } = WiaDisc.GroupSize; // 2 MiB
+
+    /// <summary>Disc header bytes written to the disc struct.</summary>
     public byte[] DiscHeader { get; set; } = new byte[WiaDisc.DiscHeaderSize];
+
+    /// <summary>Number of partition entries.</summary>
     public uint NumPartitions { get; set; }
+
+    /// <summary>Size of each partition entry (0x30).</summary>
     public uint PartitionEntrySize { get; set; } = 0x30;
+
+    /// <summary>Partition table offset.</summary>
     public ulong PartitionEntriesOffset { get; set; }
+
+    /// <summary>SHA-1 of the partition table.</summary>
     public byte[] PartitionEntriesHash { get; set; } = new byte[WiaDisc.HashSize];
+
+    /// <summary>Number of raw data entries.</summary>
     public uint NumRawDataEntries { get; set; }
+
+    /// <summary>Raw data table offset.</summary>
     public ulong RawDataEntriesOffset { get; set; }
+
+    /// <summary>Raw data table size.</summary>
     public uint RawDataEntriesSize { get; set; }
+
+    /// <summary>Number of group entries.</summary>
     public uint NumGroups { get; set; }
+
+    /// <summary>Group table offset.</summary>
     public ulong GroupEntriesOffset { get; set; }
+
+    /// <summary>Group table size.</summary>
     public uint GroupEntriesSize { get; set; }
+
+    /// <summary>Length of the compression data blob (codec properties).</summary>
     public byte ComprDataLen { get; set; }
+
+    /// <summary>Compression data blob (codec properties).</summary>
     public byte[] ComprData { get; set; } = new byte[WiaDisc.ComprDataCapacity];
 
+    /// <summary>Builds the 0xDC-byte disc struct from the current properties.</summary>
     public byte[] Build()
     {
         var b = new byte[WiaDisc.Size];
@@ -55,6 +89,10 @@ public sealed class TestDiscBuilder
 
     private byte[]? _discHashOverride;
 
+    /// <summary>
+    /// Returns the disc hash: the override set through <see cref="DiscHash"/> when present,
+    /// otherwise the SHA-1 of the built disc struct.
+    /// </summary>
     public byte[] GetDiscHash()
     {
         return _discHashOverride ?? SHA1.HashData(Build());

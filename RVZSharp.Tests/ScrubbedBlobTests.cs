@@ -3,6 +3,7 @@ using RVZSharp.Wii;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for scrubbed blob.</summary>
 public class ScrubbedBlobTests
 {
     private const int DataOffset = 0x40000;
@@ -66,6 +67,7 @@ public class ScrubbedBlobTests
         return PlainBlob.Open(new MemoryStream(iso));
     }
 
+    /// <summary>Verifies that create scrubs non game partitions and keeps the rest.</summary>
     [Fact]
     public void Create_ScrubsNonGamePartitions_And_KeepsTheRest()
     {
@@ -89,6 +91,7 @@ public class ScrubbedBlobTests
         Assert.Equal(iso[..0x80], header);
     }
 
+    /// <summary>Verifies that create non Wii disc returns null.</summary>
     [Fact]
     public void Create_NonWiiDisc_ReturnsNull()
     {
@@ -99,6 +102,7 @@ public class ScrubbedBlobTests
         Assert.Null(ScrubbedBlob.Create(blob));
     }
 
+    /// <summary>Verifies that create Wii disc without game partition returns null.</summary>
     [Fact]
     public void Create_WiiDiscWithoutGamePartition_ReturnsNull()
     {
@@ -108,6 +112,7 @@ public class ScrubbedBlobTests
         Assert.Null(ScrubbedBlob.Create(blob));
     }
 
+    /// <summary>Verifies that read at spanning a scrub boundary returns mix.</summary>
     [Fact]
     public void ReadAt_SpanningAScrubBoundary_ReturnsMix()
     {
@@ -122,6 +127,7 @@ public class ScrubbedBlobTests
         Assert.All(buffer[16..], b => Assert.Equal(0, b));
     }
 
+    /// <summary>Verifies that read at out of range and empty buffer return zero.</summary>
     [Fact]
     public void ReadAt_OutOfRange_And_EmptyBuffer_ReturnZero()
     {
@@ -134,6 +140,7 @@ public class ScrubbedBlobTests
         Assert.Equal(0, scrubbed.ReadAt(0, Span<byte>.Empty));
     }
 
+    /// <summary>Verifies that metadata mirror the inner blob.</summary>
     [Fact]
     public void Metadata_MirrorTheInnerBlob()
     {
@@ -146,6 +153,7 @@ public class ScrubbedBlobTests
         Assert.Equal(blob.BlockSize, scrubbed.BlockSize);
     }
 
+    /// <summary>Verifies that dispose closes the inner blob.</summary>
     [Fact]
     public void Dispose_ClosesTheInnerBlob()
     {

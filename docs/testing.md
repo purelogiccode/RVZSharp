@@ -55,7 +55,7 @@ byte-for-byte against their official No-Intro SHA-1s:
    fast suite on `net8.0`/`net9.0`/`net10.0` with coverage uploaded as an artifact, packs
    the library (API-compat against 1.0.0 + embedded SBOM) and publishes a smoke-tested
    ReadyToRun CLI. The slow suite and differential tests stay opt-in on developer machines.
-8. **Post-1.0.1 correctness review**: a commit-by-commit audit pinned the fixes below with
+8. **1.1.0 correctness review**: a commit-by-commit audit pinned the fixes below with
    regression tests — retail ticket title keys are common-key decrypted
    (`WiiVolumeTests`; the synthetic Wii builders now store encrypted keys like real discs),
    the WBFS header declares the size relative to the stream position and carries the
@@ -127,7 +127,7 @@ and pinned a production writer bug (default 2 MiB chunks used the ISO ticket key
 the RVZ partition-table key on re-signed No-Intro tickets); `RvzWriter` now prefers the
 container key and falls back to the ticket key for plain ISO inputs.
 
-The 1.0.1 review also fixed the plain-ISO side of that story: the ticket's title key is
+The 1.1.0 review also fixed the plain-ISO side of that story: the ticket's title key is
 AES-CBC encrypted with the Wii common key on retail discs, and `WiiVolume.GetPartitions`
 now decrypts it (Dolphin: `TicketReader::GetTitleKey`) instead of using the raw ciphertext,
 so `DiscVerifier`/`verify --partitions`, `DiscFileSystem`/`extract` and RVZ writing work on

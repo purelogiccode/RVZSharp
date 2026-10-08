@@ -3,6 +3,7 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for packing.</summary>
 public class PackingTests
 {
     private static byte[] MakeSeed(int seedValue)
@@ -18,6 +19,7 @@ public class PackingTests
         return ReferencePrng.Generate(seed, offset, count);
     }
 
+    /// <summary>Verifies that PRNG matches dolphin reference across offsets.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -44,6 +46,7 @@ public class PackingTests
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>Verifies that PRNG output is deterministic.</summary>
     [Fact]
     public void Prng_OutputIsDeterministic()
     {
@@ -59,6 +62,7 @@ public class PackingTests
         Assert.Equal(a, b);
     }
 
+    /// <summary>Verifies that packing decoder literal only.</summary>
     [Fact]
     public void PackingDecoder_LiteralOnly()
     {
@@ -71,6 +75,7 @@ public class PackingTests
         Assert.Equal(payload, ReadAll(decoder, payload.Length));
     }
 
+    /// <summary>Verifies that packing decoder padded only.</summary>
     [Fact]
     public void PackingDecoder_PaddedOnly()
     {
@@ -83,6 +88,7 @@ public class PackingTests
         Assert.Equal(junk, ReadAll(decoder, junk.Length));
     }
 
+    /// <summary>Verifies that packing decoder mixed segments.</summary>
     [Fact]
     public void PackingDecoder_MixedSegments()
     {
@@ -105,6 +111,7 @@ public class PackingTests
         Assert.Equal(Concat(literal, junk1, junk2), actual);
     }
 
+    /// <summary>Verifies that packing decoder skip depends on data offset.</summary>
     [Fact]
     public void PackingDecoder_SkipDependsOnDataOffset()
     {
@@ -123,6 +130,7 @@ public class PackingTests
         Assert.Equal(junkAtSkip, ReadAll(dS, 1000));
     }
 
+    /// <summary>Verifies that packing decoder literal segment truncated throws.</summary>
     [Fact]
     public void PackingDecoder_LiteralSegmentTruncated_Throws()
     {
@@ -132,6 +140,7 @@ public class PackingTests
         Assert.Throws<RvzFormatException>(() => ReadAll(decoder, 1000));
     }
 
+    /// <summary>Verifies that packing decoder seed truncated throws.</summary>
     [Fact]
     public void PackingDecoder_SeedTruncated_Throws()
     {

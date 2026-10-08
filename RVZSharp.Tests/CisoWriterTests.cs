@@ -13,6 +13,7 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class CisoWriterTests
 {
+    /// <summary>Verifies that game cube ISO round trips.</summary>
     [Fact]
     public void GameCubeIso_RoundTrips()
     {
@@ -22,6 +23,7 @@ public class CisoWriterTests
         AssertTailIsZero(ciso);
     }
 
+    /// <summary>Verifies that Wii ISO round trips.</summary>
     [Fact]
     public void WiiIso_RoundTrips()
     {
@@ -33,6 +35,7 @@ public class CisoWriterTests
         AssertTailIsZero(ciso);
     }
 
+    /// <summary>Verifies that header has magic block size and presence map.</summary>
     [Fact]
     public void Header_HasMagicBlockSizeAndPresenceMap()
     {
@@ -47,6 +50,7 @@ public class CisoWriterTests
         Assert.Equal(CisoBlob.HeaderSize + 0x400, ciso.Length);
     }
 
+    /// <summary>Verifies that all zero blocks are absent.</summary>
     [Fact]
     public void AllZeroBlocks_AreAbsent()
     {
@@ -61,6 +65,7 @@ public class CisoWriterTests
         Assert.Equal(iso, DecodePrefix(ciso, iso.Length));
     }
 
+    /// <summary>Verifies that scrub zeroes non game partition data.</summary>
     [Fact]
     public void Scrub_ZeroesNonGamePartitionData()
     {
@@ -78,6 +83,7 @@ public class CisoWriterTests
         Assert.Equal(iso.AsSpan(afterEnd).ToArray(), decoded.AsSpan(afterEnd).ToArray());
     }
 
+    /// <summary>Verifies that scrub shrinks the file.</summary>
     [Fact]
     public void Scrub_ShrinksTheFile()
     {
@@ -87,6 +93,7 @@ public class CisoWriterTests
         Assert.True(scrubbed.Length < plain.Length, "the scrubbed CISO should be smaller");
     }
 
+    /// <summary>Verifies that image larger than map is rejected.</summary>
     [Fact]
     public void ImageLargerThanMap_IsRejected()
     {
@@ -98,6 +105,7 @@ public class CisoWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that non power of two block size is rejected.</summary>
     [Fact]
     public void NonPowerOfTwoBlockSize_IsRejected()
     {
@@ -108,6 +116,7 @@ public class CisoWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that non seekable output is rejected.</summary>
     [Fact]
     public void NonSeekableOutput_IsRejected()
     {
@@ -118,6 +127,7 @@ public class CisoWriterTests
         Assert.Equal(0, output.Length);
     }
 
+    /// <summary>Verifies that disc without magic is rejected.</summary>
     [Fact]
     public void DiscWithoutMagic_IsRejected()
     {

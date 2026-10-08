@@ -81,6 +81,9 @@ public static class TestLegacyBuilders
         return output.ToArray();
     }
 
+    /// <summary>Computes the Adler-32 checksum used by GCZ blocks (test reference implementation).</summary>
+    /// <param name="data">The bytes to checksum.</param>
+    /// <returns>The Adler-32 checksum.</returns>
     public static uint Adler32ForTest(ReadOnlySpan<byte> data)
     {
         uint a = 1;

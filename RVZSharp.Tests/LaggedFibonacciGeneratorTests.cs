@@ -10,11 +10,13 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class LaggedFibonacciGeneratorTests
 {
+    /// <summary>Stream positions used by the seed-recovery tests (aligned, unaligned and region boundaries).</summary>
     public static TheoryData<long> Offsets =>
     [
         0, 1, 3, 4, 0x7C00, 0x8000, 0x8001, 0x1234, 0x12345, 0x20000, 0x1FFC0
     ];
 
+    /// <summary>Verifies that get seed recovers seed that regenerates the junk.</summary>
     [Theory]
     [MemberData(nameof(Offsets))]
     public void GetSeed_RecoversSeed_ThatRegeneratesTheJunk(long offset)
@@ -36,6 +38,7 @@ public class LaggedFibonacciGeneratorTests
         Assert.Equal(junk, regenerated);
     }
 
+    /// <summary>Verifies that get seed rejects random data.</summary>
     [Fact]
     public void GetSeed_RejectsRandomData()
     {
@@ -47,6 +50,7 @@ public class LaggedFibonacciGeneratorTests
         _ = seed;
     }
 
+    /// <summary>Verifies that generator matches reference PRNG.</summary>
     [Fact]
     public void Generator_MatchesReferencePrng()
     {

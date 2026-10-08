@@ -6,6 +6,7 @@ using ChunkDecodeResult = RVZSharp.Models.ChunkDecodeResult;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for chunk decoder packing.</summary>
 public partial class ChunkDecoderPackingTests
 {
     private static byte[] Payload(int size, int seed)
@@ -101,6 +102,7 @@ public partial class ChunkDecoderPackingTests
 
 public partial class ChunkDecoderPackingTests
 {
+    /// <summary>Verifies that raw chunk with packing every codec.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Zstd)]
@@ -152,6 +154,7 @@ public partial class ChunkDecoderPackingTests
         }
     }
 
+    /// <summary>Verifies that partition chunk no exceptions compressed.</summary>
     [Fact]
     public void PartitionChunk_NoExceptions_Compressed()
     {
@@ -167,6 +170,7 @@ public partial class ChunkDecoderPackingTests
         }
     }
 
+    /// <summary>Verifies that partition chunk with exceptions compressed.</summary>
     [Fact]
     public void PartitionChunk_WithExceptions_Compressed()
     {
@@ -188,6 +192,7 @@ public partial class ChunkDecoderPackingTests
         }
     }
 
+    /// <summary>Verifies that partition chunk with exceptions none aligns to 4.</summary>
     [Fact]
     public void PartitionChunk_WithExceptions_None_AlignsTo4()
     {
@@ -203,6 +208,7 @@ public partial class ChunkDecoderPackingTests
         }
     }
 
+    /// <summary>Verifies that partition chunk truncated exceptions throws.</summary>
     [Fact]
     public void PartitionChunk_TruncatedExceptions_Throws()
     {
@@ -216,6 +222,7 @@ public partial class ChunkDecoderPackingTests
         }
     }
 
+    /// <summary>Verifies that exception list count matches dolphin formula.</summary>
     [Fact]
     public void ExceptionListCount_MatchesDolphinFormula()
     {

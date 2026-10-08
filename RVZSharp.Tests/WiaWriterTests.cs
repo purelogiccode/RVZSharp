@@ -11,6 +11,7 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class WiaWriterTests
 {
+    /// <summary>Compression methods used by the WIA round-trip tests.</summary>
     public static TheoryData<CompressionType> CompressionCases => new()
     {
         CompressionType.None,
@@ -20,6 +21,7 @@ public class WiaWriterTests
         CompressionType.Lzma2
     };
 
+    /// <summary>Verifies that game cube ISO round trips.</summary>
     [Theory]
     [MemberData(nameof(CompressionCases))]
     public void GameCubeIso_RoundTrips(CompressionType compression)
@@ -29,6 +31,7 @@ public class WiaWriterTests
         Assert.Equal(iso, Decode(wia));
     }
 
+    /// <summary>Verifies that Wii ISO round trips.</summary>
     [Theory]
     [MemberData(nameof(CompressionCases))]
     public void WiiIso_RoundTrips(CompressionType compression)
@@ -40,6 +43,7 @@ public class WiaWriterTests
         Assert.Equal(iso, Decode(wia));
     }
 
+    /// <summary>Verifies that Wii ISO 4 mi b chunks round trips.</summary>
     [Theory]
     [MemberData(nameof(CompressionCases))]
     public void WiiIso_4MiBChunks_RoundTrips(CompressionType compression)
@@ -54,6 +58,7 @@ public class WiaWriterTests
         Assert.Equal(iso, Decode(wia));
     }
 
+    /// <summary>Verifies that Wii ISO 6 mi b chunk round trips.</summary>
     [Fact]
     public void WiiIso_6MiBChunk_RoundTrips()
     {
@@ -67,6 +72,7 @@ public class WiaWriterTests
         Assert.Equal(iso, Decode(wia));
     }
 
+    /// <summary>Verifies that max threads output is identical to sequential.</summary>
     [Fact]
     public void MaxThreads_OutputIsIdenticalToSequential()
     {
@@ -81,6 +87,7 @@ public class WiaWriterTests
         Assert.Equal(sequential, parallel);
     }
 
+    /// <summary>Verifies that default options use LZMA 2 and round trip.</summary>
     [Fact]
     public void DefaultOptions_UseLzma2_AndRoundTrip()
     {
@@ -94,6 +101,7 @@ public class WiaWriterTests
         Assert.Equal(iso, Decode(wia));
     }
 
+    /// <summary>Verifies that output uses WIA magic and version.</summary>
     [Fact]
     public void Output_UsesWiaMagicAndVersion()
     {
@@ -107,6 +115,7 @@ public class WiaWriterTests
         Assert.Equal(WiaFileHead.WiaVersionWriteCompatible, head.VersionCompatible);
     }
 
+    /// <summary>Verifies that packing is ignored.</summary>
     [Fact]
     public void Packing_IsIgnored()
     {
@@ -117,6 +126,7 @@ public class WiaWriterTests
         Assert.Equal(packed, unpacked);
     }
 
+    /// <summary>Verifies that Zstd is rejected.</summary>
     [Fact]
     public void Zstd_IsRejected()
     {
@@ -130,6 +140,7 @@ public class WiaWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that non multiple of 2 mi b chunk size is rejected.</summary>
     [Fact]
     public void NonMultipleOf2MiBChunkSize_IsRejected()
     {
@@ -144,6 +155,7 @@ public class WiaWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that disc without magic is rejected.</summary>
     [Fact]
     public void DiscWithoutMagic_IsRejected()
     {

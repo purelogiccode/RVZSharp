@@ -4,10 +4,12 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for CISO blob.</summary>
 public class CisoBlobTests
 {
     private const int BlockSize = 0x8000;
 
+    /// <summary>Verifies that round trip present and absent blocks.</summary>
     [Fact]
     public void RoundTrip_PresentAndAbsentBlocks()
     {
@@ -30,6 +32,7 @@ public class CisoBlobTests
         Assert.Equal(expected, probe);
     }
 
+    /// <summary>Verifies that absent block zero filled.</summary>
     [Fact]
     public void AbsentBlock_ZeroFilled()
     {
@@ -43,6 +46,7 @@ public class CisoBlobTests
         Assert.Equal(new byte[0x8000], probe);
     }
 
+    /// <summary>Verifies that partial last block zero padded.</summary>
     [Fact]
     public void PartialLastBlock_ZeroPadded()
     {
@@ -61,6 +65,7 @@ public class CisoBlobTests
         Assert.Equal(expected, probe);
     }
 
+    /// <summary>Verifies that invalid map entry treated as absent.</summary>
     [Fact]
     public void InvalidMapEntry_TreatedAsAbsent()
     {
@@ -75,6 +80,7 @@ public class CisoBlobTests
         Assert.Equal(new byte[0x8000], probe);
     }
 
+    /// <summary>Verifies that bad magic throws format exception.</summary>
     [Fact]
     public void BadMagic_ThrowsFormatException()
     {
@@ -82,6 +88,7 @@ public class CisoBlobTests
         Assert.Throws<RvzFormatException>(() => CisoBlob.Open(new MemoryStream(bytes)));
     }
 
+    /// <summary>Verifies that zero block size throws format exception.</summary>
     [Fact]
     public void ZeroBlockSize_ThrowsFormatException()
     {

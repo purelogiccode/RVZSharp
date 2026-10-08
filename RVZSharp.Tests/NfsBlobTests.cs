@@ -4,6 +4,7 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for NFS blob.</summary>
 public class NfsBlobTests
 {
     private static byte[] MakeKey()
@@ -11,6 +12,7 @@ public class NfsBlobTests
         return Enumerable.Range(0, 16).Select(i => (byte)(0x10 + i)).ToArray();
     }
 
+    /// <summary>Verifies that round trip with missing block.</summary>
     [Fact]
     public void RoundTrip_WithMissingBlock()
     {
@@ -26,6 +28,7 @@ public class NfsBlobTests
         Assert.Equal(iso, probe);
     }
 
+    /// <summary>Verifies that round trip wrong key gives garbage.</summary>
     [Fact]
     public void RoundTrip_WrongKey_GivesGarbage()
     {
@@ -39,6 +42,7 @@ public class NfsBlobTests
         Assert.NotEqual(iso, probe);
     }
 
+    /// <summary>Verifies that block zero is marked unencrypted.</summary>
     [Fact]
     public void BlockZero_IsMarkedUnencrypted()
     {
@@ -54,6 +58,7 @@ public class NfsBlobTests
         Assert.Equal(iso, probe);
     }
 
+    /// <summary>Verifies that key from htk bin on disk.</summary>
     [Fact]
     public void KeyFromHtkBin_OnDisk()
     {
@@ -83,6 +88,7 @@ public class NfsBlobTests
         }
     }
 
+    /// <summary>Verifies that missing key throws.</summary>
     [Fact]
     public void MissingKey_Throws()
     {
@@ -92,6 +98,7 @@ public class NfsBlobTests
         Assert.Throws<RvzUnsupportedException>(() => NfsBlob.Open(new MemoryStream(nfs)));
     }
 
+    /// <summary>Verifies that wrong directory name throws.</summary>
     [Fact]
     public void WrongDirectoryName_Throws()
     {
@@ -115,6 +122,7 @@ public class NfsBlobTests
         }
     }
 
+    /// <summary>Verifies that bad magic throws format exception.</summary>
     [Fact]
     public void BadMagic_ThrowsFormatException()
     {
@@ -122,6 +130,7 @@ public class NfsBlobTests
         Assert.Throws<RvzFormatException>(() => NfsBlob.Open(new MemoryStream(bytes), MakeKey()));
     }
 
+    /// <summary>Verifies that single file mode too small throws.</summary>
     [Fact]
     public void SingleFileMode_TooSmall_Throws()
     {
@@ -134,6 +143,7 @@ public class NfsBlobTests
         Assert.Throws<RvzFormatException>(() => NfsBlob.Open(new MemoryStream(trimmed), key));
     }
 
+    /// <summary>Verifies that wrong file name throws.</summary>
     [Fact]
     public void WrongFileName_Throws()
     {

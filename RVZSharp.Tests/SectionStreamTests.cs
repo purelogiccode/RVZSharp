@@ -2,8 +2,10 @@ using RVZSharp.IO;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for section stream.</summary>
 public class SectionStreamTests
 {
+    /// <summary>Verifies that external seek does not read outside section.</summary>
     [Fact]
     public void ExternalSeek_DoesNotReadOutsideSection()
     {
@@ -28,6 +30,7 @@ public class SectionStreamTests
         Assert.Equal(Enumerable.Range(0x80, 0x40).Select(i => (byte)i).ToArray(), buffer);
     }
 
+    /// <summary>Verifies that reads are bounded to section end.</summary>
     [Fact]
     public void Reads_AreBoundedToSectionEnd()
     {

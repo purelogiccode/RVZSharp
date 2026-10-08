@@ -3,6 +3,7 @@ using RVZSharp.Models;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for exception list parser.</summary>
 public class ExceptionListParserTests
 {
     private static HashExceptionEntry Entry(ushort offset, byte firstByte = 0xAB)
@@ -54,6 +55,7 @@ public class ExceptionListParserTests
         output.WriteByte((byte)value);
     }
 
+    /// <summary>Verifies that zero lists returns empty.</summary>
     [Fact]
     public void ZeroLists_ReturnsEmpty()
     {
@@ -63,6 +65,7 @@ public class ExceptionListParserTests
         Assert.Equal(0, bytesUsed);
     }
 
+    /// <summary>Verifies that zero count list consumes only the count.</summary>
     [Fact]
     public void ZeroCountList_ConsumesOnlyTheCount()
     {
@@ -73,6 +76,7 @@ public class ExceptionListParserTests
         Assert.Equal(2, bytesUsed);
     }
 
+    /// <summary>Verifies that single list parses all entries.</summary>
     [Fact]
     public void SingleList_ParsesAllEntries()
     {
@@ -86,6 +90,7 @@ public class ExceptionListParserTests
         Assert.Equal(2 + 3 * HashExceptionEntry.Size, bytesUsed);
     }
 
+    /// <summary>Verifies that single list aligned to 4 pads the list end.</summary>
     [Fact]
     public void SingleList_AlignedTo4_PadsTheListEnd()
     {
@@ -101,6 +106,7 @@ public class ExceptionListParserTests
         Assert.Equal(48, bytesUsed); // padded to the 4-byte boundary
     }
 
+    /// <summary>Verifies that aligned list without padding bytes throws.</summary>
     [Fact]
     public void AlignedList_WithoutPadding_Bytes_Throws()
     {
@@ -115,6 +121,7 @@ public class ExceptionListParserTests
         Assert.Equal(2, lists[0].Length);
     }
 
+    /// <summary>Verifies that multiple lists are parsed sequentially.</summary>
     [Fact]
     public void MultipleLists_AreParsedSequentially()
     {
@@ -132,6 +139,7 @@ public class ExceptionListParserTests
         Assert.Equal(2 + 22 + 2 + 44 + 2, bytesUsed);
     }
 
+    /// <summary>Verifies that last list aligned only the last list is padded.</summary>
     [Fact]
     public void LastListAligned_OnlyTheLastListIsPadded()
     {
@@ -146,18 +154,21 @@ public class ExceptionListParserTests
         Assert.Equal(72, bytesUsed);
     }
 
+    /// <summary>Verifies that truncated after count throws.</summary>
     [Fact]
     public void Truncated_After_Count_Throws()
     {
         Assert.Throws<RvzFormatException>(() => ExceptionListParser.Parse("\0\0"u8, 2, alignTo4: false));
     }
 
+    /// <summary>Verifies that truncated count throws.</summary>
     [Fact]
     public void Truncated_Count_Throws()
     {
         Assert.Throws<RvzFormatException>(() => ExceptionListParser.Parse([0x00], 1, alignTo4: false));
     }
 
+    /// <summary>Verifies that truncated entries throw.</summary>
     [Fact]
     public void Truncated_Entries_Throw()
     {
@@ -171,6 +182,7 @@ public class ExceptionListParserTests
         Assert.Throws<RvzFormatException>(() => ExceptionListParser.Parse(full, 1, alignTo4: false));
     }
 
+    /// <summary>Verifies that max size list parses.</summary>
     [Fact]
     public void MaxSizeList_Parses()
     {

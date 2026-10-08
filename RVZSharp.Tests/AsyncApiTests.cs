@@ -30,6 +30,7 @@ public class AsyncApiTests
         }
     }
 
+    /// <summary>Verifies that read fully async matches read fully.</summary>
     [Fact]
     public async Task ReadFullyAsync_MatchesReadFully()
     {
@@ -43,6 +44,7 @@ public class AsyncApiTests
         Assert.Equal(1.0, progress[^1]);
     }
 
+    /// <summary>Verifies that copy to async parallel matches sequential.</summary>
     [Fact]
     public async Task CopyToAsync_Parallel_MatchesSequential()
     {
@@ -56,6 +58,7 @@ public class AsyncApiTests
         Assert.Equal(iso, destination.ToArray());
     }
 
+    /// <summary>Verifies that copy to async cancellation throws.</summary>
     [Fact]
     public async Task CopyToAsync_Cancellation_Throws()
     {
@@ -75,6 +78,7 @@ public class AsyncApiTests
             }), 4, cts.Token));
     }
 
+    /// <summary>Verifies that RVZ write async matches write.</summary>
     [Fact]
     public async Task RvzWriteAsync_MatchesWrite()
     {
@@ -86,6 +90,7 @@ public class AsyncApiTests
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>Verifies that WIA write async matches write.</summary>
     [Fact]
     public async Task WiaWriteAsync_MatchesWrite()
     {
@@ -101,6 +106,7 @@ public class AsyncApiTests
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>Verifies that GCZ write async matches write.</summary>
     [Fact]
     public async Task GczWriteAsync_MatchesWrite()
     {
@@ -110,6 +116,7 @@ public class AsyncApiTests
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>Verifies that write async cancellation throws.</summary>
     [Fact]
     public async Task WriteAsync_Cancellation_Throws()
     {

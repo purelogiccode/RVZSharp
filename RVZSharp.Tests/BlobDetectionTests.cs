@@ -4,8 +4,10 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for blob detection.</summary>
 public class BlobDetectionTests
 {
+    /// <summary>Verifies that detects every magic.</summary>
     [Fact]
     public void DetectsEveryMagic()
     {
@@ -44,18 +46,21 @@ public class BlobDetectionTests
         }
     }
 
+    /// <summary>Verifies that short file throws format exception.</summary>
     [Fact]
     public void ShortFile_ThrowsFormatException()
     {
         Assert.Throws<RvzFormatException>(() => Blob.Open(new MemoryStream([1, 2, 3])));
     }
 
+    /// <summary>Verifies that non seekable stream throws argument exception.</summary>
     [Fact]
     public void NonSeekableStream_ThrowsArgumentException()
     {
         Assert.Throws<ArgumentException>(() => Blob.Open(new NonSeekableStream()));
     }
 
+    /// <summary>Verifies that corrupt container with real magic throws format exception.</summary>
     [Theory]
     [InlineData("RVZ\x01")]
     [InlineData("WIA\x01")]
@@ -72,6 +77,7 @@ public class BlobDetectionTests
         Assert.ThrowsAny<RvzException>(() => Blob.Open(new MemoryStream(content), leaveOpen: true));
     }
 
+    /// <summary>Verifies that corrupt CISO opens but writer rejects decoded garbage.</summary>
     [Fact]
     public void CorruptCiso_OpensButWriterRejectsDecodedGarbage()
     {
@@ -96,6 +102,7 @@ public class BlobDetectionTests
         });
     }
 
+    /// <summary>Verifies that corrupt GCZ with real magic throws format exception.</summary>
     [Fact]
     public void CorruptGcz_WithRealMagic_ThrowsFormatException()
     {
@@ -108,6 +115,7 @@ public class BlobDetectionTests
         Assert.Throws<RvzFormatException>(() => Blob.Open(new MemoryStream(content), leaveOpen: true));
     }
 
+    /// <summary>Verifies that corrupt TGC with real magic throws format exception.</summary>
     [Fact]
     public void CorruptTgc_WithRealMagic_ThrowsFormatException()
     {
@@ -119,6 +127,7 @@ public class BlobDetectionTests
         Assert.Throws<RvzFormatException>(() => Blob.Open(new MemoryStream(content), leaveOpen: true));
     }
 
+    /// <summary>Verifies that fake container magic falls back to plain blob.</summary>
     [Theory]
     [InlineData("GCZ\0")]
     [InlineData("RVZ\0")]

@@ -4,6 +4,7 @@ using RVZSharp.Wii;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for partition region builder.</summary>
 public class PartitionRegionBuilderTests
 {
     private static byte[] SectorData(int sector, int seedBase)
@@ -53,6 +54,7 @@ public class PartitionRegionBuilderTests
         return exceptions;
     }
 
+    /// <summary>Verifies that full region matches reference.</summary>
     [Fact]
     public void FullRegion_MatchesReference()
     {
@@ -74,6 +76,7 @@ public class PartitionRegionBuilderTests
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>Verifies that partial region zero padding matches reference.</summary>
     [Fact]
     public void PartialRegion_ZeroPadding_MatchesReference()
     {
@@ -96,6 +99,7 @@ public class PartitionRegionBuilderTests
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>Verifies that no exceptions matches reference.</summary>
     [Fact]
     public void NoExceptions_MatchesReference()
     {
@@ -117,6 +121,7 @@ public class PartitionRegionBuilderTests
         Assert.Equal(ReferenceWiiRegion.Build(data, key, exceptions, 64), builder.Finish());
     }
 
+    /// <summary>Verifies that hash area layout matches dolphin offsets.</summary>
     [Fact]
     public void HashAreaLayout_MatchesDolphinOffsets()
     {
@@ -163,6 +168,7 @@ public class PartitionRegionBuilderTests
         Assert.All(hashArea.AsSpan(0x3E0, 0x20).ToArray(), b => Assert.Equal(0, b));
     }
 
+    /// <summary>Verifies that partial region zero sector hashes match first principles.</summary>
     [Fact]
     public void PartialRegion_ZeroSectorHashes_MatchFirstPrinciples()
     {
@@ -209,6 +215,7 @@ public class PartitionRegionBuilderTests
             hashArea.AsSpan(0x340 + 7 * 20, 20).ToArray());
     }
 
+    /// <summary>Verifies that builder too many sectors throws.</summary>
     [Fact]
     public void Builder_TooManySectors_Throws()
     {
@@ -221,6 +228,7 @@ public class PartitionRegionBuilderTests
         Assert.Throws<InvalidOperationException>(() => builder.AddSector(new byte[0x7C00], []));
     }
 
+    /// <summary>Verifies that builder empty region returns empty.</summary>
     [Fact]
     public void Builder_EmptyRegion_ReturnsEmpty()
     {
@@ -228,6 +236,7 @@ public class PartitionRegionBuilderTests
         Assert.Empty(builder.Finish());
     }
 
+    /// <summary>Verifies that builder bad key length throws.</summary>
     [Fact]
     public void Builder_BadKeyLength_Throws()
     {

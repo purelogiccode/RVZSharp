@@ -10,10 +10,14 @@ public sealed class RvzHashMismatchException : RvzException
     {
     }
 
+    /// <summary>Creates a new exception with a message and an inner exception.</summary>
+    /// <param name="message">The error message.</param>
+    /// <param name="inner">The inner exception that caused this one.</param>
     public RvzHashMismatchException(string message, Exception inner) : base(message, inner)
     {
     }
 
+    /// <summary>Creates a new exception with no message.</summary>
     public RvzHashMismatchException()
     {
     }

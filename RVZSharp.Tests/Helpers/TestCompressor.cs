@@ -6,6 +6,13 @@ namespace RVZSharp.Tests.Helpers;
 /// <summary>Compresses test payloads with the same codecs RVZ writers use.</summary>
 public static class TestCompressor
 {
+    /// <summary>
+    /// Compresses <paramref name="data"/> with the given codec, producing exactly the stream
+    /// bytes an RVZ/WIA group stores (LZMA1 with end marker, LZMA2 chunks, PURGE segments).
+    /// </summary>
+    /// <param name="compression">The codec to use.</param>
+    /// <param name="data">The payload to compress.</param>
+    /// <returns>The compressed stream bytes.</returns>
     public static byte[] Compress(CompressionType compression, byte[] data)
     {
         switch (compression)

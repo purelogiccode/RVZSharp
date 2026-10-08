@@ -5,6 +5,7 @@ namespace RVZSharp.Tests;
 /// <summary>Tests for the internal <see cref="LruCache{TKey, TValue}"/> used by <see cref="RvzReader"/>.</summary>
 public class LruCacheTests
 {
+    /// <summary>Verifies that get or add caches values.</summary>
     [Fact]
     public void GetOrAdd_CachesValues()
     {
@@ -27,6 +28,7 @@ public class LruCacheTests
         Assert.Equal(1, cache.Count);
     }
 
+    /// <summary>Verifies that get or add evicts least recently used.</summary>
     [Fact]
     public void GetOrAdd_EvictsLeastRecentlyUsed()
     {
@@ -45,6 +47,7 @@ public class LruCacheTests
         Assert.NotSame(a, aAgain);
     }
 
+    /// <summary>Verifies that get or add hit refreshes recency.</summary>
     [Fact]
     public void GetOrAdd_HitRefreshesRecency()
     {
@@ -75,6 +78,7 @@ public class LruCacheTests
         Assert.Equal(1, calls);
     }
 
+    /// <summary>Verifies that get or add oversized value is returned but not cached.</summary>
     [Fact]
     public void GetOrAdd_OversizedValue_IsReturnedButNotCached()
     {
@@ -94,6 +98,7 @@ public class LruCacheTests
         Assert.Equal(0, cache.Count);
     }
 
+    /// <summary>Verifies that get or add concurrent misses return valid values and stay bounded.</summary>
     [Fact]
     public void GetOrAdd_ConcurrentMisses_ReturnValidValuesAndStayBounded()
     {
@@ -114,6 +119,7 @@ public class LruCacheTests
         Assert.InRange(cache.Count, 0, 10);
     }
 
+    /// <summary>Verifies that clear drops everything.</summary>
     [Fact]
     public void Clear_DropsEverything()
     {

@@ -3,6 +3,7 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for RVZ reader.</summary>
 public class RvzReaderTests
 {
     private static RvzSpec GcSpec(CompressionType compression, uint chunkSize, HashSet<int>? packed = null)
@@ -52,6 +53,7 @@ public class RvzReaderTests
         return [e0, e1];
     }
 
+    /// <summary>Verifies that game cube full decode every codec.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Zstd)]
@@ -67,6 +69,7 @@ public class RvzReaderTests
         Assert.Equal(iso, reader.ReadFully());
     }
 
+    /// <summary>Verifies that game cube packing.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Zstd)]
@@ -80,6 +83,7 @@ public class RvzReaderTests
         Assert.Equal(iso, reader.ReadFully());
     }
 
+    /// <summary>Verifies that game cube small chunks.</summary>
     [Fact]
     public void GameCube_SmallChunks()
     {
@@ -89,6 +93,7 @@ public class RvzReaderTests
         Assert.Equal(iso, reader.ReadFully());
     }
 
+    /// <summary>Verifies that Wii full decode.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Zstd)]
@@ -100,6 +105,7 @@ public class RvzReaderTests
         Assert.Equal(iso, reader.ReadFully());
     }
 
+    /// <summary>Verifies that Wii with packing and exceptions.</summary>
     [Fact]
     public void Wii_WithPackingAndExceptions()
     {
@@ -110,6 +116,7 @@ public class RvzReaderTests
         Assert.Equal(iso, reader.ReadFully());
     }
 
+    /// <summary>Verifies that Wii small chunks.</summary>
     [Fact]
     public void Wii_SmallChunks()
     {
@@ -120,6 +127,7 @@ public class RvzReaderTests
         Assert.Equal(iso, reader.ReadFully());
     }
 
+    /// <summary>Verifies that random access matches full decode.</summary>
     [Fact]
     public void RandomAccess_MatchesFullDecode()
     {
@@ -144,6 +152,7 @@ public class RvzReaderTests
         }
     }
 
+    /// <summary>Verifies that open bad magic throws.</summary>
     [Fact]
     public void Open_BadMagic_Throws()
     {
@@ -152,6 +161,7 @@ public class RvzReaderTests
         Assert.Throws<RvzFormatException>(() => RvzReader.Open(new MemoryStream(bytes)));
     }
 
+    /// <summary>Verifies that open truncated file throws.</summary>
     [Fact]
     public void Open_TruncatedFile_Throws()
     {
@@ -160,6 +170,7 @@ public class RvzReaderTests
             RvzReader.Open(new MemoryStream([.. bytes.AsSpan(0, bytes.Length / 2)])));
     }
 
+    /// <summary>Verifies that open truncated table section throws format exception.</summary>
     [Fact]
     public void Open_TruncatedTableSection_ThrowsFormatException()
     {
@@ -173,6 +184,7 @@ public class RvzReaderTests
             RvzReader.Open(new MemoryStream([.. bytes.AsSpan(0, cut)])));
     }
 
+    /// <summary>Verifies that open invalid hash exception offset throws.</summary>
     [Fact]
     public void Open_InvalidHashExceptionOffset_Throws()
     {
@@ -197,6 +209,7 @@ public class RvzReaderTests
         Assert.Throws<RvzFormatException>(() => reader.ReadFully());
     }
 
+    /// <summary>Verifies that open tampered group table hash throws.</summary>
     [Fact]
     public void Open_TamperedGroupTableHash_Throws()
     {
@@ -207,6 +220,7 @@ public class RvzReaderTests
         Assert.Throws<RvzHashMismatchException>(() => RvzReader.Open(new MemoryStream(bytes)));
     }
 
+    /// <summary>Verifies that open overlapping raw data throws.</summary>
     [Fact]
     public void Open_OverlappingRawData_Throws()
     {
@@ -222,6 +236,7 @@ public class RvzReaderTests
         Assert.Throws<RvzFormatException>(() => RvzReader.Open(new MemoryStream(bytes)));
     }
 
+    /// <summary>Verifies that open out of order partition segments throws.</summary>
     [Fact]
     public void Open_OutOfOrderPartitionSegments_Throws()
     {
@@ -275,8 +290,10 @@ public class RvzReaderTests
     }
 }
 
+/// <summary>Unit tests for RVZ reader matrix.</summary>
 public class RvzReaderMatrixTests
 {
+    /// <summary>Verifies that Wii more combinations.</summary>
     [Theory]
     [InlineData(CompressionType.Bzip2, 0x80000)]
     [InlineData(CompressionType.Lzma, 0x80000)]
@@ -310,6 +327,7 @@ public class RvzReaderMatrixTests
         Assert.Equal(iso, reader.ReadFully());
     }
 
+    /// <summary>Verifies that corrupt group data throws.</summary>
     [Fact]
     public void CorruptGroupData_Throws()
     {

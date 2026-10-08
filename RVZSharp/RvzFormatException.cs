@@ -18,6 +18,7 @@ public sealed class RvzFormatException : RvzException
     {
     }
 
+    /// <summary>Creates a new exception with no message.</summary>
     public RvzFormatException()
     {
     }

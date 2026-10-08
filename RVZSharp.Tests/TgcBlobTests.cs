@@ -4,6 +4,7 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for TGC blob.</summary>
 public class TgcBlobTests
 {
     private static byte[] ReadAll(TgcBlob reader)
@@ -20,6 +21,7 @@ public class TgcBlobTests
         return output;
     }
 
+    /// <summary>Verifies that round trip relocates DOL FST and FST offsets.</summary>
     [Fact]
     public void RoundTrip_RelocatesDolFstAndFstOffsets()
     {
@@ -31,6 +33,7 @@ public class TgcBlobTests
         Assert.Equal(iso, ReadAll(reader));
     }
 
+    /// <summary>Verifies that round trip no DOL relocation.</summary>
     [Fact]
     public void RoundTrip_NoDolRelocation()
     {
@@ -41,6 +44,7 @@ public class TgcBlobTests
         Assert.Equal(iso, ReadAll(reader));
     }
 
+    /// <summary>Verifies that random access across patched regions.</summary>
     [Fact]
     public void RandomAccess_AcrossPatchedRegions()
     {
@@ -55,6 +59,7 @@ public class TgcBlobTests
         Assert.Equal(iso.AsSpan(start, length).ToArray(), probe);
     }
 
+    /// <summary>Verifies that bad magic throws format exception.</summary>
     [Fact]
     public void BadMagic_ThrowsFormatException()
     {

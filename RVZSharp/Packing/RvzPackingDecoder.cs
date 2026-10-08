@@ -209,6 +209,8 @@ public sealed class RvzPackingDecoder : Stream
         return true;
     }
 
+    /// <summary>Releases the wrapped stream unless it is left open.</summary>
+    /// <param name="disposing">True when called from <see cref="IDisposable.Dispose"/>.</param>
     protected override void Dispose(bool disposing)
     {
         if (disposing && !_leaveOpen)

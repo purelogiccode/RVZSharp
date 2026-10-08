@@ -43,6 +43,7 @@ public class LibraryApiTests
         return iso;
     }
 
+    /// <summary>Verifies that blob open by path detects and decodes.</summary>
     [Fact]
     public void Blob_Open_ByPath_DetectsAndDecodes()
     {
@@ -61,6 +62,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that blob open by path opens RVZ and decodes byte exact.</summary>
     [Fact]
     public void Blob_Open_ByPath_OpensRvzAndDecodesByteExact()
     {
@@ -85,6 +87,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that blob open by path with NFS key decodes.</summary>
     [Fact]
     public void Blob_Open_ByPath_WithNfsKey_Decodes()
     {
@@ -106,6 +109,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that read fully default implementation works on non overriding blob.</summary>
     [Fact]
     public void ReadFully_DefaultImplementation_WorksOnNonOverridingBlob()
     {
@@ -116,6 +120,7 @@ public class LibraryApiTests
         Assert.Equal(iso, blob.ReadFully());
     }
 
+    /// <summary>Verifies that read fully with progress works on non overriding blob.</summary>
     [Fact]
     public void ReadFully_WithProgress_WorksOnNonOverridingBlob()
     {
@@ -128,6 +133,7 @@ public class LibraryApiTests
         Assert.Equal(1.0, progress[^1]);
     }
 
+    /// <summary>Verifies that copy to streams whole image and reports monotonic progress.</summary>
     [Fact]
     public void CopyTo_StreamsWholeImage_AndReportsMonotonicProgress()
     {
@@ -150,6 +156,7 @@ public class LibraryApiTests
         Assert.Equal(1.0, progress[^1]);
     }
 
+    /// <summary>Verifies that copy to observes cancellation mid stream.</summary>
     [Fact]
     public void CopyTo_ObservesCancellation_MidStream()
     {
@@ -180,6 +187,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that RVZ reader read fully with progress and cancellation.</summary>
     [Fact]
     public void RvzReader_ReadFully_WithProgress_AndCancellation()
     {
@@ -197,6 +205,7 @@ public class LibraryApiTests
         Assert.Throws<OperationCanceledException>(() => reader.ReadFully(null, cts.Token));
     }
 
+    /// <summary>Verifies that RVZ reader copy to streams byte exact.</summary>
     [Fact]
     public void RvzReader_CopyTo_StreamsByteExact()
     {
@@ -211,6 +220,7 @@ public class LibraryApiTests
         Assert.Equal(iso, destination.ToArray());
     }
 
+    /// <summary>Verifies that disc hasher computes known vectors.</summary>
     [Fact]
     public void DiscHasher_ComputesKnownVectors()
     {
@@ -225,6 +235,7 @@ public class LibraryApiTests
             Convert.ToHexString(hashes.Sha1).ToLowerInvariant());
     }
 
+    /// <summary>Verifies that disc hashes matches compares all three hashes.</summary>
     [Fact]
     public void DiscHashes_Matches_ComparesAllThreeHashes()
     {
@@ -239,6 +250,7 @@ public class LibraryApiTests
         Assert.False(hashes.Matches(hashes with { Sha1 = new byte[20] }));
     }
 
+    /// <summary>Verifies that disc hasher matches framework hashes and reports progress.</summary>
     [Fact]
     public void DiscHasher_MatchesFrameworkHashes_AndReportsProgress()
     {
@@ -253,6 +265,7 @@ public class LibraryApiTests
         Assert.Equal(1.0, progress[^1]);
     }
 
+    /// <summary>Verifies that disc hasher prefix overload hashes only the requested bytes.</summary>
     [Fact]
     public void DiscHasher_PrefixOverload_HashesOnlyTheRequestedBytes()
     {
@@ -266,6 +279,7 @@ public class LibraryApiTests
         Assert.NotEqual(DiscHasher.Compute(blob).Sha1, hashes.Sha1);
     }
 
+    /// <summary>Verifies that disc hasher length outside the image is rejected.</summary>
     [Fact]
     public void DiscHasher_LengthOutsideTheImage_IsRejected()
     {
@@ -275,6 +289,7 @@ public class LibraryApiTests
         Assert.Throws<ArgumentOutOfRangeException>(() => DiscHasher.Compute(blob, iso.Length + 1));
     }
 
+    /// <summary>Verifies that disc hasher observes cancellation.</summary>
     [Fact]
     public void DiscHasher_ObservesCancellation()
     {
@@ -286,6 +301,7 @@ public class LibraryApiTests
             DiscHasher.Compute(blob, cancellationToken: cts.Token));
     }
 
+    /// <summary>Verifies that blob disc validation classifies game cube Wii and unknown.</summary>
     [Fact]
     public void Blob_DiscValidation_ClassifiesGameCubeWiiAndUnknown()
     {
@@ -318,6 +334,7 @@ public class LibraryApiTests
         Assert.Throws<ArgumentNullException>(() => Blob.GetDiscType(null!));
     }
 
+    /// <summary>Verifies that RVZ writer reports monotonic progress ending at one.</summary>
     [Fact]
     public void RvzWriter_Reports_MonotonicProgress_EndingAtOne()
     {
@@ -339,6 +356,7 @@ public class LibraryApiTests
         Assert.Equal(1.0, progress[^1]);
     }
 
+    /// <summary>Verifies that RVZ writer observes cancellation.</summary>
     [Fact]
     public void RvzWriter_Observes_Cancellation()
     {
@@ -360,6 +378,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that RVZ writer cancels mid conversion.</summary>
     [Fact]
     public void RvzWriter_Cancels_MidConversion()
     {
@@ -391,6 +410,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that blob open split plain ISO concatenates parts.</summary>
     [Fact]
     public void Blob_Open_SplitPlainIso_ConcatenatesParts()
     {
@@ -413,6 +433,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that blob open split plain ISO stream overload with path.</summary>
     [Fact]
     public void Blob_Open_SplitPlainIso_StreamOverload_WithPath()
     {
@@ -435,6 +456,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that blob open split plain ISO zero size continuation falls back to first part.</summary>
     [Fact]
     public void Blob_Open_SplitPlainIso_ZeroSizeContinuation_FallsBackToFirstPart()
     {
@@ -456,6 +478,7 @@ public class LibraryApiTests
         }
     }
 
+    /// <summary>Verifies that blob stream reads seeks and copies.</summary>
     [Fact]
     public void BlobStream_ReadsSeeksAndCopies()
     {
@@ -485,6 +508,7 @@ public class LibraryApiTests
         Assert.Equal(0, stream.Read(new byte[16]));
     }
 
+    /// <summary>Verifies that blob stream dispose closes blob unless leave open.</summary>
     [Fact]
     public void BlobStream_Dispose_ClosesBlobUnlessLeaveOpen()
     {
@@ -499,6 +523,7 @@ public class LibraryApiTests
         Assert.Equal(4, kept.ReadAt(0, new byte[4]));
     }
 
+    /// <summary>Verifies that blob stream write is not supported.</summary>
     [Fact]
     public void BlobStream_Write_IsNotSupported()
     {
@@ -510,6 +535,7 @@ public class LibraryApiTests
         Assert.Throws<NotSupportedException>(() => stream.SetLength(1));
     }
 
+    /// <summary>Verifies that writer path overloads round trip through readers.</summary>
     [Fact]
     public void WriterPathOverloads_RoundTrip_ThroughReaders()
     {

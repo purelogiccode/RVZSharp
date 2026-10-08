@@ -11,6 +11,7 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class WiiVolumeTests
 {
+    /// <summary>Verifies that get title key decrypts retail ticket.</summary>
     [Fact]
     public void GetTitleKey_DecryptsRetailTicket()
     {
@@ -21,6 +22,7 @@ public class WiiVolumeTests
         Assert.Equal(key, WiiVolume.GetTitleKey(ticket));
     }
 
+    /// <summary>Verifies that get partitions plain ISO returns plaintext key.</summary>
     [Fact]
     public void GetPartitions_PlainIso_ReturnsPlaintextKey()
     {

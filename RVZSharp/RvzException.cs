@@ -18,6 +18,7 @@ public class RvzException : Exception
     {
     }
 
+    /// <summary>Creates a new exception with no message.</summary>
     public RvzException()
     {
     }

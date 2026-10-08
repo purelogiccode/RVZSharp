@@ -3,7 +3,7 @@
 Release highlights, newest first. The full 1.0.0 announcement is in
 [Release notes 1.0.0](release-notes-1.0.0.md).
 
-## 1.0.1 (unreleased)
+## 1.1.0 (unreleased)
 
 A feature and correctness release. The public API stays compatible with 1.0.0 (checked at
 pack time against the published package via `PackageValidationBaselineVersion`).

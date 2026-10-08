@@ -2,6 +2,7 @@ using RVZSharp.IO;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for non disposing stream.</summary>
 public class NonDisposingStreamTests
 {
     private static MemoryStream CreateInner(out byte[] data)
@@ -10,6 +11,7 @@ public class NonDisposingStreamTests
         return new MemoryStream(data);
     }
 
+    /// <summary>Verifies that dispose does not dispose the inner stream.</summary>
     [Fact]
     public void Dispose_DoesNotDisposeTheInnerStream()
     {
@@ -22,6 +24,7 @@ public class NonDisposingStreamTests
         Assert.Equal(0, inner.ReadByte());
     }
 
+    /// <summary>Verifies that read and read span delegate to the inner stream.</summary>
     [Fact]
     public void Read_And_ReadSpan_DelegateToTheInnerStream()
     {
@@ -37,6 +40,7 @@ public class NonDisposingStreamTests
         Assert.Equal(data.Skip(16).Take(16).ToArray(), span);
     }
 
+    /// <summary>Verifies that position length seek flush delegate.</summary>
     [Fact]
     public void Position_Length_Seek_Flush_Delegate()
     {
@@ -59,6 +63,7 @@ public class NonDisposingStreamTests
         Assert.Equal(0x24, inner.Position);
     }
 
+    /// <summary>Verifies that write throws not supported.</summary>
     [Fact]
     public void Write_ThrowsNotSupported()
     {
@@ -68,6 +73,7 @@ public class NonDisposingStreamTests
         Assert.Throws<NotSupportedException>(() => wrapper.Write(new byte[1], 0, 1));
     }
 
+    /// <summary>Verifies that set length throws not supported.</summary>
     [Fact]
     public void SetLength_ThrowsNotSupported()
     {
@@ -77,6 +83,7 @@ public class NonDisposingStreamTests
         Assert.Throws<NotSupportedException>(() => wrapper.SetLength(100));
     }
 
+    /// <summary>Verifies that capabilities mirror the inner stream.</summary>
     [Fact]
     public void Capabilities_MirrorTheInnerStream()
     {

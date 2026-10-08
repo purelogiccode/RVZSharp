@@ -11,6 +11,7 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class RvzWriterTests
 {
+    /// <summary>Compression/packing combinations used by the writer round-trip tests.</summary>
     public static TheoryData<CompressionType, bool> CompressionCases => new()
     {
         { CompressionType.None, false },
@@ -22,6 +23,7 @@ public class RvzWriterTests
         { CompressionType.Lzma2, true }
     };
 
+    /// <summary>Verifies that game cube ISO round trips.</summary>
     [Theory]
     [MemberData(nameof(CompressionCases))]
     public void GameCubeIso_RoundTrips(CompressionType compression, bool packing)
@@ -31,6 +33,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(rvz));
     }
 
+    /// <summary>Verifies that Wii ISO round trips.</summary>
     [Theory]
     [MemberData(nameof(CompressionCases))]
     public void WiiIso_RoundTrips(CompressionType compression, bool packing)
@@ -42,6 +45,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(rvz));
     }
 
+    /// <summary>Verifies that Wii ISO with FST split round trips.</summary>
     [Theory]
     [MemberData(nameof(CompressionCases))]
     public void WiiIso_WithFstSplit_RoundTrips(CompressionType compression, bool packing)
@@ -56,6 +60,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(rvz));
     }
 
+    /// <summary>Verifies that Wii ISO modified hash padding round trips.</summary>
     [Fact]
     public void WiiIso_ModifiedHashPadding_RoundTrips()
     {
@@ -77,6 +82,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(rvz));
     }
 
+    /// <summary>Verifies that Wii ISO overlapping update partition is skipped and data retained.</summary>
     [Fact]
     public void WiiIso_OverlappingUpdatePartition_IsSkipped_AndDataRetained()
     {
@@ -111,6 +117,7 @@ public class RvzWriterTests
         Assert.Single(reader.Partitions); // the update partition was not encoded separately
     }
 
+    /// <summary>Verifies that Wii ISO odd sized partition data tail becomes raw.</summary>
     [Fact]
     public void WiiIso_OddSizedPartitionData_TailBecomesRaw()
     {
@@ -129,6 +136,7 @@ public class RvzWriterTests
         Assert.Single(reader.Partitions); // encoded as a partition, not raw
     }
 
+    /// <summary>Verifies that disc type unhashed Wii disc is still Wii.</summary>
     [Fact]
     public void DiscType_UnhashedWiiDisc_IsStillWii()
     {
@@ -147,6 +155,7 @@ public class RvzWriterTests
         Assert.Equal(DiscType.Wii, reader.Disc.DiscType);
     }
 
+    /// <summary>Verifies that disc without magic is rejected.</summary>
     [Fact]
     public void DiscWithoutMagic_IsRejected()
     {
@@ -166,6 +175,7 @@ public class RvzWriterTests
         Assert.Equal(0, ms.Length); // nothing was written
     }
 
+    /// <summary>Verifies that all zero input without magic is rejected.</summary>
     [Fact]
     public void AllZeroInput_WithoutMagic_IsRejected()
     {
@@ -177,6 +187,7 @@ public class RvzWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that game cube ISO with magic at 0 x 1 c is written as game cube.</summary>
     [Fact]
     public void GameCubeIso_WithMagicAt0x1C_IsWrittenAsGameCube()
     {
@@ -191,6 +202,7 @@ public class RvzWriterTests
         Assert.Equal(DiscType.GameCube, reader.Disc.DiscType);
     }
 
+    /// <summary>Verifies that Wii ISO scrubbed zeroes non game partition data.</summary>
     [Fact]
     public void WiiIso_Scrubbed_ZeroesNonGamePartitionData()
     {
@@ -238,6 +250,7 @@ public class RvzWriterTests
         Assert.Equal(expected, Decode(ms.ToArray()));
     }
 
+    /// <summary>Verifies that Wii ISO first raw entry starts at 0 x 80.</summary>
     [Fact]
     public void WiiIso_FirstRawEntry_StartsAt0x80()
     {
@@ -279,6 +292,7 @@ public class RvzWriterTests
         return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
     }
 
+    /// <summary>Verifies that all zero ISO produces tiny file.</summary>
     [Fact]
     public void AllZeroIso_ProducesTinyFile()
     {
@@ -293,6 +307,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(rvz));
     }
 
+    /// <summary>Verifies that junk only ISO packs with recovered seed.</summary>
     [Fact]
     public void JunkOnlyIso_PacksWithRecoveredSeed()
     {
@@ -319,6 +334,7 @@ public class RvzWriterTests
         Assert.True(reader.GroupEntries[0].RvzPackedSize > 0);
     }
 
+    /// <summary>Verifies that chunk size smaller than 2 mi b round trips.</summary>
     [Fact]
     public void ChunkSize_SmallerThan2MiB_RoundTrips()
     {
@@ -332,6 +348,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(ms.ToArray()));
     }
 
+    /// <summary>Verifies that Wii ISO small chunks with hash exceptions round trips.</summary>
     [Fact]
     public void WiiIso_SmallChunks_WithHashExceptions_RoundTrips()
     {
@@ -349,6 +366,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(ms.ToArray()));
     }
 
+    /// <summary>Verifies that Wii ISO 6 mi b chunks round trips.</summary>
     [Fact]
     public void WiiIso_6MiBChunks_RoundTrips()
     {
@@ -367,6 +385,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(ms.ToArray()));
     }
 
+    /// <summary>Verifies that invalid chunk size throws.</summary>
     [Fact]
     public void InvalidChunkSize_Throws()
     {
@@ -378,6 +397,7 @@ public class RvzWriterTests
             }));
     }
 
+    /// <summary>Verifies that max threads output is identical to sequential.</summary>
     [Theory]
     [InlineData(CompressionType.Zstd)]
     [InlineData(CompressionType.Lzma2)]
@@ -392,6 +412,7 @@ public class RvzWriterTests
         Assert.Equal(sequential, parallel);
     }
 
+    /// <summary>Verifies that negative max threads throws.</summary>
     [Fact]
     public void NegativeMaxThreads_Throws()
     {
@@ -415,6 +436,7 @@ public class RvzWriterTests
         return ms.ToArray();
     }
 
+    /// <summary>Verifies that chunk size multiple of 2 mi b round trips.</summary>
     [Fact]
     public void ChunkSize_MultipleOf2MiB_RoundTrips()
     {
@@ -436,6 +458,7 @@ public class RvzWriterTests
         Assert.Equal(iso, Decode(ms.ToArray()));
     }
 
+    /// <summary>Verifies that legacy formats convert to RVZ and decode back.</summary>
     [Fact]
     public void LegacyFormats_ConvertToRvz_AndDecodeBack()
     {
@@ -469,6 +492,7 @@ public class RvzWriterTests
         Assert.Equal(iso, RoundTripViaRvz(ciso, iso.Length));
     }
 
+    /// <summary>Verifies that NFS converts to RVZ and decode back.</summary>
     [Fact]
     public void Nfs_ConvertsToRvz_AndDecodeBack()
     {
@@ -502,6 +526,7 @@ public class RvzWriterTests
         }
     }
 
+    /// <summary>Verifies that game cube ISO size with small chunk remainder round trips.</summary>
     [Fact]
     public void GameCubeIso_SizeWithSmallChunkRemainder_RoundTrips()
     {
@@ -519,6 +544,7 @@ public class RvzWriterTests
         Assert.All(reader.RawDataEntries, entry => Assert.True(entry.NumGroups > 0));
     }
 
+    /// <summary>Verifies that Wii ISO junk in partition data round trips.</summary>
     [Fact]
     public void WiiIso_JunkInPartitionData_RoundTrips()
     {

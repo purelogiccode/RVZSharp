@@ -3,8 +3,10 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for WIA file head.</summary>
 public class WiaFileHeadTests
 {
+    /// <summary>Verifies that parse valid header returns all fields.</summary>
     [Fact]
     public void Parse_ValidHeader_ReturnsAllFields()
     {
@@ -29,6 +31,7 @@ public class WiaFileHeadTests
         Assert.Equal(12345ul, head.RvzFileSize);
     }
 
+    /// <summary>Verifies that parse truncated throws format exception.</summary>
     [Fact]
     public void Parse_Truncated_ThrowsFormatException()
     {
@@ -36,6 +39,7 @@ public class WiaFileHeadTests
         Assert.Throws<RvzFormatException>(() => WiaFileHead.Parse(bytes.AsSpan(0, 0x30)));
     }
 
+    /// <summary>Verifies that validate bad magic throws format exception.</summary>
     [Fact]
     public void Validate_BadMagic_ThrowsFormatException()
     {
@@ -47,6 +51,7 @@ public class WiaFileHeadTests
         Assert.Contains("magic", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Verifies that validate WIA magic with RVZ rules throws format exception.</summary>
     [Fact]
     public void Validate_WiaMagicWithRvzRules_ThrowsFormatException()
     {
@@ -59,6 +64,7 @@ public class WiaFileHeadTests
         head.Validate(bytes, bytes.Length, WiaRvzFormat.Wia); // must not throw
     }
 
+    /// <summary>Verifies that validate version too old throws unsupported exception.</summary>
     [Fact]
     public void Validate_VersionTooOld_ThrowsUnsupportedException()
     {
@@ -69,6 +75,7 @@ public class WiaFileHeadTests
         Assert.Throws<RvzUnsupportedException>(() => head.Validate(bytes, bytes.Length));
     }
 
+    /// <summary>Verifies that validate version compatible too new throws unsupported exception.</summary>
     [Fact]
     public void Validate_VersionCompatibleTooNew_ThrowsUnsupportedException()
     {
@@ -79,6 +86,7 @@ public class WiaFileHeadTests
         Assert.Throws<RvzUnsupportedException>(() => head.Validate(bytes, bytes.Length));
     }
 
+    /// <summary>Verifies that validate file size mismatch throws format exception.</summary>
     [Fact]
     public void Validate_FileSizeMismatch_ThrowsFormatException()
     {
@@ -88,6 +96,7 @@ public class WiaFileHeadTests
         Assert.Throws<RvzFormatException>(() => head.Validate(bytes, bytes.Length + 1));
     }
 
+    /// <summary>Verifies that validate tampered hash throws hash mismatch exception.</summary>
     [Fact]
     public void Validate_TamperedHash_ThrowsHashMismatchException()
     {
@@ -98,6 +107,7 @@ public class WiaFileHeadTests
         Assert.Throws<RvzHashMismatchException>(() => head.Validate(bytes, bytes.Length));
     }
 
+    /// <summary>Verifies that validate valid header passes.</summary>
     [Fact]
     public void Validate_ValidHeader_Passes()
     {
@@ -107,6 +117,7 @@ public class WiaFileHeadTests
         head.Validate(bytes, bytes.Length); // must not throw
     }
 
+    /// <summary>Verifies that format version matches dolphin style.</summary>
     [Fact]
     public void FormatVersion_MatchesDolphinStyle()
     {

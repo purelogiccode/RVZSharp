@@ -15,6 +15,7 @@ public class WbfsWriterTests
 {
     private const int ClusterSize = 0x40000; // 256 KiB: the smallest size whose map fits u16
 
+    /// <summary>Verifies that Wii ISO round trips.</summary>
     [Fact]
     public void WiiIso_RoundTrips()
     {
@@ -26,6 +27,7 @@ public class WbfsWriterTests
         AssertTailIsZero(wbfs);
     }
 
+    /// <summary>Verifies that header has expected fields.</summary>
     [Fact]
     public void Header_HasExpectedFields()
     {
@@ -40,6 +42,7 @@ public class WbfsWriterTests
         Assert.Equal(0, wbfs.Length % 512);
     }
 
+    /// <summary>Verifies that header copies disc header for tools.</summary>
     [Fact]
     public void Header_CopiesDiscHeaderForTools()
     {
@@ -51,6 +54,7 @@ public class WbfsWriterTests
         Assert.Equal(iso.AsSpan(0, 256).ToArray(), wbfs.AsSpan(512, 256).ToArray());
     }
 
+    /// <summary>Verifies that write at non zero stream position declares relative sector count.</summary>
     [Fact]
     public void WriteAtNonZeroStreamPosition_DeclaresRelativeSectorCount()
     {
@@ -72,6 +76,7 @@ public class WbfsWriterTests
         Assert.Equal(iso, decoded);
     }
 
+    /// <summary>Verifies that zero clusters share one volume cluster.</summary>
     [Fact]
     public void ZeroClusters_ShareOneVolumeCluster()
     {
@@ -91,6 +96,7 @@ public class WbfsWriterTests
             "zero clusters should not be stored");
     }
 
+    /// <summary>Verifies that scrub zeroes non game partition data.</summary>
     [Fact]
     public void Scrub_ZeroesNonGamePartitionData()
     {
@@ -107,6 +113,7 @@ public class WbfsWriterTests
         Assert.Equal(iso.AsSpan(afterEnd).ToArray(), decoded.AsSpan(afterEnd).ToArray());
     }
 
+    /// <summary>Verifies that game cube disc is rejected.</summary>
     [Fact]
     public void GameCubeDisc_IsRejected()
     {
@@ -123,6 +130,7 @@ public class WbfsWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that disc without magic is rejected.</summary>
     [Fact]
     public void DiscWithoutMagic_IsRejected()
     {
@@ -134,6 +142,7 @@ public class WbfsWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that cluster size below 32 ki b is rejected.</summary>
     [Fact]
     public void ClusterSizeBelow32KiB_IsRejected()
     {
@@ -144,6 +153,7 @@ public class WbfsWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that cluster size too small for map is rejected.</summary>
     [Fact]
     public void ClusterSizeTooSmallForMap_IsRejected()
     {
@@ -155,6 +165,7 @@ public class WbfsWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that non power of two cluster size is rejected.</summary>
     [Fact]
     public void NonPowerOfTwoClusterSize_IsRejected()
     {
@@ -165,6 +176,7 @@ public class WbfsWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that non seekable output is rejected.</summary>
     [Fact]
     public void NonSeekableOutput_IsRejected()
     {

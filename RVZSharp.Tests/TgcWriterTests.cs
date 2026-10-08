@@ -11,6 +11,7 @@ namespace RVZSharp.Tests;
 /// </summary>
 public class TgcWriterTests
 {
+    /// <summary>Verifies that game cube ISO round trips.</summary>
     [Fact]
     public void GameCubeIso_RoundTrips()
     {
@@ -19,6 +20,7 @@ public class TgcWriterTests
         Assert.Equal(iso, Decode(tgc));
     }
 
+    /// <summary>Verifies that random access across patched regions matches the ISO.</summary>
     [Fact]
     public void RandomAccess_AcrossPatchedRegions_MatchesTheIso()
     {
@@ -35,6 +37,7 @@ public class TgcWriterTests
         }
     }
 
+    /// <summary>Verifies that header has expected fields.</summary>
     [Fact]
     public void Header_HasExpectedFields()
     {
@@ -54,6 +57,7 @@ public class TgcWriterTests
         Assert.Equal(tgc.Length, TgcWriter.HeaderSize + iso.Length);
     }
 
+    /// <summary>Verifies that no DOL is tolerated.</summary>
     [Fact]
     public void NoDol_IsTolerated()
     {
@@ -63,6 +67,7 @@ public class TgcWriterTests
         Assert.Equal(iso, Decode(tgc));
     }
 
+    /// <summary>Verifies that Wii disc is rejected.</summary>
     [Fact]
     public void WiiDisc_IsRejected()
     {
@@ -75,6 +80,7 @@ public class TgcWriterTests
         Assert.Equal(0, ms.Length);
     }
 
+    /// <summary>Verifies that disc without magic is rejected.</summary>
     [Fact]
     public void DiscWithoutMagic_IsRejected()
     {

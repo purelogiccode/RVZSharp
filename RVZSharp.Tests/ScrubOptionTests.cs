@@ -69,6 +69,7 @@ public class ScrubOptionTests
         return reader.ReadFully();
     }
 
+    /// <summary>Verifies that without scrub update partition round trips.</summary>
     [Fact]
     public void WithoutScrub_UpdatePartitionRoundTrips()
     {
@@ -81,6 +82,7 @@ public class ScrubOptionTests
             decoded.AsSpan(UpdateDataStart, PartitionSize).ToArray());
     }
 
+    /// <summary>Verifies that with scrub update partition is zeroed game partition survives.</summary>
     [Fact]
     public void WithScrub_UpdatePartitionIsZeroed_GamePartitionSurvives()
     {
@@ -96,6 +98,7 @@ public class ScrubOptionTests
             b => Assert.Equal(0, b));
     }
 
+    /// <summary>Verifies that scrub on game cube disc is a no op.</summary>
     [Fact]
     public void Scrub_OnGameCubeDisc_IsANoOp()
     {

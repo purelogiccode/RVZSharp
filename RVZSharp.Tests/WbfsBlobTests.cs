@@ -4,12 +4,14 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for WBFS blob.</summary>
 public class WbfsBlobTests
 {
     // Real WBFS files use 2 MiB clusters (wlba entries are u16, so small clusters would
     // overflow for a full disc).
     private const int ClusterSize = 0x200000;
 
+    /// <summary>Verifies that round trip full and empty clusters.</summary>
     [Fact]
     public void RoundTrip_FullAndEmptyClusters()
     {
@@ -30,6 +32,7 @@ public class WbfsBlobTests
         Assert.Equal(expected, probe);
     }
 
+    /// <summary>Verifies that sparse disc empty clusters zero filled.</summary>
     [Fact]
     public void SparseDisc_EmptyClustersZeroFilled()
     {
@@ -48,6 +51,7 @@ public class WbfsBlobTests
         Assert.Equal(expected, probe);
     }
 
+    /// <summary>Verifies that random access.</summary>
     [Fact]
     public void RandomAccess()
     {
@@ -61,6 +65,7 @@ public class WbfsBlobTests
         Assert.Equal(iso.AsSpan(ClusterSize + 0x8000, 0x10000).ToArray(), probe);
     }
 
+    /// <summary>Verifies that bad magic throws format exception.</summary>
     [Fact]
     public void BadMagic_ThrowsFormatException()
     {
@@ -68,6 +73,7 @@ public class WbfsBlobTests
         Assert.Throws<RvzFormatException>(() => WbfsBlob.Open(new MemoryStream(bytes)));
     }
 
+    /// <summary>Verifies that size mismatch throws format exception.</summary>
     [Fact]
     public void SizeMismatch_ThrowsFormatException()
     {
@@ -78,6 +84,7 @@ public class WbfsBlobTests
         Assert.Throws<RvzFormatException>(() => WbfsBlob.Open(new MemoryStream(trimmed)));
     }
 
+    /// <summary>Verifies that disc table is read from offset 12 not padding.</summary>
     [Fact]
     public void DiscTable_IsReadFromOffset12_NotPadding()
     {
@@ -95,6 +102,7 @@ public class WbfsBlobTests
         Assert.Throws<RvzFormatException>(() => WbfsBlob.Open(new MemoryStream(wbfs)));
     }
 
+    /// <summary>Verifies that split files round trip.</summary>
     [Fact]
     public void SplitFiles_RoundTrip()
     {

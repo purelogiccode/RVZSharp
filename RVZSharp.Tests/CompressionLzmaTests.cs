@@ -3,6 +3,7 @@ using RVZSharp.Models;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for compression LZMA.</summary>
 public class CompressionLzmaTests
 {
     private static byte[] MakePayload(int size, int seed = 1)
@@ -67,6 +68,7 @@ public class CompressionLzmaTests
         return (props, output.ToArray());
     }
 
+    /// <summary>Verifies that LZMA 1 round trip.</summary>
     [Theory]
     [InlineData(true)] // end-of-stream marker present (Dolphin style)
     [InlineData(false)] // size-terminated only
@@ -82,6 +84,7 @@ public class CompressionLzmaTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
+    /// <summary>Verifies that LZMA 1 bad properties throws.</summary>
     [Theory]
     [InlineData(new byte[] { }, "requires 5 bytes")]
     [InlineData(new byte[] { 0xFF, 0, 0, 0, 0 }, "properties byte")]
@@ -94,6 +97,7 @@ public class CompressionLzmaTests
         Assert.Contains(messagePart, ex.Message);
     }
 
+    /// <summary>Verifies that LZMA encoder output has end of stream marker.</summary>
     [Fact]
     public void LzmaEncoder_Output_HasEndOfStreamMarker()
     {
@@ -125,6 +129,7 @@ public class CompressionLzmaTests
         Assert.Equal(0, stream.Read(buffer, 0, 1));
     }
 
+    /// <summary>Verifies that LZMA 2 uncompressed chunk round trip.</summary>
     [Fact]
     public void Lzma2_UncompressedChunk_RoundTrip()
     {
@@ -138,6 +143,7 @@ public class CompressionLzmaTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
+    /// <summary>Verifies that LZMA 2 compressed chunk round trip.</summary>
     [Fact]
     public void Lzma2_CompressedChunk_RoundTrip()
     {
@@ -151,6 +157,7 @@ public class CompressionLzmaTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
+    /// <summary>Verifies that LZMA 2 bad properties throws.</summary>
     [Fact]
     public void Lzma2_BadProperties_Throws()
     {

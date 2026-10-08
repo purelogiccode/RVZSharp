@@ -31,6 +31,7 @@ public class ParallelDecodeTests
         }
     }
 
+    /// <summary>Verifies that game cube parallel copy matches sequential.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Zstd)]
@@ -62,6 +63,7 @@ public class ParallelDecodeTests
         }
     }
 
+    /// <summary>Verifies that Wii parallel copy matches sequential.</summary>
     [Theory]
     [InlineData(CompressionType.Zstd)]
     [InlineData(CompressionType.Lzma2)]
@@ -85,6 +87,7 @@ public class ParallelDecodeTests
         Assert.Equal(iso, parallel.ToArray());
     }
 
+    /// <summary>Verifies that Wii multi region chunks parallel copy matches sequential.</summary>
     [Fact]
     public void Wii_MultiRegionChunks_ParallelCopy_MatchesSequential()
     {
@@ -106,6 +109,7 @@ public class ParallelDecodeTests
         Assert.Equal(iso, parallel.ToArray());
     }
 
+    /// <summary>Verifies that WIA parallel copy matches sequential.</summary>
     [Fact]
     public void Wia_ParallelCopy_MatchesSequential()
     {
@@ -126,6 +130,7 @@ public class ParallelDecodeTests
         Assert.Equal(iso, parallel.ToArray());
     }
 
+    /// <summary>Verifies that parallel copy reports progress and ends at one.</summary>
     [Fact]
     public void ParallelCopy_ReportsProgressAndEndsAtOne()
     {
@@ -148,6 +153,7 @@ public class ParallelDecodeTests
         Assert.True(progress.SequenceEqual(progress.Order()), "progress must be monotonic");
     }
 
+    /// <summary>Verifies that parallel copy cancellation throws.</summary>
     [Fact]
     public void ParallelCopy_Cancellation_Throws()
     {
@@ -173,6 +179,7 @@ public class ParallelDecodeTests
             }), 4, cts.Token));
     }
 
+    /// <summary>Verifies that non RVZ format ignores thread count.</summary>
     [Fact]
     public void NonRvzFormat_IgnoresThreadCount()
     {

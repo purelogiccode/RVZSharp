@@ -5,6 +5,7 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for WIA reader.</summary>
 public class WiaReaderTests
 {
     private static byte[] ReadAll(RvzReader reader)
@@ -21,6 +22,7 @@ public class WiaReaderTests
         return output;
     }
 
+    /// <summary>Verifies that game cube disc round trips.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Purge)]
@@ -47,6 +49,7 @@ public class WiaReaderTests
         Assert.Equal(iso, ReadAll(reader));
     }
 
+    /// <summary>Verifies that Wii disc with exceptions round trips.</summary>
     [Theory]
     [InlineData(CompressionType.None)]
     [InlineData(CompressionType.Purge)]
@@ -75,6 +78,7 @@ public class WiaReaderTests
         Assert.Equal(iso, ReadAll(reader));
     }
 
+    /// <summary>Verifies that random access across chunks.</summary>
     [Fact]
     public void RandomAccess_AcrossChunks()
     {
@@ -100,6 +104,7 @@ public class WiaReaderTests
         }
     }
 
+    /// <summary>Verifies that Zstd rejected for WIA.</summary>
     [Fact]
     public void Zstd_RejectedForWia()
     {
@@ -115,6 +120,7 @@ public class WiaReaderTests
         Assert.Throws<RvzUnsupportedException>(() => RvzReader.OpenWia(new MemoryStream(file)));
     }
 
+    /// <summary>Verifies that PURGE rejected for RVZ.</summary>
     [Fact]
     public void Purge_RejectedForRvz()
     {
@@ -129,6 +135,7 @@ public class WiaReaderTests
         Assert.Throws<RvzUnsupportedException>(() => RvzReader.Open(new MemoryStream(file)));
     }
 
+    /// <summary>Verifies that small chunk size rejected for WIA.</summary>
     [Fact]
     public void SmallChunkSize_RejectedForWia()
     {
@@ -144,6 +151,7 @@ public class WiaReaderTests
         Assert.Throws<RvzFormatException>(() => RvzReader.OpenWia(new MemoryStream(file)));
     }
 
+    /// <summary>Verifies that bad magic rejected.</summary>
     [Fact]
     public void BadMagic_Rejected()
     {
@@ -156,6 +164,7 @@ public class WiaReaderTests
         Assert.Equal(BlobType.Rvz, rvz.Type);
     }
 
+    /// <summary>Verifies that blob factory detects WIA.</summary>
     [Fact]
     public void BlobFactory_DetectsWia()
     {
@@ -174,8 +183,10 @@ public class WiaReaderTests
     }
 }
 
+/// <summary>Unit tests for PURGE decoder.</summary>
 public class PurgeDecoderTests
 {
+    /// <summary>Verifies that round trip segments and zero fill.</summary>
     [Fact]
     public void RoundTrip_SegmentsAndZeroFill()
     {
@@ -189,6 +200,7 @@ public class PurgeDecoderTests
         Assert.Equal(data, PurgeDecoder.Decode(encoded, [], data.Length));
     }
 
+    /// <summary>Verifies that round trip with preceding data.</summary>
     [Fact]
     public void RoundTrip_WithPrecedingData()
     {
@@ -201,6 +213,7 @@ public class PurgeDecoderTests
         Assert.Equal(data, PurgeDecoder.Decode(encoded, preceding, data.Length));
     }
 
+    /// <summary>Verifies that all zero data produces empty stream.</summary>
     [Fact]
     public void AllZeroData_ProducesEmptyStream()
     {
@@ -212,6 +225,7 @@ public class PurgeDecoderTests
         Assert.Equal(data, PurgeDecoder.Decode(encoded, [], data.Length));
     }
 
+    /// <summary>Verifies that tampered trailer throws hash mismatch.</summary>
     [Fact]
     public void TamperedTrailer_ThrowsHashMismatch()
     {
@@ -223,6 +237,7 @@ public class PurgeDecoderTests
         Assert.Throws<RvzHashMismatchException>(() => PurgeDecoder.Decode(encoded, [], data.Length));
     }
 
+    /// <summary>Verifies that truncated stream throws format exception.</summary>
     [Fact]
     public void TruncatedStream_ThrowsFormatException()
     {
@@ -238,6 +253,7 @@ public class PurgeDecoderTests
             PurgeDecoder.Decode([1, 2, 3], [], 0x1000)); // shorter than the trailer
     }
 
+    /// <summary>Verifies that segment beyond expected size throws.</summary>
     [Fact]
     public void SegmentBeyondExpectedSize_Throws()
     {

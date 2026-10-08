@@ -11,7 +11,10 @@ namespace RVZSharp.Tests.Helpers;
 /// </summary>
 public static class TestWiiIsoBuilder
 {
+    /// <summary>Offset of the game partition's header (ticket) in the built image.</summary>
     public const int PartitionOffset = 0x100000;
+
+    /// <summary>Offset of the partition data relative to <see cref="PartitionOffset"/>.</summary>
     public const int DataOffset = 0x40000; // partition data starts at PartitionOffset + DataOffset
 
     /// <summary>

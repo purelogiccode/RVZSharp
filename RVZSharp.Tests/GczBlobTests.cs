@@ -4,6 +4,7 @@ using RVZSharp.Tests.Helpers;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for GCZ blob.</summary>
 public class GczBlobTests
 {
     private static byte[] MakeIso(int length = 0x18000, int seed = 21)
@@ -27,6 +28,7 @@ public class GczBlobTests
         return output;
     }
 
+    /// <summary>Verifies that round trip all compressed.</summary>
     [Fact]
     public void RoundTrip_AllCompressed()
     {
@@ -39,6 +41,7 @@ public class GczBlobTests
         Assert.Equal(iso, ReadAll(reader));
     }
 
+    /// <summary>Verifies that round trip mixed raw and compressed.</summary>
     [Fact]
     public void RoundTrip_MixedRawAndCompressed()
     {
@@ -53,6 +56,7 @@ public class GczBlobTests
         Assert.Equal(iso, ReadAll(reader));
     }
 
+    /// <summary>Verifies that unaligned disc size serves exact length.</summary>
     [Fact]
     public void UnalignedDiscSize_ServesExactLength()
     {
@@ -64,6 +68,7 @@ public class GczBlobTests
         Assert.Equal(iso, ReadAll(reader));
     }
 
+    /// <summary>Verifies that random access across blocks.</summary>
     [Fact]
     public void RandomAccess_AcrossBlocks()
     {
@@ -81,6 +86,7 @@ public class GczBlobTests
         }
     }
 
+    /// <summary>Verifies that corrupt block throws hash mismatch.</summary>
     [Fact]
     public void CorruptBlock_ThrowsHashMismatch()
     {
@@ -92,6 +98,7 @@ public class GczBlobTests
         Assert.Throws<RvzHashMismatchException>(() => ReadAll(reader));
     }
 
+    /// <summary>Verifies that truncated data throws format exception.</summary>
     [Fact]
     public void TruncatedData_ThrowsFormatException()
     {
@@ -102,6 +109,7 @@ public class GczBlobTests
             GczBlob.Open(new MemoryStream(gcz.AsSpan(0, gcz.Length - 0x1000).ToArray())));
     }
 
+    /// <summary>Verifies that bad magic throws format exception.</summary>
     [Fact]
     public void BadMagic_ThrowsFormatException()
     {
@@ -110,6 +118,7 @@ public class GczBlobTests
         Assert.Throws<RvzFormatException>(() => GczBlob.Open(new MemoryStream(bytes)));
     }
 
+    /// <summary>Verifies that read past block table throws format exception.</summary>
     [Fact]
     public void ReadPastBlockTable_ThrowsFormatException()
     {

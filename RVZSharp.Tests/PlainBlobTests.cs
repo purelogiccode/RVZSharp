@@ -3,6 +3,7 @@ using RVZSharp.Models;
 
 namespace RVZSharp.Tests;
 
+/// <summary>Unit tests for plain blob.</summary>
 public class PlainBlobTests
 {
     private static MemoryStream StreamWith(byte[] data)
@@ -15,6 +16,7 @@ public class PlainBlobTests
         return Enumerable.Range(0, length).Select(i => (byte)i).ToArray();
     }
 
+    /// <summary>Verifies that metadata are exposed.</summary>
     [Fact]
     public void Metadata_AreExposed()
     {
@@ -25,6 +27,7 @@ public class PlainBlobTests
         Assert.Equal(0, blob.BlockSize);
     }
 
+    /// <summary>Verifies that read at returns the requested bytes.</summary>
     [Fact]
     public void ReadAt_ReturnsTheRequestedBytes()
     {
@@ -35,6 +38,7 @@ public class PlainBlobTests
         Assert.Equal(Pattern(0x100).Skip(0x80).Take(16).ToArray(), buffer);
     }
 
+    /// <summary>Verifies that read at past end returns partial then zero.</summary>
     [Fact]
     public void ReadAt_PastEnd_ReturnsPartial_ThenZero()
     {
@@ -46,6 +50,7 @@ public class PlainBlobTests
         Assert.Equal(0, blob.ReadAt(0x24, buffer));
     }
 
+    /// <summary>Verifies that read at out of range returns zero.</summary>
     [Theory]
     [InlineData(-1)]
     [InlineData(0x100)]
@@ -57,6 +62,7 @@ public class PlainBlobTests
         Assert.Equal(0, blob.ReadAt(position, new byte[16]));
     }
 
+    /// <summary>Verifies that read at empty buffer returns zero.</summary>
     [Fact]
     public void ReadAt_EmptyBuffer_ReturnsZero()
     {
@@ -65,6 +71,7 @@ public class PlainBlobTests
         Assert.Equal(0, blob.ReadAt(0, Span<byte>.Empty));
     }
 
+    /// <summary>Verifies that read at repositions the underlying stream.</summary>
     [Fact]
     public void ReadAt_RepositionsTheUnderlyingStream()
     {
@@ -80,6 +87,7 @@ public class PlainBlobTests
         Assert.Equal(0x50, buffer[0]);
     }
 
+    /// <summary>Verifies that dispose closes the stream by default.</summary>
     [Fact]
     public void Dispose_ClosesTheStream_ByDefault()
     {
@@ -91,6 +99,7 @@ public class PlainBlobTests
         Assert.Throws<ObjectDisposedException>(() => stream.ReadByte());
     }
 
+    /// <summary>Verifies that leave open keeps the stream usable.</summary>
     [Fact]
     public void LeaveOpen_KeepsTheStreamUsable()
     {
@@ -102,6 +111,7 @@ public class PlainBlobTests
         stream.Dispose();
     }
 
+    /// <summary>Verifies that non seekable stream throws.</summary>
     [Fact]
     public void NonSeekableStream_Throws()
     {

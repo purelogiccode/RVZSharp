@@ -21,8 +21,13 @@ public static class RealRvzCatalog
     /// <summary>(display name, relative file name, expected ISO SHA-1, expected ISO size).</summary>
     public record RealRvz(string Name, string File, string Sha1, long IsoSize);
 
-    public const string GcDir = @"F:\Nintendo GameCube";
-    public const string WiiDir = @"F:\Nintendo Wii";
+    /// <summary>GameCube catalog directory (override with <c>RVZ_REAL_GC_DIR</c>).</summary>
+    public static readonly string GcDir =
+        Environment.GetEnvironmentVariable("RVZ_REAL_GC_DIR") ?? @"F:\Nintendo GameCube";
+
+    /// <summary>Wii catalog directory (override with <c>RVZ_REAL_WII_DIR</c>).</summary>
+    public static readonly string WiiDir =
+        Environment.GetEnvironmentVariable("RVZ_REAL_WII_DIR") ?? @"F:\Nintendo Wii";
 
     public static readonly RealRvz[] GameCube =
     [
@@ -206,23 +211,14 @@ public class RealRvzDecodeTests
 
     private static long FindSize(string dir, string file)
     {
-        switch (dir)
+        var catalog = string.Equals(dir, RealRvzCatalog.GcDir, StringComparison.OrdinalIgnoreCase)
+            ? RealRvzCatalog.GameCube
+            : RealRvzCatalog.Wii;
+        foreach (var e in catalog)
         {
-            case RealRvzCatalog.GcDir:
+            if (e.File == file)
             {
-                foreach (var e in RealRvzCatalog.GameCube)
-                    if (e.File == file)
-                        return e.IsoSize;
-
-                break;
-            }
-            case RealRvzCatalog.WiiDir:
-            {
-                foreach (var e in RealRvzCatalog.Wii)
-                    if (e.File == file)
-                        return e.IsoSize;
-
-                break;
+                return e.IsoSize;
             }
         }
 

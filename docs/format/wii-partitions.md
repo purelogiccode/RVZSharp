@@ -28,11 +28,20 @@ The partition header (at `partition_offset`) holds:
 | Offset | Field |
 |---|---|
 | 0x00 | ticket: signature type — `0x10001` (RSA2048) |
-| 0x1BF | 16-byte title key |
+| 0x1BF | 16-byte title key (AES-CBC encrypted with the console common key) |
+| 0x1DC | title ID (u64 BE) — also the IV for the title-key decryption |
+| 0x1F1 | common key index (0 = retail, 1 = Korean) |
 | 0x2B8 | data_offset (u32 BE, << 2) |
 | 0x2BC | data_size (u32 BE, << 2) |
 | 0x424 | FST offset within the partition (u32 BE, << 2) |
 | 0x428 | FST size (u32 BE, << 2) |
+
+The title key is stored encrypted: `title_key = AES-128-CBC-decrypt(common_key, IV =
+title_id ‖ 0⁸, ticket[0x1BF..0x1CF])`, with the common key selected by the ticket issuer
+(RVT/iQue) or the common-key index (Dolphin: `TicketReader::GetTitleKey` /
+`IOSC::Decrypt`; RVZSharp: `WiiVolume.GetTitleKey`). RVZ/WIA containers store the
+**decrypted** key in their partition table, which is authoritative even when a re-signed
+ticket carries a different one.
 
 The partition data lives at `partition_offset + data_offset`, `data_size` bytes long.
 Invalid partitions (wrong alignment, zero/undersized size) are encoded as raw data instead.

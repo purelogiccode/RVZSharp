@@ -15,7 +15,7 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 | Namespace | Contents |
 |---|---|
 | `RVZSharp.Blobs` | `IBlobReader`, `Blob` (factory), `BlobType`, per-format readers |
-| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `DiscHasher`, `DiscInfo`, `BlobStream`, `RvzWriteOptions`, `GczWriteOptions` |
+| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `CisoWriter`, `WbfsWriter`, `TgcWriter`, `DiscHasher`, `DiscInfo`, `BlobStream`, `RvzWriteOptions`, `GczWriteOptions` |
 | `RVZSharp.Models` | container structs: `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`, `CompressionType` |
 | `RVZSharp.Chunks` | `ChunkDecoder`, `ExceptionListParser` |
 | `RVZSharp.Compression` | codec factories: `CompressionCodecFactory`, `CompressionEncoderFactory` (the vendored 7-Zip LZMA port is internal) |
@@ -23,6 +23,7 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 | `RVZSharp.Packing` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator` |
 | `RVZSharp.Wii` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor`, `PartitionReader` |
 | `RVZSharp.Files` | `DiscFileSystem`, `DiscFileInfo` (FST parsing and file extraction) |
+| `RVZSharp.Verification` | `DiscVerifier` and the `VerificationReport`/`VerificationIssue`/`PartitionVerification`/`VerificationSeverity` models |
 
 ---
 
@@ -324,6 +325,10 @@ fs.CopyFileTo(file, output);                    // streams the decrypted file by
 - `PartitionReader` (public, `IBlobReader`) exposes any Wii partition's decrypted bytes
   directly; it decrypts sectors on demand and is also what `WiiVolume.GetFstOffset`/
   `GetFstSize` use internally.
+- `Partition.Key` is the **plaintext** partition key: for RVZ/WIA inputs it is the
+  container's authoritative partition-table key (which wins even when the disc ticket was
+  re-signed), and for plain ISOs it is the ticket title key decrypted with the Wii common
+  key (`WiiVolume.GetTitleKey`).
 
 ---
 
@@ -433,7 +438,8 @@ decoded bytes.
 
 `DiscVerifier.Verify` mirrors Dolphin's verify tab: it enumerates the disc's Wii partitions,
 checks each partition header, TMD structure and H3 table, and walks every data sector's
-h0/h1/h2/h3 hash tree. Problems are reported per partition with a severity; only
+h0/h1/h2/h3 hash tree (decrypting sectors with the plaintext partition key derived by
+`WiiVolume.GetPartitions`). Problems are reported per partition with a severity; only
 `VerificationSeverity.High` problems (corrupt data) make a report invalid.
 
 ```csharp
@@ -613,8 +619,11 @@ container that embeds packed chunks.
 
 These types back the partition optimization:
 
-- `WiiVolume` — disc-header parsing, partition-table discovery, ticket reading (title key
-  at ticket + 0x1BF), FST offsets, `IsWiiDisc` / `HasWiiHashes` / `HasWiiEncryption`.
+- `WiiVolume` — disc-header parsing, partition-table discovery, ticket handling and FST
+  offsets, plus `IsWiiDisc` / `HasWiiHashes` / `HasWiiEncryption`. `GetTitleKey(ticket)`
+  decrypts the 16-byte title key at ticket + 0x1BF with the console common key (IV = the
+  title ID at 0x1DC; retail/Korean/RVT keys), exactly like Dolphin's
+  `TicketReader::GetTitleKey`.
 - `PartitionRegionBuilder(key)` — rebuilds one encrypted 2 MiB region from decrypted
   payload + hash exceptions; used by `RvzReader.ReadAt`. `Finish()` returns the encrypted
   region bytes.

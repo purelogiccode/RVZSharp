@@ -143,7 +143,7 @@ public static class GczWriter
             }
             else
             {
-                Parallel.For(0, count,
+                ParallelExecution.For(0, count,
                     new ParallelOptions
                     {
                         MaxDegreeOfParallelism = maxThreads,

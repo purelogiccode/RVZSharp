@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using RVZSharp.Blobs;
 using RVZSharp.Interfaces;
 using RVZSharp.Compression;
+using RVZSharp.IO;
 using RVZSharp.Models;
 using RVZSharp.Packing;
 using RVZSharp.Wii;
@@ -34,15 +35,16 @@ internal static class WiaRvzWriter
     /// <summary>
     /// Decorates an <see cref="IBlobReader"/> with progress reporting and cancellation.
     /// All input reads in <see cref="Write"/> flow through <see cref="ReadAt"/>, so wrapping
-    /// the input is enough to observe the whole conversion (the reported fraction is clamped
-    /// to 1.0; header and table re-reads can push the byte count past the image size).
+    /// the input is enough to observe the whole conversion. The reported fraction is based on
+    /// the highest image offset reached, so it is monotonic and hits exactly 1.0 only when the
+    /// final image byte has been read (header and table re-reads do not advance it).
     /// </summary>
     private sealed class ProgressReader : IBlobReader
     {
         private readonly IBlobReader _inner;
         private readonly IProgress<double>? _progress;
         private readonly CancellationToken _cancellationToken;
-        private long _bytesServed;
+        private long _maxOffsetReached;
 
         public ProgressReader(IBlobReader inner, IProgress<double>? progress,
             CancellationToken cancellationToken)
@@ -62,8 +64,12 @@ internal static class WiaRvzWriter
             var read = _inner.ReadAt(position, buffer);
             if (read > 0)
             {
-                _bytesServed += read;
-                _progress?.Report(Math.Min(1.0, (double)_bytesServed / Length));
+                var end = position + read;
+                if (end > _maxOffsetReached)
+                {
+                    _maxOffsetReached = end;
+                    _progress?.Report(Math.Min(1.0, (double)_maxOffsetReached / Length));
+                }
             }
 
             return read;
@@ -641,7 +647,7 @@ internal static class WiaRvzWriter
             }
             else
             {
-                Parallel.For(0, count,
+                ParallelExecution.For(0, count,
                     new ParallelOptions
                     {
                         MaxDegreeOfParallelism = _maxThreads,

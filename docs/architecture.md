@@ -25,9 +25,10 @@
 | `Chunks/` | `ChunkDecoder`, `TableParser` | Group decompression, exception-list parsing, table loading |
 | `Compression/` | `CompressionCodecFactory`, `CompressionEncoderFactory`, `ICompressionDecoder`, `ICompressionEncoder`, codecs, `Lzma/` (vendored 7-Zip decoder) | Read-side decompression and write-side compression |
 | `Packing/` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator`, `LaggedFibonacciPrng` | RVZ junk packing: segment streams and PRNG seed recovery |
-| `Wii/` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor`, `PartitionReader` | Wii partition encryption, hash tree, exceptions, decrypted partition views |
+| `Wii/` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor`, `PartitionReader` | Wii partition encryption, hash tree, exceptions, ticket title-key decryption, decrypted partition views |
 | `Files/` | `DiscFileSystem`, `DiscFileInfo` | GameCube/Wii FST parsing, case-insensitive lookup, file data streaming |
 | `Verification/` | `DiscVerifier` | Dolphin VolumeVerifier equivalent: partition headers, TMD/H3 tables and the h0/h1/h2/h3 hash tree walk |
+| `IO/` | `LruCache`, `MultiPartStream`, `BlobCopy`, `Crc32`, `SectionStream`, `ParallelExecution` | Decoded-unit caching, split-file streams, copy/hash helpers and exception-preserving parallel loops |
 
 ## Read path
 
@@ -124,9 +125,11 @@ Key points:
 
 `DiscVerifier.Verify` (Dolphin: `VolumeVerifier`) parses each partition header, validates
 the TMD structure and the H3 table against the TMD content hash, then walks every data
-sector: it decrypts the hash area (zero IV) and data (IV = ciphertext at 0x3D0), recomputes
-h0 from the 31 data blocks, compares the embedded h1/h2 slots and the h3 entry, and reports
-every mismatch with a severity. GameCube discs have no hash trees and are reported valid.
+sector: it decrypts the hash area (zero IV) and data (IV = ciphertext at 0x3D0) with the
+plaintext partition key (`WiiVolume.GetPartitions`, which prefers the container's key and
+otherwise common-key decrypts the ticket's title key), recomputes h0 from the 31 data
+blocks, compares the embedded h1/h2 slots and the h3 entry, and reports every mismatch with
+a severity. GameCube discs have no hash trees and are reported valid.
 
 ## Design decisions
 

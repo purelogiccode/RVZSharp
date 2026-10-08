@@ -51,12 +51,12 @@ dotnet_naming_rule.private_members_with_underscore.symbols = private_symbol
 dotnet_naming_rule.private_members_with_underscore.style = underscore_prefix
 dotnet_naming_rule.private_members_with_underscore.severity = suggestion
 dotnet_naming_symbols.private_symbol.applicable_kinds = field, property
-dotnet_naming_symbols.private_symbol.required_modifiers = private
+dotnet_naming_symbols.private_symbol.applicable_accessibilities = private
 dotnet_naming_style.underscore_prefix.required_prefix = _
 dotnet_naming_style.underscore_prefix.capitalization = camel_case
 
 # Constant fields are PascalCase.
-dotnet_naming_rule.constants_pascal.symbol = const_symbol
+dotnet_naming_rule.constants_pascal.symbols = const_symbol
 dotnet_naming_rule.constants_pascal.style = pascal_case
 dotnet_naming_rule.constants_pascal.severity = suggestion
 dotnet_naming_symbols.const_symbol.applicable_kinds = field

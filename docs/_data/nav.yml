@@ -1,5 +1,7 @@
 - title: Home
   url: "/"
+- title: What's new
+  url: "/whats-new.html"
 - title: Getting started
   url: "/getting-started.html"
 - title: Packaging & distribution

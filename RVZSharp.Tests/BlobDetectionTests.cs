@@ -76,15 +76,15 @@ public class BlobDetectionTests
     public void CorruptCiso_OpensButWriterRejectsDecodedGarbage()
     {
         // CISO is validated lazily (like Dolphin): a header with a plausible block size
-        // opens even though the payload is garbage — the block map says every block is
-        // absent, so the decoded bytes are zeroes. The writer's disc-header validation is
-        // what stops such garbage from being wrapped into an RVZ.
+        // opens even though the payload is garbage — the decoded bytes carry no disc magic.
+        // The writer's disc-header validation is what stops such garbage from being wrapped
+        // into an RVZ.
         var content = new byte[350_000];
         new Random(42).NextBytes(content);
         System.Text.Encoding.ASCII.GetBytes("CISO").CopyTo(content, 0);
         content[4] = 0x00; // block size 0x8000, little endian
-        content[5] = 0x00;
-        content[6] = 0x80;
+        content[5] = 0x80;
+        content[6] = 0x00;
         content[7] = 0x00;
 
         using var blob = Blob.Open(new MemoryStream(content), leaveOpen: true);

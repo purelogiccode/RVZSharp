@@ -2,7 +2,7 @@
 
 The test suite is split into **two projects**, so the default run is always the fast one:
 
-- **`RVZSharp.Tests`** — **464 synthetic tests** (unit + end-to-end round trips), ~1
+- **`RVZSharp.Tests`** — **468 synthetic tests** (unit + end-to-end round trips), ~1
   minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
 - **`RVZSharp.Slow.Tests`** — **97 real-file tests** (full decode, structural checks,
   writer round trips against real game images), ~12 minutes when the games are mounted.
@@ -55,6 +55,15 @@ byte-for-byte against their official No-Intro SHA-1s:
    fast suite on `net8.0`/`net9.0`/`net10.0` with coverage uploaded as an artifact, packs
    the library (API-compat against 1.0.0 + embedded SBOM) and publishes a smoke-tested
    ReadyToRun CLI. The slow suite and differential tests stay opt-in on developer machines.
+8. **Post-1.0.1 correctness review**: a commit-by-commit audit pinned the fixes below with
+   regression tests — retail ticket title keys are common-key decrypted
+   (`WiiVolumeTests`; the synthetic Wii builders now store encrypted keys like real discs),
+   the WBFS header declares the size relative to the stream position and carries the
+   disc-header copy (`WbfsWriterTests`), extract reads TMD/cert/H3 at partition-relative
+   offsets and skips H3 for hashless discs, `convert -f iso --json` keeps stdout
+   JSON-only, `convert --verify` honors Ctrl+C (exit 130), writer progress is monotonic
+   (`ProgressReader`), and parallel decode/encode failures surface the original exception
+   instead of `AggregateException` (`ParallelExecution`).
 
 ## Test files
 
@@ -78,7 +87,8 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `WiaWriterTests` | WIA round trips across all five codecs (GC + Wii with hash exceptions), 4/6 MiB chunks, magic/version, PURGE, option validation, `MaxThreads` determinism |
 | `GczWriterTests` | GCZ round trips (GC + Wii), last-block zero padding, header fields, raw/compressed block storage, `MaxThreads` determinism, option validation |
 | `CisoWriterTests` | CISO round trips (GC + Wii), presence map, absent all-zero blocks, scrub shrinking, header fields, option validation |
-| `WbfsWriterTests` | WBFS round trips (Wii), shared zero cluster, header fields, scrub, cluster-size/map limits, option validation |
+| `WbfsWriterTests` | WBFS round trips (Wii), shared zero cluster, header fields, disc-header copy, non-zero stream position, scrub, cluster-size/map limits, option validation |
+| `WiiVolumeTests` | ticket title-key decryption (common key, IV = title ID) and partition discovery returning plaintext keys |
 | `TgcWriterTests` | TGC round trips (GC), DOL/FST header fields and relocation, random access, GameCube-only validation |
 | `DiscVerifierTests` | Wii hash-tree verification: valid unencrypted + encrypted partitions, corrupt data/hash areas, H3/TMD mismatches, truncation, GameCube/non-disc reports |
 | `ParallelDecodeTests` | parallel `CopyTo` equals sequential for GC/Wii/WIA (multi-batch, multi-region chunks, exceptions), progress, cancellation, non-RVZ fallback |
@@ -117,6 +127,13 @@ and pinned a production writer bug (default 2 MiB chunks used the ISO ticket key
 the RVZ partition-table key on re-signed No-Intro tickets); `RvzWriter` now prefers the
 container key and falls back to the ticket key for plain ISO inputs.
 
+The 1.0.1 review also fixed the plain-ISO side of that story: the ticket's title key is
+AES-CBC encrypted with the Wii common key on retail discs, and `WiiVolume.GetPartitions`
+now decrypts it (Dolphin: `TicketReader::GetTitleKey`) instead of using the raw ciphertext,
+so `DiscVerifier`/`verify --partitions`, `DiscFileSystem`/`extract` and RVZ writing work on
+real encrypted images. The synthetic builders (`TestWiiIsoBuilder.WriteTicketKey`) store
+common-key-encrypted keys so the fast suite exercises the same path.
+
 Legacy-format real files are covered by `RealLegacyFileTests` through environment variables
 (`RVZ_REAL_GCZ`, `RVZ_REAL_CISO`, `RVZ_REAL_WBFS`, `RVZ_REAL_TGC`, `RVZ_REAL_WIA`, and
 `RVZ_REAL_NFS` + `RVZ_REAL_NFS_KEY`; each with an optional `<VAR>_SHA1` expectation), and
@@ -130,7 +147,7 @@ and `RVZ_DIFF_ISO` points at a real ISO. All of them no-op when unset.
 |---|---|
 | `TestRvzBuilder` | RVZ/WIA file builder (chunks, codecs, packing, partitions, exceptions) |
 | `TestLegacyBuilders` | GCZ, CISO, WBFS, TGC, NFS builders |
-| `TestWiiIsoBuilder` | realistic Wii ISO: disc header, partition table, RSA2048 ticket, encrypted partition data |
+| `TestWiiIsoBuilder` | realistic Wii ISO: disc header, partition table, RSA2048 ticket (title key common-key encrypted, like retail discs), encrypted partition data |
 | `ReferencePrng` | the junk PRNG used to generate padding in tests (matches the reader's semantics) |
 | `TestCompressor` | reference encoders (deflate, bzip2, LZMA1/LZMA2, Zstd, Purge) |
 

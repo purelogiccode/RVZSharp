@@ -593,7 +593,7 @@ public sealed class RvzReader : IBlobReader
                 else
                 {
                     var First = first;
-                    Parallel.For(0, count,
+                    ParallelExecution.For(0, count,
                         new ParallelOptions
                         {
                             MaxDegreeOfParallelism = threads,

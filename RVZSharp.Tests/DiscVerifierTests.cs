@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using RVZSharp.Blobs;
 using RVZSharp.Models;
+using RVZSharp.Tests.Helpers;
 using RVZSharp.Verification;
 using RVZSharp.Wii;
 
@@ -227,7 +228,7 @@ public class DiscVerifierTests
 
         var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 7 + 3)).ToArray();
         WriteBe32(iso, PartitionOffset, 0x10001); // ticket signature type
-        key.CopyTo(iso, PartitionOffset + 0x1BF);
+        TestWiiIsoBuilder.WriteTicketKey(iso, PartitionOffset, key);
         WriteBe32(iso, PartitionOffset + 0x2A4, TmdSize);
         WriteBe32(iso, PartitionOffset + 0x2A8, TmdOffset >> 2);
         WriteBe32(iso, PartitionOffset + 0x2AC, CertSize);

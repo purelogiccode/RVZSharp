@@ -15,6 +15,9 @@ public readonly struct Partition
     /// <summary>data_size (shifted) from the partition header, in bytes.</summary>
     public required ulong DataSize { get; init; }
 
-    /// <summary>The 16-byte title key from the partition's ticket.</summary>
+    /// <summary>
+    /// The plaintext 16-byte partition key: the container's stored key for RVZ/WIA inputs, or
+    /// the ticket title key (common-key decrypted) for plain ISO inputs.
+    /// </summary>
     public required byte[] Key { get; init; }
 }

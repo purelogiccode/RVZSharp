@@ -260,11 +260,18 @@ internal static class Program
         public static TemporaryFile SpoolStdin()
         {
             var file = Create();
-            using var stdin = Console.OpenStandardInput();
-            using var output = File.Create(file.Path);
-            stdin.CopyTo(output);
-
-            return file;
+            try
+            {
+                using var stdin = Console.OpenStandardInput();
+                using var output = File.Create(file.Path);
+                stdin.CopyTo(output);
+                return file;
+            }
+            catch
+            {
+                file.Dispose();
+                throw;
+            }
         }
 
         public void CopyToStdout()
@@ -281,7 +288,7 @@ internal static class Program
             {
                 File.Delete(Path);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 // The OS cleans the temp directory up eventually.
             }
@@ -555,7 +562,7 @@ internal static class Program
                 if (format == "iso")
                 {
                     var decodeResult = DecodeBlob(input, writePath, expectedSha1: null, maxThreads,
-                        originalOutput, quiet: spooledOutput != null);
+                        originalOutput, quiet: json || spooledOutput != null);
                     return decodeResult != 0
                         ? decodeResult
                         : FinishConvert(originalInput, originalOutput, writePath, format, input.Length,
@@ -712,6 +719,12 @@ internal static class Program
                 return FinishConvert(originalInput, originalOutput, writePath, format, input.Length,
                     inputHashes, json, spooledOutput);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            ConsoleProgress.Clear();
+            Console.Error.WriteLine("Canceled.");
+            return 130;
         }
         catch (Exception e)
         {
@@ -1474,7 +1487,9 @@ internal static class Program
                     continue;
                 }
 
-                text.Append($"/// PARTITION: {name} <{listPath}> ///\n");
+                var headerLine = $"/// PARTITION: {name} <{listPath}> ///\n";
+                Console.Write(headerLine);
+                text.Append(headerLine);
                 found |= ListPartition(blob, partition, name, listPath, text);
             }
         }
@@ -1733,12 +1748,16 @@ internal static class Program
 
             var offset = (long)partition.Value.Offset;
             CopyData(blob, offset, 0x2A4, Path.Combine(basePath, "ticket.bin"));
-            CopyPartitionBlob(blob, offset + 0x2A4, offset + 0x2A8,
+            CopyPartitionBlob(blob, offset, offset + 0x2A4, offset + 0x2A8,
                 Path.Combine(basePath, "tmd.bin"));
-            CopyPartitionBlob(blob, offset + 0x2AC, offset + 0x2B0,
+            CopyPartitionBlob(blob, offset, offset + 0x2AC, offset + 0x2B0,
                 Path.Combine(basePath, "cert.bin"));
-            CopyPartitionBlob(blob, offset + 0x2B4, null, Path.Combine(basePath, "h3.bin"),
-                fixedSize: 0x18000);
+            // Hashless discs (NKit/decrypted) have no H3 table (Dolphin: DiscExtractor.cpp).
+            if (WiiVolume.HasWiiHashes(blob))
+            {
+                CopyPartitionBlob(blob, offset, offset + 0x2B4, null,
+                    Path.Combine(basePath, "h3.bin"), fixedSize: 0x18000);
+            }
         }
         finally
         {
@@ -1746,9 +1765,13 @@ internal static class Program
         }
     }
 
-    /// <summary>Reads a size/shifted-offset pair from the partition header and copies the blob.</summary>
-    private static void CopyPartitionBlob(IBlobReader blob, long sizeAddress, long? offsetAddress,
-        string path, int fixedSize = 0)
+    /// <summary>
+    /// Reads a size/shifted-offset pair from the partition header and copies the blob. The
+    /// shifted offsets are partition-relative, so <paramref name="partitionOffset"/> is added
+    /// to them (Dolphin: DiscExtractor).
+    /// </summary>
+    private static void CopyPartitionBlob(IBlobReader blob, long partitionOffset, long sizeAddress,
+        long? offsetAddress, string path, int fixedSize = 0)
     {
         var size = fixedSize;
         if (size == 0 && !TryReadBe32(blob, sizeAddress, out size))
@@ -1763,11 +1786,11 @@ internal static class Program
                 return;
             }
 
-            CopyData(blob, (long)((ulong)offset << 2), size, path);
+            CopyData(blob, partitionOffset + (long)((ulong)offset << 2), size, path);
         }
         else if (TryReadBe32(blob, sizeAddress, out var rawOffset))
         {
-            CopyData(blob, (long)((ulong)rawOffset << 2), size, path);
+            CopyData(blob, partitionOffset + (long)((ulong)rawOffset << 2), size, path);
         }
     }
 

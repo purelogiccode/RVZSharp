@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using RVZSharp.Wii;
 
 namespace RVZSharp.Tests.Helpers;
@@ -48,7 +49,7 @@ public static class TestWiiIsoBuilder
 
         // Partition header at PartitionOffset: ticket + data offset/size + FST fields.
         WriteBe32(iso, PartitionOffset, 0x10001u); // RSA2048 signature type
-        key.CopyTo(iso, PartitionOffset + 0x1BF);
+        WriteTicketKey(iso, PartitionOffset, key);
         WriteBe32(iso, PartitionOffset + 0x2B8, DataOffset >> 2);
         WriteBe32(iso, PartitionOffset + 0x2BC, (uint)(dataSize >> 2));
         WriteBe32(iso, PartitionOffset + 0x424, 0); // FST offset
@@ -145,14 +146,41 @@ public static class TestWiiIsoBuilder
     private static void WritePartitionHeader(byte[] iso, int partitionOffset)
     {
         WriteBe32(iso, partitionOffset, 0x10001u); // RSA2048 signature type
-        for (var i = 0; i < 16; i++)
+        var key = new byte[16];
+        for (var i = 0; i < key.Length; i++)
         {
-            iso[partitionOffset + 0x1BF + i] = (byte)(i + 1); // title key
+            key[i] = (byte)(i + 1);
         }
+
+        WriteTicketKey(iso, partitionOffset, key);
 
         WriteBe32(iso, partitionOffset + 0x2B8, DataOffset >> 2);
         WriteBe32(iso, partitionOffset + 0x2BC, (uint)(PartitionDataSize >> 2));
     }
+
+    /// <summary>
+    /// Writes <paramref name="plaintextKey"/> to the ticket the way retail discs store it:
+    /// AES-CBC encrypted with the Wii retail common key, IV = the title ID already present at
+    /// ticket + 0x1DC (Dolphin: TicketReader::GetTitleKey / IOSC::Decrypt).
+    /// </summary>
+    public static void WriteTicketKey(byte[] iso, int partitionOffset, byte[] plaintextKey)
+    {
+        var iv = new byte[16];
+        Array.Copy(iso, partitionOffset + 0x1DC, iv, 0, 8);
+        using var aes = Aes.Create();
+        aes.Key = RetailCommonKey;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.None;
+        using var encryptor = aes.CreateEncryptor(aes.Key, iv);
+        var encrypted = encryptor.TransformFinalBlock(plaintextKey, 0, 16);
+        encrypted.CopyTo(iso, partitionOffset + 0x1BF);
+    }
+
+    private static readonly byte[] RetailCommonKey =
+    [
+        0xEB, 0xE4, 0x2A, 0x22, 0x5E, 0x85, 0x93, 0xE4,
+        0x48, 0xD9, 0xC5, 0x45, 0x73, 0x81, 0xAA, 0xF7
+    ];
 
     private static void WriteBe32(byte[] data, int offset, uint value)
     {

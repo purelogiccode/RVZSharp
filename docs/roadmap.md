@@ -17,6 +17,7 @@
 | 11 — Robustness & performance | thread-safe `ReadAt` with a 16 MiB LRU decoded-unit cache, binary-search area lookup, ArrayPool group reads; parser caps + mutation/fuzz robustness suite; Native AOT/trimming validated (library annotated, CLI trimmed + AOT publish smoke-tested) | ✅ done |
 | 12 — Formats & verification | `CisoWriter`/`WbfsWriter`/`TgcWriter` (+ `convert -f ciso\|wbfs\|tgc`); `DiscVerifier` Wii h0/h1/h2/h3 + TMD/H3 verification (`verify --partitions`); env-var real legacy-file tests + optional `dolphin-tool`/`wit`/`wwt` differential tests | ✅ done |
 | 13 — Tooling & packaging | GitHub Actions CI (build + fast tests on net8.0/9.0/10.0, coverage artifact, pack + API validation, ReadyToRun CLI publish) and Dependabot; `PackageValidationBaselineVersion` (1.0.0) diffing the public API; SPDX SBOM embedded in the nupkg; CLI `--json`, `-` stdin/stdout and shell completions | ✅ done (not published yet) |
+| 14 — Correctness review | commit-by-commit audit after 1.0.1: retail ticket-key decryption with the Wii common key (`WiiVolume.GetTitleKey`), extract TMD/cert/H3 partition-relative offsets + H3 guard, WBFS header size/copy fixes, `convert --json` stdout hygiene, Ctrl+C exit 130, monotonic writer progress, original-exception propagation from parallel loops — each pinned by a regression test | ✅ done |
 
 ## Supported
 
@@ -29,7 +30,8 @@
   scrubbed images); TGC is GameCube-only.
 - `--scrub`: zeroes the data of non-game Wii partitions (update/channel) before converting.
 - Wii partition optimization with hash exceptions, FST split, zero groups, PRNG-junk
-  packing with seed recovery.
+  packing with seed recovery; partition keys are common-key decrypted from the ticket
+  (`WiiVolume.GetTitleKey`) or taken from the container's partition table.
 - Progress/cancellation on both encode (`RvzWriter.Write`/`WiaWriter.Write`) and decode
   (`IBlobReader.CopyTo`/`ReadFully`); `DiscHasher` computes CRC-32/MD5/SHA-1 in one pass;
   `DiscVerifier` walks Wii partition h0/h1/h2/h3 hash trees and the TMD/H3 tables

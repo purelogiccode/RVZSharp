@@ -75,9 +75,13 @@ for speed. Levels 1–9 (Zstd −131072..22, like Dolphin's CLI).
 ## Technical
 
 **Does RVZSharp decrypt games?**
-It decrypts *partition data with the key found in the image itself* (the ticket's title
-key) purely to re-encode it compactly — the decoded ISO is byte-identical to the original
-encrypted disc. No console keys are used or required.
+It decrypts *partition data with the key found in the image itself* purely to re-encode it
+compactly or to read the file system — the decoded ISO is byte-identical to the original
+encrypted disc. The ticket stores its title key AES-CBC encrypted with the Wii **common
+key** (a public constant also used by Dolphin, not a per-console secret); RVZSharp decrypts
+it exactly like Dolphin's `TicketReader::GetTitleKey` (`WiiVolume.GetTitleKey`), and RVZ/WIA
+inputs use the container's stored key directly. No console-specific keys are used or
+required.
 
 **Why does the junk look periodic every 32 KiB?**
 The padding PRNG's stream position is defined as `offset % 0x8000`; junk at any offset is

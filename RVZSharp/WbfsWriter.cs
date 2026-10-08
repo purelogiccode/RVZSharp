@@ -158,7 +158,7 @@ public static class WbfsWriter
         }
 
         var end = output.Position;
-        var hdSectorCount = end / HdSectorSize;
+        var hdSectorCount = (end - start) / HdSectorSize;
         if (hdSectorCount > uint.MaxValue)
         {
             throw new RvzFormatException("The WBFS file is too large for the format.");
@@ -174,6 +174,9 @@ public static class WbfsWriter
         header[8] = 9; // hd_sector_shift: 512-byte sectors
         header[9] = (byte)System.Numerics.BitOperations.Log2((uint)clusterSize);
         header[12] = 1; // disc_table[0]: a disc is present in slot 0
+        // The 256 bytes after the header hold a copy of the disc header so tools can identify
+        // the disc without reading the volume data (Dolphin skips this region: WbfsBlob.cpp).
+        input.ReadAt(0, header.Slice(HdSectorSize, DiscHeaderSize));
 
         output.Position = start;
         output.Write(header);

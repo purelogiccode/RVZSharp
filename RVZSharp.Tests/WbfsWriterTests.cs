@@ -41,6 +41,38 @@ public class WbfsWriterTests
     }
 
     [Fact]
+    public void Header_CopiesDiscHeaderForTools()
+    {
+        var iso = TestWiiIsoBuilder.Build(Key(), 8, TestWiiIsoBuilder.RandomData(8));
+        var wbfs = Convert(iso);
+
+        // Bytes 0x200..0x300 hold a copy of the disc header so tools can identify the disc
+        // without decoding the volume data (Dolphin skips this region).
+        Assert.Equal(iso.AsSpan(0, 256).ToArray(), wbfs.AsSpan(512, 256).ToArray());
+    }
+
+    [Fact]
+    public void WriteAtNonZeroStreamPosition_DeclaresRelativeSectorCount()
+    {
+        var iso = TestWiiIsoBuilder.Build(Key(), 8, TestWiiIsoBuilder.RandomData(8));
+        using var ms = new MemoryStream();
+        ms.Write(new byte[512]); // a 512-byte prefix before the WBFS file
+        WbfsWriter.Write(PlainBlob.Open(new MemoryStream(iso)), ms,
+            new WbfsWriteOptions { BlockSize = ClusterSize });
+
+        var length = (int)ms.Length - 512;
+        Assert.Equal(0, length % 512);
+        Assert.Equal((uint)(length / 512), ReadBe32(ms.ToArray(), 512 + 4));
+
+        // The sliced file must be a valid WBFS (Dolphin rejects a size/count mismatch).
+        var slice = ms.ToArray().AsSpan(512).ToArray();
+        using var blob = WbfsBlob.Open(new MemoryStream(slice));
+        var decoded = new byte[iso.Length];
+        Assert.Equal(iso.Length, blob.ReadAt(0, decoded));
+        Assert.Equal(iso, decoded);
+    }
+
+    [Fact]
     public void ZeroClusters_ShareOneVolumeCluster()
     {
         var iso = TestWiiIsoBuilder.Build(Key(), 8, TestWiiIsoBuilder.RandomData(8));

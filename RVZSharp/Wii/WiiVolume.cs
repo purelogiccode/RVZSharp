@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
 
@@ -26,6 +27,26 @@ public static class WiiVolume
 
     /// <summary>Partition table entry value meaning "no partition".</summary>
     public const uint PARTITION_NONE = 0xFFFFFFFF;
+
+    // Console common keys (Dolphin: IOSC.cpp). A ticket stores its title key AES-CBC
+    // encrypted with the console's common key, using the ticket's title ID as the IV.
+    private static readonly byte[] RetailCommonKey =
+    [
+        0xEB, 0xE4, 0x2A, 0x22, 0x5E, 0x85, 0x93, 0xE4,
+        0x48, 0xD9, 0xC5, 0x45, 0x73, 0x81, 0xAA, 0xF7
+    ];
+
+    private static readonly byte[] KoreanCommonKey =
+    [
+        0x63, 0xB8, 0x2B, 0xB4, 0xF4, 0x61, 0x4E, 0x2E,
+        0x13, 0xF2, 0xFE, 0xFB, 0xBA, 0x4C, 0x9B, 0x7E
+    ];
+
+    private static readonly byte[] RvtCommonKey =
+    [
+        0xA1, 0x60, 0x4A, 0x6A, 0x71, 0x23, 0xB5, 0x29,
+        0xAE, 0x8B, 0xEC, 0x32, 0xC8, 0x16, 0xFC, 0xAA
+    ];
 
     /// <summary>True for a Wii disc whose partition data has hash trees (disc header 0x60).</summary>
     /// <param name="disc">The disc image to inspect.</param>
@@ -97,6 +118,7 @@ public static class WiiVolume
         var partitions = new List<Partition>();
         var header = new byte[0x80];
         disc.ReadAt(0, header);
+        var containerKeys = GetContainerPartitionKeys(disc);
 
         Span<byte> tableInfo = stackalloc byte[8];
         Span<byte> entry = stackalloc byte[8];
@@ -159,7 +181,14 @@ public static class WiiVolume
                     continue;
                 }
 
-                var key = ticket.Slice(0x1BF, 16).ToArray();
+                // The container (RVZ/WIA) stores the authoritative partition key; the ticket on
+                // the decoded disc can carry a re-signed (different) title key, so container
+                // keys win (Dolphin: WIABlob partition keys). Plain ISOs fall back to the
+                // ticket title key, which is common-key encrypted on retail discs.
+                var key = containerKeys.TryGetValue(
+                    partitionOffset + dataOffset.Value, out var containerKey)
+                    ? containerKey
+                    : GetTitleKey(ticket);
                 partitions.Add(new Partition
                 {
                     Offset = partitionOffset,
@@ -185,6 +214,76 @@ public static class WiiVolume
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Decrypts the title key stored in a partition ticket (Dolphin: TicketReader::GetTitleKey).
+    /// Retail tickets store the 16 bytes at 0x1BF AES-CBC encrypted with the console's common
+    /// key, using the ticket's title ID at 0x1DC as the IV. The common key is chosen by the
+    /// ticket issuer (RVT/iQue discs) or the common-key index at 0x1F1 (0 = retail, 1 = Korean).
+    /// </summary>
+    /// <param name="ticket">A complete 0x2A4-byte RSA2048 ticket, including its signature.</param>
+    /// <returns>The decrypted 16-byte title key.</returns>
+    /// <exception cref="ArgumentException"><paramref name="ticket"/> is shorter than a ticket.</exception>
+    public static byte[] GetTitleKey(ReadOnlySpan<byte> ticket)
+    {
+        if (ticket.Length < 0x1F2)
+        {
+            throw new ArgumentException(
+                "The ticket is too short to contain a title key.", nameof(ticket));
+        }
+
+        Span<byte> iv = stackalloc byte[16];
+        ticket.Slice(0x1DC, 8).CopyTo(iv);
+        var encrypted = ticket.Slice(0x1BF, 16).ToArray();
+        var key = new byte[16];
+        using var aes = Aes.Create();
+        aes.Key = SelectCommonKey(ticket);
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.None;
+        using var decryptor = aes.CreateDecryptor(aes.Key, iv.ToArray());
+        decryptor.TransformBlock(encrypted, 0, encrypted.Length, key, 0);
+        return key;
+    }
+
+    private static byte[] SelectCommonKey(ReadOnlySpan<byte> ticket)
+    {
+        // RVT (iQue) tickets are issued by Root-CA00000002-XS00000006 (Dolphin: GetConsoleType);
+        // the issuer string lives in the signature structure at 0x140.
+        if (ticket.Length >= 0x180 &&
+            ticket.Slice(0x140, 0x40).StartsWith("Root-CA00000002-XS00000006"u8))
+        {
+            return RvtCommonKey;
+        }
+
+        // Any index other than 1 falls back to the retail key, like Dolphin.
+        return ticket[0x1F1] == 1 ? KoreanCommonKey : RetailCommonKey;
+    }
+
+    /// <summary>
+    /// Returns the authoritative partition keys of an RVZ/WIA container, keyed by the raw disc
+    /// offset where each partition's data starts (Dolphin: WIABlob partition entries).
+    /// </summary>
+    private static Dictionary<ulong, byte[]> GetContainerPartitionKeys(IBlobReader disc)
+    {
+        var keys = new Dictionary<ulong, byte[]>();
+        if (disc is not RvzReader container)
+        {
+            return keys;
+        }
+
+        foreach (var partition in container.Partitions)
+        {
+            foreach (var segment in partition.Data)
+            {
+                if (segment.NumSectors != 0)
+                {
+                    keys[(ulong)segment.FirstSector * WiaDisc.SectorSize] = partition.Key;
+                }
+            }
+        }
+
+        return keys;
     }
 
     /// <summary>The FST offset within the partition (partition header 0x424, shifted).</summary>

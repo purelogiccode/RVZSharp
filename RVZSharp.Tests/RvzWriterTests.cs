@@ -99,7 +99,7 @@ public class RvzWriterTests
         // Stamp the update partition's ticket + data header (its bytes live inside partition
         // 1's data region; they just need to look like a valid partition).
         WriteBe32(iso, 0x200000, 0x10001u);
-        key.CopyTo(iso, 0x200000 + 0x1BF);
+        TestWiiIsoBuilder.WriteTicketKey(iso, 0x200000, key);
         WriteBe32(iso, 0x200000 + 0x2B8, 0x40000 >> 2);
         WriteBe32(iso, 0x200000 + 0x2BC, 0x100000 >> 2);
 
@@ -208,7 +208,7 @@ public class RvzWriterTests
         WriteBe32(iso, 0x8008, 0x600000 >> 2);
         WriteBe32(iso, 0x800C, 0x10); // update partition type
         WriteBe32(iso, 0x600000, 0x10001u);
-        key.CopyTo(iso, 0x600000 + 0x1BF);
+        TestWiiIsoBuilder.WriteTicketKey(iso, 0x600000, key);
         WriteBe32(iso, 0x600000 + 0x2B8, 0x40000 >> 2);
         WriteBe32(iso, 0x600000 + 0x2BC, 0x100000 >> 2);
 

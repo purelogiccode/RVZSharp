@@ -21,7 +21,9 @@ dotnet add package RVZSharp
 - the RVZ packing scheme (Lagged Fibonacci PRNG padding reconstruction);
 - Wii partition reconstruction: SHA-1 hash trees (h0/h1/h2), hash exceptions, and
   AES-128-CBC re-encryption with the partition key — the output is identical to the
-  original encrypted disc image;
+  original encrypted disc image. Retail ticket title keys are decrypted with the Wii
+  common key (Dolphin: `TicketReader::GetTitleKey`, exposed as `WiiVolume.GetTitleKey`),
+  and RVZ/WIA inputs use the container's authoritative partition key;
 - full container validation (magic, versions, all SHA-1 integrity checks, structure rules);
 - thread-safe random access (`RvzReader.ReadAt`) with a bounded 16 MiB LRU cache of decoded
   units, and Native AOT/trimming compatibility (the library is annotated and the CLI
@@ -240,14 +242,16 @@ disc header/region, ticket/TMD/cert/H3) per partition.
 
 ## Documentation
 
-The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki covering the
-[CLI](docs/usage-cli.md), the [library API](docs/usage-library.md),
-[architecture](docs/architecture.md), the [RVZ container format](docs/format/rvz.md),
+The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki (also
+published as the GitHub Pages site, with a side menu in both) covering
+[what's new](docs/whats-new.md), the [CLI](docs/usage-cli.md), the
+[library API](docs/usage-library.md), [architecture](docs/architecture.md), the
+[RVZ container format](docs/format/rvz.md),
 [compression & packing](docs/format/compression-packing.md),
 [Wii partitions](docs/format/wii-partitions.md), the
 [legacy formats](docs/format/legacy.md), [testing](docs/testing.md),
 [packaging & distribution](docs/packaging.md), [roadmap](docs/roadmap.md) and a
-[FAQ](docs/faq.md).
+[FAQ](docs/faq.md). Release highlights are summarized in [WhatsNew.md](WhatsNew.md).
 
 ## Project layout
 
@@ -262,7 +266,7 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
 - `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
   surface, plus the legacy `info`/`decode` commands, `--json` output, `-` stdin/stdout and
   shell completions).
-- `RVZSharp.Tests` — 464 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 468 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
   packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), GCZ writer tests, parallel
@@ -324,6 +328,15 @@ release (`PackageValidationBaselineVersion` 1.0.0) and carries an embedded SPDX 
 GitHub Actions (`.github/workflows/ci.yml`) builds and tests on `net8.0`/`net9.0`/`net10.0`
 with coverage, packs, and publishes a smoke-tested ReadyToRun CLI artifact. Dependabot
 keeps NuGet and Actions dependencies current.
+
+**1.0.1 (unreleased)** adds the legacy writers (CISO/WBFS/TGC), `DiscVerifier`, the CI and
+packaging gates above, and the CLI conveniences (`--json`, `-` stdin/stdout, completions).
+A post-release review also fixed a set of correctness bugs: retail ticket title keys are
+now common-key decrypted (so `verify --partitions`, `extract` and RVZ writing work on real
+encrypted discs), extract's `tmd.bin`/`cert.bin`/`h3.bin` use partition-relative offsets,
+the WBFS header declares the file size correctly and carries the disc-header copy,
+`convert --verify` honors Ctrl+C (exit 130), writer progress is monotonic, and parallel
+decode/encode failures surface the original exception. See [WhatsNew.md](WhatsNew.md).
 
 ## License
 

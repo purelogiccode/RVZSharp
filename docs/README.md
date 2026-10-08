@@ -13,7 +13,7 @@ implementations in
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 464 fast (every framework, ~1 min) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 468 fast (every framework, ~1 min) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing), WIA (None, PURGE, Bzip2, LZMA1, LZMA2) and GCZ (zlib deflate) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
@@ -22,6 +22,7 @@ implementations in
 
 | Page | What it covers |
 |---|---|
+| [What's new](whats-new.md) | Release highlights (1.0.1 unreleased, 1.0.0) |
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
 | [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
 | [CLI reference](usage-cli.md) | `convert`, `header`, `verify`, `extract` (+ legacy `info`/`decode`) — options and examples |
@@ -42,6 +43,17 @@ implementations in
 - Multi-byte integers are **big-endian** (network order) unless a page says otherwise.
 - The format pages describe the on-disk layout as implemented by Dolphin and verified by
   this project's tests; they are an implementation companion to `References/dolphin-master/docs/WiaAndRvz.md`.
+
+## Wiki and Pages
+
+These pages are published twice from the same files:
+
+- **GitHub Pages** (`.github/workflows/pages.yml`) builds this folder with Jekyll; the side
+  menu comes from [`_data/nav.yml`](_data/nav.yml) rendered by
+  [`_layouts/default.html`](_layouts/default.html).
+- **GitHub Wiki** — copy these pages to the wiki root (`README.md` → `Home.md`,
+  `format/*.md` → `format/…` subpages); the side menu is [`_Sidebar.md`](_Sidebar.md).
+  Wiki links use the page names without the `.md` suffix.
 
 ## Feature overview
 

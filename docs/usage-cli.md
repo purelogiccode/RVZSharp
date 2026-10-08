@@ -245,11 +245,13 @@ tree under `files/` and the system data next to it:
 <out>/<PARTITION>/ticket.bin       Wii partition ticket (0x2A4)
 <out>/<PARTITION>/tmd.bin          Wii TMD
 <out>/<PARTITION>/cert.bin         Wii certificate chain
-<out>/<PARTITION>/h3.bin           Wii H3 hash table (0x18000)
+<out>/<PARTITION>/h3.bin           Wii H3 hash table (0x18000; discs with hash trees only)
 ```
 
 - Wii partitions are read through the **decrypted** partition view, so FST offsets and file
   data match Dolphin's partition-relative semantics (AES-128-CBC, IV = ciphertext at 0x3D0).
+  The key is the container's partition-table key for RVZ/WIA inputs, or the ticket title key
+  decrypted with the Wii common key for plain ISOs (`WiiVolume.GetTitleKey`).
 - Partitions without a usable file system are skipped with a warning; their system data is
   still exported (Dolphin behavior).
 - Extraction exits 1 when nothing was extracted (`-s` matched nothing or no partition

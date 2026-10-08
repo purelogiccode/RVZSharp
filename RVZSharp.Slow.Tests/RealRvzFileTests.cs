@@ -368,11 +368,13 @@ public class RealRvzWriteRoundTripTests
 
     private static void ReencodeAndVerifySha1(string path, string expectedSha1)
     {
-        using var decoded = Blob.Open(path);
-        var filename = Path.Combine(
-            Path.GetTempPath(), "rvzsharp_roundtrip_" + Guid.NewGuid().ToString("N") + ".rvz");
+        // A dedicated temp directory that is always removed, even when the test fails: the
+        // re-encoded file can be over a gigabyte, so it must never linger in %TEMP%.
+        var directory = Directory.CreateTempSubdirectory("rvzsharp-roundtrip-").FullName;
         try
         {
+            using var decoded = Blob.Open(path);
+            var filename = Path.Combine(directory, "reencoded.rvz");
             using (var outFile = File.Create(filename))
             {
                 RvzWriter.Write(decoded, outFile, RvzWriteOptions.Default);
@@ -384,7 +386,7 @@ public class RealRvzWriteRoundTripTests
         }
         finally
         {
-            File.Delete(filename);
+            Directory.Delete(directory, recursive: true);
         }
     }
 }

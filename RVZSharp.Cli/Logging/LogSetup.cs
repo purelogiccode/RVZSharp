@@ -5,7 +5,8 @@ namespace RVZSharp.Cli.Logging;
 /// <summary>
 /// Configures the process-wide Serilog logger for the CLI: console output, a rolling
 /// file under the temp directory, and a bug-report sink that forwards warnings and
-/// errors to the bug-report API.
+/// errors to the bug-report API. Console logs go to stderr so stdout only ever carries
+/// the command's result (JSON, hashes, disc images written with <c>-o -</c>).
 /// </summary>
 internal static class LogSetup
 {
@@ -26,7 +27,9 @@ internal static class LogSetup
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
-            .WriteTo.Console(outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}")
+            .WriteTo.Console(
+                outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}",
+                standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
             .WriteTo.File(
                 Path.Combine(logDir, "rvzsharp-.log"),
                 rollingInterval: RollingInterval.Day,

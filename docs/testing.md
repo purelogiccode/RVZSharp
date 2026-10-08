@@ -51,6 +51,10 @@ byte-for-byte against their official No-Intro SHA-1s:
    `RVZSHARP_FUZZ_ITERATIONS=2000` for a deeper local pass (CI keeps the default).
 6. **Concurrency** (`ConcurrentReadTests`): parallel random `ReadAt` calls on GC/Wii
    containers (mixed with `ReadFully`) must match the reference ISO byte-for-byte.
+7. **Continuous integration** (`.github/workflows/ci.yml`): builds the solution and runs the
+   fast suite on `net8.0`/`net9.0`/`net10.0` with coverage uploaded as an artifact, packs
+   the library (API-compat against 1.0.0 + embedded SBOM) and publishes a smoke-tested
+   ReadyToRun CLI. The slow suite and differential tests stay opt-in on developer machines.
 
 ## Test files
 

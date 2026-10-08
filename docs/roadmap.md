@@ -16,6 +16,7 @@
 | 10 — API ergonomics | Dolphin-default compression level 5, `DiscInfo` metadata API, split plain ISO (`.part0.iso`), path overloads (`RvzWriter.Write`/`RvzReader.Open`), seekable `BlobStream`, `Scrub` writer option | ✅ done |
 | 11 — Robustness & performance | thread-safe `ReadAt` with a 16 MiB LRU decoded-unit cache, binary-search area lookup, ArrayPool group reads; parser caps + mutation/fuzz robustness suite; Native AOT/trimming validated (library annotated, CLI trimmed + AOT publish smoke-tested) | ✅ done |
 | 12 — Formats & verification | `CisoWriter`/`WbfsWriter`/`TgcWriter` (+ `convert -f ciso\|wbfs\|tgc`); `DiscVerifier` Wii h0/h1/h2/h3 + TMD/H3 verification (`verify --partitions`); env-var real legacy-file tests + optional `dolphin-tool`/`wit`/`wwt` differential tests | ✅ done |
+| 13 — Tooling & packaging | GitHub Actions CI (build + fast tests on net8.0/9.0/10.0, coverage artifact, pack + API validation, ReadyToRun CLI publish) and Dependabot; `PackageValidationBaselineVersion` (1.0.0) diffing the public API; SPDX SBOM embedded in the nupkg; CLI `--json`, `-` stdin/stdout and shell completions | ✅ done (not published yet) |
 
 ## Supported
 
@@ -66,7 +67,7 @@
 
 ## Possible next steps
 
-- CI (GitHub Actions build/test/pack) and NuGet polish (baseline API validation, SBOM).
-- CLI conveniences: `--json` output, `-` stdin/stdout, shell completions.
 - Run the legacy/differential slow tests against a real collection of GCZ/CISO/WBFS/TGC/NFS
   files and `dolphin-tool`/`wit`/`wwt` on a machine that has them.
+- Publish the 1.0.1 package (API-compat validated against 1.0.0, SBOM embedded) and the
+  ReadyToRun/Native AOT CLI binaries.

@@ -44,9 +44,14 @@
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <!-- Validates that every target framework (net8.0/net9.0/net10.0) asset is compatible
-         with the package's supported frameworks. Add PackageValidationBaselineVersion when
-         the API stabilizes (see docs/packaging.md). -->
+         with the package's supported frameworks, and that the public API stays compatible
+         with the last published release (1.0.0). Breaking changes must be suppressed with a
+         justification in CompatibilitySuppressions.xml (see docs/packaging.md). -->
         <EnablePackageValidation>true</EnablePackageValidation>
+        <PackageValidationBaselineVersion>1.0.0</PackageValidationBaselineVersion>
+        <!-- SPDX 2.2 SBOM for the package, generated next to the nupkg on Release builds
+         (Microsoft.Sbom.Targets). Kept out of Debug builds to keep the dev loop fast. -->
+        <GenerateSBOM Condition="'$(Configuration)' == 'Release'">true</GenerateSBOM>
     </PropertyGroup>
 
     <ItemGroup>
@@ -58,6 +63,7 @@
         <PackageReference Include="SharpZipLib" Version="1.4.2" />
         <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Sbom.Targets" Version="4.1.13" PrivateAssets="all" />
         <PackageReference Include="Meziantou.Analyzer" Version="3.0.294">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>

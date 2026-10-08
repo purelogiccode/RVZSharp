@@ -53,6 +53,7 @@ internal static class Program
                 "header" => HeaderCommand(args[1..]),
                 "verify" => VerifyCommand(args[1..]),
                 "extract" => ExtractCommand(args[1..]),
+                "completions" when args.Length >= 2 => CompletionsCommand(args[1]),
                 "info" when args.Length >= 2 => Info(args[1]),
                 "decode" when args.Length >= 3 => Decode(args[1], args[2], args[3..]),
                 _ => PrintUsageAndFail()
@@ -86,15 +87,20 @@ internal static class Program
 
                                 commands supported: [convert, verify, header, extract]
                                 legacy commands:    [info, decode]
+                                helpers:            [completions]
 
-                                convert  -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
+                                convert  -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz|ciso|wbfs|tgc] [-s]
                                          [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2|purge] [-l <level>]
-                                         [--threads <int>] [--verify]
+                                         [--threads <int>] [--verify] [--json]
                                 header   -i <FILE> [-j] [-b] [-c] [-l]
-                                verify   -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
+                                verify   -i <FILE> [-u <dir>] [-a crc32|md5|sha1] [--partitions] [--json]
                                 extract  -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l] [-q] [-g]
                                 info     <FILE>                        (legacy alias of 'header')
                                 decode   <FILE> <OUT> [--sha1 <hex>] [--threads <int>] (decode any blob to a plain ISO)
+                                completions <bash|zsh|fish|powershell>  print a shell completion script
+
+                                FILE arguments may be '-' to read the disc image from stdin; convert also
+                                accepts '-o -' to write the converted image to stdout.
                                 """);
     }
 
@@ -102,6 +108,19 @@ internal static class Program
     {
         PrintUsage();
         return 1;
+    }
+
+    /// <summary>Prints the shell completion script for bash, zsh, fish or PowerShell.</summary>
+    private static int CompletionsCommand(string shell)
+    {
+        var script = Completions.Get(shell);
+        if (script is null)
+        {
+            return Fail($"unsupported shell '{shell}' (expected bash, zsh, fish or powershell)");
+        }
+
+        Console.WriteLine(script);
+        return 0;
     }
 
     private static int Fail(string message)
@@ -210,6 +229,63 @@ internal static class Program
             }
 
             base.Dispose(disposing);
+        }
+    }
+
+    /// <summary>
+    /// Temporary file backing the <c>-</c> stdin/stdout convention: stdin is spooled to a
+    /// seekable temp file because every container reader/writer does random access, and an
+    /// output image is written to a temp file and copied to stdout after verification.
+    /// </summary>
+    private sealed class TemporaryFile : IDisposable
+    {
+        public string Path { get; }
+
+        private TemporaryFile(string path)
+        {
+            Path = path;
+        }
+
+        /// <summary>Creates a unique, not-yet-existing temp file path.</summary>
+        public static TemporaryFile Create()
+        {
+            var directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "RVZSharp");
+            Directory.CreateDirectory(directory);
+            return new TemporaryFile(
+                System.IO.Path.Combine(directory, $"cli-{Guid.NewGuid():N}.tmp"));
+        }
+
+        /// <summary>Spools the entire standard input into a seekable temp file.</summary>
+        public static TemporaryFile SpoolStdin()
+        {
+            var file = Create();
+            using (var stdin = Console.OpenStandardInput())
+            using (var output = File.Create(file.Path))
+            {
+                stdin.CopyTo(output);
+            }
+
+            return file;
+        }
+
+        public void CopyToStdout()
+        {
+            using var stdout = Console.OpenStandardOutput();
+            using var file = File.OpenRead(Path);
+            file.CopyTo(stdout);
+            stdout.Flush();
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                File.Delete(Path);
+            }
+            catch (IOException)
+            {
+                // The OS cleans the temp directory up eventually.
+            }
         }
     }
 
@@ -342,7 +418,8 @@ internal static class Program
         ["chunk-size"] = new OptionSpec("--chunk-size", true, null),
         ["no-packing"] = new OptionSpec("--no-packing", false, null),
         ["threads"] = new OptionSpec("--threads", true, null),
-        ["verify"] = new OptionSpec("--verify", false, null)
+        ["verify"] = new OptionSpec("--verify", false, null),
+        ["json"] = new OptionSpec("--json", false, null)
     };
 
     private static int ConvertCommand(IReadOnlyList<string> args)
@@ -362,7 +439,10 @@ internal static class Program
                     + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
                     + "  -l, --compression_level    level of compression for the selected method\n"
                     + "  --threads <int>            compression/decode threads (0 = processor count, default)\n"
-                    + "  --verify                   verify the written file decodes to the input image");
+                    + "  --verify                   verify the written file decodes to the input image\n"
+                    + "  --json                     print the conversion result as JSON on stdout\n"
+                    + "\n"
+                    + "  -i - reads the input from stdin; -o - writes the image to stdout (no --json).");
                 return args.Count == 0 ? 1 : 0;
             }
 
@@ -374,7 +454,16 @@ internal static class Program
                     return Fail("No input set");
                 }
 
-                return ConvertLegacy(args[0], args[1], args.Skip(2).ToArray());
+                using var legacyInput = args[0] == "-" ? TemporaryFile.SpoolStdin() : null;
+                using var legacyOutput = args[1] == "-" ? TemporaryFile.Create() : null;
+                var legacyResult = ConvertLegacy(legacyInput?.Path ?? args[0],
+                    legacyOutput?.Path ?? args[1], args.Skip(2).ToArray());
+                if (legacyResult == 0 && legacyOutput != null)
+                {
+                    legacyOutput.CopyToStdout();
+                }
+
+                return legacyResult;
             }
 
             ParsedArgs options;
@@ -404,8 +493,19 @@ internal static class Program
                 return Fail("No output format set");
             }
 
-            var inputPath = options.Get("input")!;
-            var outputPath = options.Get("output")!;
+            var originalInput = options.Get("input")!;
+            var originalOutput = options.Get("output")!;
+            var json = options.HasFlag("json");
+
+            if (json && originalOutput == "-")
+            {
+                return Fail("--json cannot be combined with writing the image to stdout");
+            }
+
+            using var spooledInput = originalInput == "-" ? TemporaryFile.SpoolStdin() : null;
+            using var spooledOutput = originalOutput == "-" ? TemporaryFile.Create() : null;
+            var inputPath = spooledInput?.Path ?? originalInput;
+            var writePath = spooledOutput?.Path ?? originalOutput;
 
             IBlobReader blob;
             try
@@ -462,10 +562,12 @@ internal static class Program
 
                 if (format == "iso")
                 {
-                    var decodeResult = DecodeBlob(input, outputPath, expectedSha1: null, maxThreads);
-                    return decodeResult != 0 || inputHashes is null
+                    var decodeResult = DecodeBlob(input, writePath, expectedSha1: null, maxThreads,
+                        originalOutput, quiet: spooledOutput != null);
+                    return decodeResult != 0
                         ? decodeResult
-                        : VerifyOutput(inputHashes, outputPath, input.Length);
+                        : FinishConvert(originalInput, originalOutput, writePath, format, input.Length,
+                            inputHashes, json, spooledOutput);
                 }
 
                 var blockSize = 0;
@@ -557,7 +659,7 @@ internal static class Program
                     MaxThreads = maxThreads
                 };
 
-                using (var output = File.Create(outputPath))
+                using (var output = File.Create(writePath))
                 {
                     var progress = new ConsoleProgress("Encoding ");
                     try
@@ -614,7 +716,8 @@ internal static class Program
                 }
 
                 ConsoleProgress.Clear();
-                return inputHashes is null ? 0 : VerifyOutput(inputHashes, outputPath, input.Length);
+                return FinishConvert(originalInput, originalOutput, writePath, format, input.Length,
+                    inputHashes, json, spooledOutput);
             }
         }
         catch (Exception e)
@@ -622,6 +725,47 @@ internal static class Program
             Log.Error(e, "Convert command failed");
             return Fail(e.Message);
         }
+    }
+
+    /// <summary>
+    /// Shared convert tail: optionally verify the written image, copy it to stdout when the
+    /// output is '-', and print the JSON result. Returns the process exit code.
+    /// </summary>
+    private static int FinishConvert(string originalInput, string originalOutput, string writePath,
+        string format, long inputLength, DiscHashes? inputHashes, bool json, TemporaryFile? spooledOutput)
+    {
+        var result = inputHashes is null
+            ? 0
+            : VerifyOutput(inputHashes, writePath, inputLength,
+                quiet: json || spooledOutput != null);
+        if (result != 0)
+        {
+            return result;
+        }
+
+        var outputSize = new FileInfo(writePath).Length;
+        spooledOutput?.CopyToStdout();
+
+        if (json)
+        {
+            var resultJson = new JsonObject
+            {
+                ["input"] = originalInput,
+                ["output"] = originalOutput,
+                ["format"] = format,
+                ["input_bytes"] = inputLength,
+                ["output_bytes"] = outputSize
+            };
+            if (inputHashes is not null)
+            {
+                resultJson["verified"] = true;
+                resultJson["sha1"] = ToLowerHex(inputHashes.Sha1);
+            }
+
+            Console.WriteLine(resultJson.ToJsonString());
+        }
+
+        return 0;
     }
 
     /// <summary>Legacy positional convert: rvzsharp convert &lt;in&gt; &lt;out&gt; [options].</summary>
@@ -699,7 +843,8 @@ internal static class Program
     /// Reopens the written file and checks that it decodes to the same CRC-32/MD5/SHA-1 as
     /// the input (the convert command's --verify extension).
     /// </summary>
-    private static int VerifyOutput(DiscHashes inputHashes, string outputPath, long inputLength)
+    private static int VerifyOutput(DiscHashes inputHashes, string outputPath, long inputLength,
+        bool quiet = false)
     {
         IBlobReader blob;
         try
@@ -738,7 +883,11 @@ internal static class Program
                 return Fail("Verification failed: the output does not decode to the input image.");
             }
 
-            Console.WriteLine($"Verification: OK ({ToLowerHex(inputHashes.Sha1)})");
+            if (!quiet)
+            {
+                Console.WriteLine($"Verification: OK ({ToLowerHex(inputHashes.Sha1)})");
+            }
+
             return 0;
         }
     }
@@ -836,15 +985,18 @@ internal static class Program
                 return Fail("No input set");
             }
 
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin() : null;
+            var path = spooledInput?.Path ?? inputPath;
+
             IBlobReader blob;
             try
             {
-                var file = File.OpenRead(inputPath);
-                blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
+                var file = File.OpenRead(path);
+                blob = Blob.Open(file, filePath: path, leaveOpen: false);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Error(e, "Failed to open input file '{InputPath}'", inputPath);
+                Log.Error(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("Unable to open disc image");
             }
 
@@ -992,7 +1144,8 @@ internal static class Program
         // (VerifyCommand.cpp:134-137); without it, -a rchash is an invalid choice.
         ["algorithm"] = new OptionSpec("-a", true, ["crc32", "md5", "sha1"]),
         // RVZSharp extension: walk the Wii hash trees like Dolphin's verify tab.
-        ["partitions"] = new OptionSpec("--partitions", false, null)
+        ["partitions"] = new OptionSpec("--partitions", false, null),
+        ["json"] = new OptionSpec("--json", false, null)
     };
 
     private static int VerifyCommand(IReadOnlyList<string> args)
@@ -1006,7 +1159,10 @@ internal static class Program
                     + "  -u, --user <dir>           user folder path (accepted for compatibility)\n"
                     + "  -i, --input <FILE>         path to input file\n"
                     + "  -a, --algorithm <algo>     compute one digest: crc32, md5, sha1\n"
-                    + "  --partitions               verify the Wii partition hash trees and TMD/H3 tables");
+                    + "  --partitions               verify the Wii partition hash trees and TMD/H3 tables\n"
+                    + "  --json                     print the result as JSON on stdout\n"
+                    + "\n"
+                    + "  -i - reads the input from stdin.");
                 return args.Count == 0 ? 1 : 0;
             }
 
@@ -1027,17 +1183,21 @@ internal static class Program
             }
 
             var algorithm = options.Get("algorithm");
+            var json = options.HasFlag("json");
 
             var inputPath = options.Get("input")!;
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin() : null;
+            var path = spooledInput?.Path ?? inputPath;
+
             IBlobReader blob;
             try
             {
-                var file = File.OpenRead(inputPath);
-                blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
+                var file = File.OpenRead(path);
+                blob = Blob.Open(file, filePath: path, leaveOpen: false);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Error(e, "Failed to open input file '{InputPath}'", inputPath);
+                Log.Error(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("Unable to open input file");
             }
 
@@ -1053,12 +1213,36 @@ internal static class Program
                     var verifyProgress = new ConsoleProgress("Verifying ");
                     var report = DiscVerifier.Verify(blob, verifyProgress, Cancellation.Token);
                     ConsoleProgress.Clear();
-                    return PrintVerificationReport(report);
+                    return PrintVerificationReport(report, json, inputPath);
                 }
 
                 var progress = new ConsoleProgress("Verifying ");
                 var hashes = DiscHasher.Compute(blob, progress, Cancellation.Token);
                 ConsoleProgress.Clear();
+
+                if (json)
+                {
+                    var result = new JsonObject { ["input"] = inputPath };
+                    if (algorithm is not null)
+                    {
+                        result["algorithm"] = algorithm;
+                        result["value"] = algorithm switch
+                        {
+                            "crc32" => hashes.Crc32.ToString("x8"),
+                            "md5" => ToLowerHex(hashes.Md5),
+                            _ => ToLowerHex(hashes.Sha1)
+                        };
+                    }
+                    else
+                    {
+                        result["crc32"] = hashes.Crc32.ToString("x8");
+                        result["md5"] = ToLowerHex(hashes.Md5);
+                        result["sha1"] = ToLowerHex(hashes.Sha1);
+                    }
+
+                    Console.WriteLine(result.ToJsonString());
+                    return 0;
+                }
 
                 if (algorithm is not null)
                 {
@@ -1091,11 +1275,42 @@ internal static class Program
     }
 
     /// <summary>
-    /// Prints a <see cref="DiscVerifier"/> report and returns 0 when the disc is valid, 1
-    /// otherwise (the verify command's --partitions extension).
+    /// Prints a <see cref="DiscVerifier"/> report (text or JSON) and returns 0 when the disc
+    /// is valid, 1 otherwise (the verify command's --partitions extension).
     /// </summary>
-    private static int PrintVerificationReport(VerificationReport report)
+    private static int PrintVerificationReport(VerificationReport report, bool json, string inputPath)
     {
+        if (json)
+        {
+            var partitions = new JsonArray();
+            foreach (var partition in report.Partitions)
+            {
+                partitions.Add((JsonNode)new JsonObject
+                {
+                    ["name"] = partition.Name,
+                    ["offset"] = partition.Partition.Offset,
+                    ["valid"] = partition.IsValid,
+                    ["blocks"] = partition.Blocks,
+                    ["verified_blocks"] = partition.VerifiedBlocks,
+                    ["failed_blocks"] = partition.FailedBlocks,
+                    ["issues"] = IssuesToJson(partition.Issues)
+                });
+            }
+
+            var result = new JsonObject
+            {
+                ["input"] = inputPath,
+                ["disc_type"] = report.DiscType.ToString(),
+                ["valid"] = report.IsValid,
+                ["total_blocks"] = report.TotalBlocks,
+                ["verified_blocks"] = report.VerifiedBlocks,
+                ["partitions"] = partitions,
+                ["issues"] = IssuesToJson(report.Issues)
+            };
+            Console.WriteLine(result.ToJsonString());
+            return report.IsValid ? 0 : 1;
+        }
+
         Console.WriteLine($"Disc type: {report.DiscType}");
         if (report.TotalBlocks > 0)
         {
@@ -1121,6 +1336,21 @@ internal static class Program
 
         Console.WriteLine(report.IsValid ? "Verification OK." : "Verification failed.");
         return report.IsValid ? 0 : 1;
+    }
+
+    private static JsonArray IssuesToJson(IReadOnlyList<VerificationIssue> issues)
+    {
+        var array = new JsonArray();
+        foreach (var issue in issues)
+        {
+            array.Add((JsonNode)new JsonObject
+            {
+                ["severity"] = issue.Severity.ToString(),
+                ["message"] = issue.Message
+            });
+        }
+
+        return array;
     }
 
     private static string ToLowerHex(byte[] bytes)
@@ -1193,15 +1423,18 @@ internal static class Program
                 specificPartition = "DATA";
             }
 
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin() : null;
+            var path = spooledInput?.Path ?? inputPath;
+
             IBlobReader blob;
             try
             {
-                var file = File.OpenRead(inputPath);
-                blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
+                var file = File.OpenRead(path);
+                blob = Blob.Open(file, filePath: path, leaveOpen: false);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Error(e, "Failed to open input file '{InputPath}'", inputPath);
+                Log.Error(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("The input file could not be opened.");
             }
 
@@ -1616,8 +1849,11 @@ internal static class Program
     {
         try
         {
-            using var file = File.OpenRead(path);
-            using var reader = Blob.Open(file, filePath: path, leaveOpen: true);
+            using var spooledInput = path == "-" ? TemporaryFile.SpoolStdin() : null;
+            var readPath = spooledInput?.Path ?? path;
+
+            using var file = File.OpenRead(readPath);
+            using var reader = Blob.Open(file, filePath: readPath, leaveOpen: true);
 
             Console.WriteLine($"file:            {path}");
             Console.WriteLine($"format:          {Blob.GetName(reader.Type)}");
@@ -1703,9 +1939,21 @@ internal static class Program
                 }
             }
 
-            using var input = File.OpenRead(inputPath);
-            using var reader = Blob.Open(input, filePath: inputPath, leaveOpen: true);
-            return DecodeBlob(reader, outputPath, expectedSha1, maxThreads);
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin() : null;
+            using var spooledOutput = outputPath == "-" ? TemporaryFile.Create() : null;
+            var readPath = spooledInput?.Path ?? inputPath;
+            var writePath = spooledOutput?.Path ?? outputPath;
+
+            using var input = File.OpenRead(readPath);
+            using var reader = Blob.Open(input, filePath: readPath, leaveOpen: true);
+            var result = DecodeBlob(reader, writePath, expectedSha1, maxThreads, outputPath,
+                quiet: spooledOutput != null);
+            if (result == 0 && spooledOutput != null)
+            {
+                spooledOutput.CopyToStdout();
+            }
+
+            return result;
         }
         catch (Exception e)
         {
@@ -1716,7 +1964,7 @@ internal static class Program
     }
 
     private static int DecodeBlob(IBlobReader reader, string outputPath, string? expectedSha1,
-        int maxThreads = 1)
+        int maxThreads = 1, string? displayPath = null, bool quiet = false)
     {
         try
         {
@@ -1739,7 +1987,11 @@ internal static class Program
             if (expectedSha1 != null)
             {
                 var actual = Convert.ToHexString(hashing.GetHashAndReset()).ToLowerInvariant();
-                Console.WriteLine($"sha1: {actual}");
+                if (!quiet)
+                {
+                    Console.WriteLine($"sha1: {actual}");
+                }
+
                 if (!string.Equals(actual, expectedSha1.Trim().ToLowerInvariant(), StringComparison.Ordinal))
                 {
                     Log.Warning("SHA-1 mismatch: expected {Expected}, got {Actual}", expectedSha1, actual);
@@ -1748,7 +2000,11 @@ internal static class Program
                 }
             }
 
-            Console.WriteLine($"decoded {reader.Length} bytes to {outputPath}");
+            if (!quiet)
+            {
+                Console.WriteLine($"decoded {reader.Length} bytes to {displayPath ?? outputPath}");
+            }
+
             return 0;
         }
         catch (Exception e)

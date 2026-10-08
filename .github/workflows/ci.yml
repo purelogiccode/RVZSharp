@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build + fast tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Restore
+        run: dotnet restore CSharp_RVZSharp.sln
+      - name: Build
+        run: dotnet build CSharp_RVZSharp.sln -c Release --no-restore
+      - name: Fast tests (net8.0 + net9.0 + net10.0) with coverage
+        run: >
+          dotnet test RVZSharp.Tests -c Release --no-build
+          --collect:"XPlat Code Coverage"
+          --results-directory artifacts/coverage
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: artifacts/coverage
+          if-no-files-found: ignore
+
+  pack:
+    name: Pack + API validation + SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # Runs EnablePackageValidation (baseline 1.0.0) and generates the SPDX SBOM
+      # that is embedded in the nupkg (Microsoft.Sbom.Targets, Release only).
+      - name: Pack
+        run: dotnet pack RVZSharp/RVZSharp.csproj -c Release -o artifacts/packages
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/packages
+
+  cli:
+    name: Publish CLI (win-x64, ReadyToRun)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # Native AOT remains the release path; this ReadyToRun single-file build is the
+      # non-AOT fallback artifact and is validated here so it cannot rot.
+      - name: Publish
+        run: >
+          dotnet publish RVZSharp.Cli/RVZSharp.Cli.csproj -c Release -f net10.0
+          -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:PublishReadyToRun=true
+          -o artifacts/rvzsharp-win-x64
+      - name: Smoke test
+        run: artifacts/rvzsharp-win-x64/RVZSharp.Cli.exe --help
+      - name: Upload CLI
+        uses: actions/upload-artifact@v4
+        with:
+          name: rvzsharp-win-x64
+          path: artifacts/rvzsharp-win-x64

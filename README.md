@@ -1,3 +1,4 @@
+[![CI](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-8.0_%7C_9.0_%7C_10.0-blueviolet)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green)](LICENSE)
@@ -212,12 +213,13 @@ container magic).
 
 ```
 dotnet run --project RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
-dotnet run --project RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1]
-dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz|wia|gcz \
+dotnet run --project RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1] [--partitions] [--json]
+dotnet run --project RVZSharp.Cli -- convert -i <file> -o <out> -f iso|rvz|wia|gcz|ciso|wbfs|tgc \
     [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2|purge] [-l <level>] [-s] \
-    [--threads <n>] [--verify]
+    [--threads <n>] [--verify] [--json]
 dotnet run --project RVZSharp.Cli -- extract -i <file> [-o <dir>] [-p <name>] \
     [-s <path>] [-l] [-q] [-g]
+dotnet run --project RVZSharp.Cli -- completions bash|zsh|fish|powershell
 ```
 
 The CLI accepts the same command arguments as Dolphin's `dolphin-tool` (`convert`,
@@ -230,9 +232,11 @@ carry all SHA-1 checksums. `--scrub` zeroes the data of non-game Wii partitions
 (update/channel) before converting. `-f iso` decodes back to a plain ISO. RVZSharp
 extensions: `--threads <n>` sets the compression/decode worker count (output is
 byte-identical for any value), `--verify` re-decodes the written file and compares
-CRC-32/MD5/SHA-1 with the input, and `-c purge` exposes PURGE for WIA. `extract` reads the
-disc's file system: list or extract the FST tree and the system data (boot/BI2/apploader/
-DOL/FST, Wii disc header/region, ticket/TMD/cert/H3) per partition.
+CRC-32/MD5/SHA-1 with the input, `--json` prints machine-readable results on stdout, `-`
+reads stdin / writes stdout, `completions <shell>` prints bash/zsh/fish/PowerShell
+completion scripts, and `-c purge` exposes PURGE for WIA. `extract` reads the disc's file
+system: list or extract the FST tree and the system data (boot/BI2/apploader/DOL/FST, Wii
+disc header/region, ticket/TMD/cert/H3) per partition.
 
 ## Documentation
 
@@ -256,7 +260,8 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   `CisoWriter`, `WbfsWriter`, `TgcWriter`. Every public and internal type and member carries
   XML documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
 - `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
-  surface, plus the legacy `info`/`decode` commands).
+  surface, plus the legacy `info`/`decode` commands, `--json` output, `-` stdin/stdout and
+  shell completions).
 - `RVZSharp.Tests` — 464 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
@@ -313,6 +318,12 @@ real Wii game with the default **2 MiB chunk size**, the writer used the ISO tic
 instead of the RVZ partition-table key (No-Intro dumps carry re-signed tickets whose key
 differs), producing files the reader rejected. `RvzWriter` now prefers the container's
 partition-table key and falls back to the ticket key for plain ISO inputs.
+
+**Packaging & CI**: the NuGet package is API-compat validated against the last published
+release (`PackageValidationBaselineVersion` 1.0.0) and carries an embedded SPDX 2.2 SBOM;
+GitHub Actions (`.github/workflows/ci.yml`) builds and tests on `net8.0`/`net9.0`/`net10.0`
+with coverage, packs, and publishes a smoke-tested ReadyToRun CLI artifact. Dependabot
+keeps NuGet and Actions dependencies current.
 
 ## License
 

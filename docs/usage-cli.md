@@ -46,7 +46,7 @@ Converts a disc image to another container format (DolphinTool semantics):
 ```
 convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz|ciso|wbfs|tgc] [-s]
         [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
-        [--threads <int>] [--verify]
+        [--threads <int>] [--verify] [--json]
 ```
 
 | Option | Meaning |
@@ -61,6 +61,7 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz|ciso|wbfs|tgc] [-s]
 | `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso`/`-f gcz` a warning notes that scrubbing gains little. |
 | `--threads` | compression threads (RVZSharp extension). `0` (default) uses the processor count; the output is byte-identical for any value. |
 | `--verify` | after writing, decode the output and compare its CRC-32/MD5/SHA-1 with the input (RVZSharp extension); prints `Verification: OK (<sha1>)` or fails. With `-s` the scrubbed input is the reference. |
+| `--json` | print a single JSON object with the conversion result on stdout (RVZSharp extension): `input`, `output`, `format`, `input_bytes`, `output_bytes`, plus `verified`/`sha1` with `--verify`. Cannot be combined with `-o -`. |
 
 Block-size validation follows Dolphin's `IsDiscImageBlockSizeValid`:
 
@@ -110,6 +111,11 @@ Notes:
   sequential processing.
 - **`--verify`** (RVZSharp extension) hashes the input before writing and re-decodes the
   written file afterwards, comparing CRC-32, MD5 and SHA-1. It works for every `-f` value.
+  CISO/WBFS decode to a padded image (map capacity / fixed Wii size); verification hashes
+  the input-length prefix, so it compares equal.
+- **`-i -`** reads the disc image from stdin; **`-o -`** writes the converted image to
+  stdout (the file is staged in a temp file so it can still be seeked and verified, then
+  streamed out). `--json` is rejected with `-o -` because both use stdout.
 - `-s` (scrub) requires a Wii disc with a game partition; other inputs fail with
   Dolphin's "Unable to process disc image. Try again without --scrub."
 
@@ -164,7 +170,7 @@ Country: USA
 Hashes the decoded disc content (DolphinTool semantics):
 
 ```
-verify -i <FILE> [-u <dir>] [-a crc32|md5|sha1] [--partitions]
+verify -i <FILE> [-u <dir>] [-a crc32|md5|sha1] [--partitions] [--json]
 ```
 
 - With no `-a`, prints the full report:
@@ -196,6 +202,14 @@ Blocks verified: 143360 of 143360
 game partition at 0x00100000: OK (143360 blocks verified, 0 failed)
 Verification OK.
 ```
+
+- **`--json`** (RVZSharp extension) prints one JSON object on stdout instead of the text
+  report. Without `--partitions`: `{"input","crc32","md5","sha1"}`, or
+  `{"input","algorithm","value"}` with `-a`. With `--partitions`:
+  `{"input","disc_type","valid","total_blocks","verified_blocks","partitions":[…],"issues":[…]}`,
+  where each partition carries `name`, `offset`, `valid`, `blocks`, `verified_blocks`,
+  `failed_blocks` and `issues` (`{"severity","message"}`). Exit codes are unchanged.
+- **`-i -`** reads the input from stdin.
 
 ## `extract`
 
@@ -262,6 +276,40 @@ rvzsharp extract -i game.rvz -s files/maps/foo.dat -o extracted
 |---|---|
 | 0 | success (also for `-h`/`--help` on a command) |
 | 1 | usage error, unknown option, unsupported feature, open/verification failure |
+| 130 | interrupted with Ctrl+C |
 
 Errors are printed to stderr in DolphinTool's style (`Error: No input set`,
-`Error: Block size must be set for GCZ/RVZ/WIA`, …).
+`Error: Block size must be set for GCZ/RVZ/WIA`, …). Console logs and progress also go to
+stderr, so **stdout only ever carries the command's result** (JSON, hashes, listings, or a
+disc image written with `-o -`).
+
+## Piping & machine-readable output
+
+```bash
+# hash a disc from stdin
+cat game.rvz | rvzsharp verify -i - --json
+
+# convert and stream the result into another tool
+rvzsharp convert -i game.iso -o - -f ciso -b 2048 | ciso-tool ...
+
+# scripted conversion: read the result JSON, check the exit code
+rvzsharp convert -i game.iso -o game.rvz -f rvz -b 131072 -c zstd -l 5 --verify --json
+```
+
+`-` is accepted wherever a disc image file is read (`convert`, `verify`, `header`,
+`extract`, `info`, `decode` input) and for `convert -o`. Because every container reader
+and writer needs random access, stdin/stdout are staged through a temp file under
+`%TEMP%/RVZSharp`, so large images cost one extra copy.
+
+## Shell completions
+
+```bash
+rvzsharp completions bash >> ~/.bashrc
+rvzsharp completions zsh  > "${fpath[1]}/_rvzsharp"
+rvzsharp completions fish > ~/.config/fish/completions/rvzsharp.fish
+rvzsharp completions powershell | Out-String | Invoke-Expression   # or add to $PROFILE
+```
+
+The scripts complete commands, per-command options, `-f` formats, `-c` compression
+methods, `-a` algorithms and file paths. They are static, so when the command surface
+changes the completion scripts are updated in the same change (release checklist).

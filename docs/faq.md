@@ -42,6 +42,12 @@ or, for an original source image: compute the SHA-1 of the source ISO once, then
 discs, `rvzsharp verify -i game.rvz --partitions` walks the partition hash trees and
 TMD/H3 tables like Dolphin's verify tab and reports per-partition problems.
 
+**Can I script the CLI?**
+Yes — add `--json` to `convert` or `verify` for one machine-readable object on stdout, use
+`-i -` / `convert -o -` to pipe disc images through stdin/stdout, and generate shell
+completions with `rvzsharp completions bash|zsh|fish|powershell`. Logs and progress go to
+stderr, so stdout stays clean.
+
 **Why is WBFS conversion slow?**
 WBFS has a fixed ~9.4 GiB logical size; converting reads the whole logical image even when
 the file is mostly empty clusters. Prefer `decode` then `convert game.iso`.

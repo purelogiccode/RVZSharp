@@ -31,16 +31,47 @@ public static class DiscHasher
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
+        return Compute(image, image.Length, progress, cancellationToken);
+    }
+
+    /// <summary>
+    /// Hashes the first <paramref name="length"/> bytes of the decoded image served by
+    /// <paramref name="image"/> in 1 MiB blocks. Useful for containers whose decoded image is
+    /// padded with zeroes (CISO decodes to its map capacity, WBFS to the fixed Wii size), where
+    /// only the prefix corresponds to the source image.
+    /// </summary>
+    /// <param name="image">The disc image to hash (any format).</param>
+    /// <param name="length">Number of decoded bytes to hash (at most <see cref="IBlobReader.Length"/>).</param>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the bytes hashed.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between reads.</param>
+    /// <returns>The CRC-32, MD5 and SHA-1 of the decoded prefix.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="image"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="length"/> is negative or larger than the image.
+    /// </exception>
+    /// <exception cref="RvzFormatException">Decoding stopped before <paramref name="length"/> bytes.</exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    public static DiscHashes Compute(IBlobReader image, long length,
+        IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        if (length < 0 || length > image.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length),
+                $"Length {length} is outside the image (0..{image.Length}).");
+        }
 
         using var md5 = IncrementalHash.CreateHash(HashAlgorithmName.MD5);
         using var sha1 = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
         var buffer = new byte[1 << 20];
         var crc = 0xFFFFFFFFu;
         var position = 0L;
-        while (position < image.Length)
+        while (position < length)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var take = (int)Math.Min(buffer.Length, image.Length - position);
+            var take = (int)Math.Min(buffer.Length, length - position);
             var read = image.ReadAt(position, buffer.AsSpan(0, take));
             if (read <= 0)
             {
@@ -52,7 +83,7 @@ public static class DiscHasher
             md5.AppendData(span);
             sha1.AppendData(span);
             position += read;
-            progress?.Report((double)position / image.Length);
+            progress?.Report((double)position / length);
         }
 
         return new DiscHashes

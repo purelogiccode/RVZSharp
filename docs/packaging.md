@@ -50,12 +50,17 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
    `PackageValidationBaselineVersion` to diff the public API against the previous release
    (API-compat analysis) — see the roadmap.
 3. **Tests on every framework** — `dotnet test CSharp_RVZSharp.sln -c Release` runs the
-   fast suite (395 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
+   fast suite (464 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
    (`dotnet test RVZSharp.Slow.Tests -c Release`) runs on machines with the games mounted.
 4. **Consumer smoke test** — before publishing, a fresh project consuming only the nupkg
    (from a local feed) must compile and run on .NET 8 and .NET 10, converting and decoding
    a disc image byte-exactly. This catches packaging mistakes (missing files, wrong
    dependency graph) that unit tests cannot.
+5. **Native AOT / trimming** — the library sets `IsAotCompatible`/`IsTrimmable` and the CLI
+   sets `EnableAotAnalyzer`/`EnableTrimAnalyzer`, so trim/AOT warnings fail the build on all
+   frameworks. Release smoke test: `dotnet publish RVZSharp.Cli -r win-x64
+   -p:PublishTrimmed=true` (and `-p:PublishAot=true`) must produce warning-free binaries
+   that round-trip a disc image byte-exactly.
 
 ## Publishing to nuget.org
 

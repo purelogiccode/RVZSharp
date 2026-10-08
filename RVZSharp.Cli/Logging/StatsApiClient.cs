@@ -1,5 +1,5 @@
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using Serilog;
 
 namespace RVZSharp.Cli.Logging;
@@ -18,12 +18,6 @@ internal sealed class StatsApiClient : IDisposable
     private readonly string _applicationId;
     private readonly string _version;
     private int _failureReporting;
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
-    };
 
     /// <summary>
     /// Creates a client with a 10-second HTTP timeout, a bearer API key, and the calling
@@ -48,8 +42,13 @@ internal sealed class StatsApiClient : IDisposable
     {
         try
         {
-            var payload = new { applicationId = _applicationId, version = _version };
-            var json = JsonSerializer.Serialize(payload, JsonOptions);
+            // JsonObject (not reflection-based serialization) keeps the CLI trim/AOT-safe.
+            var payload = new JsonObject
+            {
+                ["applicationId"] = _applicationId,
+                ["version"] = _version
+            };
+            var json = payload.ToJsonString();
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await _httpClient.PostAsync(ApiUrl, content).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode &&

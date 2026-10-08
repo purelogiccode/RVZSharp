@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Runtime.InteropServices;
 using RVZSharp.Interfaces;
 using RVZSharp.Chunks;
@@ -13,11 +14,21 @@ namespace RVZSharp;
 /// <see cref="Open(Stream, bool)"/> (RVZ) or <see cref="OpenWia(Stream, bool)"/> (WIA), then
 /// serves the original disc image (ISO) bytes via <see cref="ReadAt"/> — byte-identical to the
 /// source disc, including re-encrypted Wii partition data and rebuilt hash trees.
+/// <see cref="ReadAt"/> is thread-safe: decoded units are shared through a bounded LRU cache
+/// (<see cref="DefaultCacheSize"/>), so concurrent random access is supported. Do not dispose
+/// the reader while another thread is reading.
 /// </summary>
 public sealed class RvzReader : IBlobReader
 {
     /// <summary>Bytes of partition data per 2 MiB region (64 sectors × 0x7C00).</summary>
     public const int RegionDataSize = 64 * WiiHashCalculator.SectorDataSize; // 0x1F0000
+
+    /// <summary>Bytes of decoded data cached for random access (Dolphin: CachedBlob).</summary>
+    public const int DefaultCacheSize = 16 * 1024 * 1024;
+
+    private const byte KindRaw = 0;
+    private const byte KindPartitionChunk = 1;
+    private const byte KindPartitionRegion = 2;
 
     private readonly Stream _file;
     private readonly bool _leaveOpen;
@@ -25,13 +36,20 @@ public sealed class RvzReader : IBlobReader
     private readonly ICompressionDecoder _codec;
     private readonly DataArea[] _areas;
 
-    private byte[]? _cachedRawPayload;
-    private long _cachedRawKey = -1;
-    private byte[]? _cachedRegion;
-    private long _cachedRegionKey = -1;
-    private byte[]? _cachedChunkPayload;
-    private HashExceptionEntry[][] _cachedChunkLists = [];
-    private long _cachedChunkKey = -1;
+    /// <summary>
+    /// Thread-safe LRU of decoded units (raw chunks, partition chunks and rebuilt partition
+    /// regions) so concurrent <see cref="ReadAt"/> calls share decoded data.
+    /// </summary>
+    private readonly LruCache<CacheKey, CacheValue> _cache = new(DefaultCacheSize);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct CacheKey(byte Kind, int Area, int Segment, long Unit);
+
+    private sealed class CacheValue
+    {
+        public required byte[] Payload { get; init; }
+        public HashExceptionEntry[][] Lists { get; init; } = [];
+    }
 
     /// <summary>Serializes file reads; decompression itself runs lock-free on worker threads.</summary>
 #if NET9_0_OR_GREATER
@@ -131,6 +149,52 @@ public sealed class RvzReader : IBlobReader
         return Open(stream, leaveOpen, WiaRvzFormat.Wia);
     }
 
+    /// <summary>
+    /// Parses and validates an RVZ file by path. The returned reader owns the file stream;
+    /// disposing the reader closes it.
+    /// </summary>
+    /// <param name="path">Path of the RVZ file.</param>
+    /// <exception cref="IOException">The file cannot be opened.</exception>
+    /// <exception cref="RvzFormatException">The file is structurally invalid.</exception>
+    /// <exception cref="RvzHashMismatchException">A container SHA-1 does not match.</exception>
+    /// <exception cref="RvzUnsupportedException">The file version is unsupported.</exception>
+    public static RvzReader Open(string path)
+    {
+        var stream = File.OpenRead(path);
+        try
+        {
+            return Open(stream, leaveOpen: false, WiaRvzFormat.Rvz);
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Parses and validates a WIA file by path. The returned reader owns the file stream;
+    /// disposing the reader closes it.
+    /// </summary>
+    /// <param name="path">Path of the WIA file.</param>
+    /// <exception cref="IOException">The file cannot be opened.</exception>
+    /// <exception cref="RvzFormatException">The file is structurally invalid.</exception>
+    /// <exception cref="RvzHashMismatchException">A container SHA-1 does not match.</exception>
+    /// <exception cref="RvzUnsupportedException">The file version is unsupported.</exception>
+    public static RvzReader OpenWia(string path)
+    {
+        var stream = File.OpenRead(path);
+        try
+        {
+            return Open(stream, leaveOpen: false, WiaRvzFormat.Wia);
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
+    }
+
     private static RvzReader Open(Stream stream, bool leaveOpen, WiaRvzFormat format)
     {
         if (!stream.CanSeek)
@@ -158,6 +222,7 @@ public sealed class RvzReader : IBlobReader
 
         var disc = WiaDisc.Parse(discBytes);
         disc.Validate(fileHead.DiscSize, discBytes, fileHead.DiscHash, format);
+        ValidateTableBounds(stream, fileHead, disc);
 
         var partitions = TableParser.ParsePartitions(stream, disc);
         var rawData = TableParser.ParseRawDataEntries(stream, disc);
@@ -165,6 +230,58 @@ public sealed class RvzReader : IBlobReader
         ValidateDataLayout(partitions, rawData);
 
         return new RvzReader(stream, leaveOpen, format, fileHead, disc, partitions, rawData, groups);
+    }
+
+    /// <summary>
+    /// Bounds the table counts and offsets before any table allocation. Every group and raw
+    /// entry covers at least one 32 KiB chunk of the declared image, so counts must be
+    /// consistent with <c>iso_file_size</c>; absolute caps keep hostile headers from
+    /// requesting multi-gigabyte allocations (the table hashes are checked only afterwards).
+    /// </summary>
+    private static void ValidateTableBounds(Stream stream, WiaFileHead fileHead, WiaDisc disc)
+    {
+        const long absoluteEntryCap = 4 * 1024 * 1024; // 4M entries = ~48 MiB group table
+        var fileLength = stream.Length;
+        var maxEntries = Math.Min((long)(fileHead.IsoFileSize / 0x8000) + 4096, absoluteEntryCap);
+
+        if (disc.NumGroups > maxEntries)
+        {
+            throw new RvzFormatException(
+                $"The group table declares {disc.NumGroups} entries for a "
+                + $"{fileHead.IsoFileSize}-byte image.");
+        }
+
+        if (disc.NumRawDataEntries > maxEntries)
+        {
+            throw new RvzFormatException(
+                $"The raw-data table declares {disc.NumRawDataEntries} entries for a "
+                + $"{fileHead.IsoFileSize}-byte image.");
+        }
+
+        if (disc.NumPartitions > 4096)
+        {
+            throw new RvzFormatException(
+                $"The partition table declares {disc.NumPartitions} entries.");
+        }
+
+        var partitionTableBytes = (long)disc.NumPartitions * disc.PartitionEntrySize;
+        if (partitionTableBytes > fileLength ||
+            (long)disc.PartitionEntriesOffset > fileLength - partitionTableBytes)
+        {
+            throw new RvzFormatException("The partition table lies outside the file.");
+        }
+
+        if (disc.RawDataEntriesSize > fileLength ||
+            (long)disc.RawDataEntriesOffset > fileLength - disc.RawDataEntriesSize)
+        {
+            throw new RvzFormatException("The raw-data table lies outside the file.");
+        }
+
+        if (disc.GroupEntriesSize > fileLength ||
+            (long)disc.GroupEntriesOffset > fileLength - disc.GroupEntriesSize)
+        {
+            throw new RvzFormatException("The group table lies outside the file.");
+        }
     }
 
     /// <summary>
@@ -265,6 +382,8 @@ public sealed class RvzReader : IBlobReader
     /// <summary>
     /// Reads <paramref name="buffer.Length"/> bytes of the decoded disc image at
     /// <paramref name="position"/>. Returns fewer bytes at the end of the image.
+    /// Thread-safe: concurrent calls share decoded units through the LRU cache and only
+    /// serialize the short file reads.
     /// </summary>
     public int ReadAt(long position, Span<byte> buffer)
     {
@@ -539,8 +658,8 @@ public sealed class RvzReader : IBlobReader
 
     private byte[] DecodePartitionRegion(DataArea area, long regionIndex)
     {
-        // One chunk payload can feed several sectors of a region; cache it locally so the
-        // parallel path never touches the reader's single-slot caches.
+        // One chunk payload can feed several sectors of a region; keep a per-region local map
+        // so the parallel path decodes each chunk once without touching the shared LRU.
         var chunks = new Dictionary<long, (byte[] Payload, HashExceptionEntry[][] Lists)>();
         return BuildPartitionRegion(area, regionIndex, chunkIndex =>
         {
@@ -589,25 +708,42 @@ public sealed class RvzReader : IBlobReader
             return new ChunkDecodeResult { Payload = new byte[expectedSize] };
         }
 
-        var stored = new byte[group.StoredSize];
-        lock (_fileLock)
+        // Untrusted size fields: never allocate or read beyond the actual file.
+        if (group.StoredSize > int.MaxValue ||
+            (long)group.FileOffset + group.StoredSize > _file.Length)
         {
-            if (!ReadExactlyAt(_file, (long)group.FileOffset, stored))
-            {
-                throw new RvzFormatException(
-                    $"Group at file offset 0x{group.FileOffset:X} is truncated.");
-            }
+            throw new RvzFormatException(
+                $"Group at file offset 0x{group.FileOffset:X} with size {group.StoredSize} "
+                + "lies outside the file.");
         }
 
-        using var memory = new MemoryStream(stored, writable: false);
-        return ChunkDecoder.DecodeChunk(memory, Disc, _codec, new ChunkDecodeRequest
+        var storedSize = (int)group.StoredSize;
+        var stored = ArrayPool<byte>.Shared.Rent(storedSize);
+        try
         {
-            Group = new GroupEntry(0, group.StoredSize, group.UsesDiscCompression,
-                group.RvzPackedSize),
-            IsPartition = isPartition,
-            ExpectedSize = expectedSize,
-            DataOffset = dataOffset
-        });
+            lock (_fileLock)
+            {
+                if (!ReadExactlyAt(_file, (long)group.FileOffset, stored.AsSpan(0, storedSize)))
+                {
+                    throw new RvzFormatException(
+                        $"Group at file offset 0x{group.FileOffset:X} is truncated.");
+                }
+            }
+
+            using var memory = new MemoryStream(stored, 0, storedSize, writable: false);
+            return ChunkDecoder.DecodeChunk(memory, Disc, _codec, new ChunkDecodeRequest
+            {
+                Group = new GroupEntry(0, group.StoredSize, group.UsesDiscCompression,
+                    group.RvzPackedSize),
+                IsPartition = isPartition,
+                ExpectedSize = expectedSize,
+                DataOffset = dataOffset
+            });
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(stored);
+        }
     }
 
     private int ClampToRawChunk(DataArea area, long position, int requested)
@@ -639,33 +775,13 @@ public sealed class RvzReader : IBlobReader
 
     private byte[] GetRawChunk(int rawIndex, long chunkIndex, long areaSize)
     {
-        var key = ((long)rawIndex << 32) | chunkIndex;
-        if (_cachedRawKey != key || _cachedRawPayload == null)
-        {
-            var entry = RawDataEntries[rawIndex];
-            var groupIndex = entry.GroupIndex + chunkIndex;
-            if (groupIndex >= GroupEntries.Length)
+        return _cache.GetOrAdd(
+            new CacheKey(KindRaw, rawIndex, 0, chunkIndex),
+            _ => new CacheValue
             {
-                throw new RvzFormatException(
-                    $"Raw-data entry {rawIndex} references group {groupIndex}, but only "
-                    + $"{GroupEntries.Length} groups exist.");
-            }
-
-            var group = GroupEntries[groupIndex];
-            var expectedSize = (int)Math.Min(Disc.ChunkSize, areaSize - chunkIndex * Disc.ChunkSize);
-            var result = ChunkDecoder.DecodeChunk(_file, Disc, _codec,
-                new ChunkDecodeRequest
-                {
-                    Group = group,
-                    IsPartition = false,
-                    ExpectedSize = expectedSize,
-                    DataOffset = chunkIndex * Disc.ChunkSize
-                });
-            _cachedRawPayload = result.Payload;
-            _cachedRawKey = key;
-        }
-
-        return _cachedRawPayload;
+                Payload = DecodeRawChunk(rawIndex, chunkIndex, areaSize)
+            },
+            value => value.Payload.Length).Payload;
     }
 
     private void ReadPartitionArea(DataArea area, long position, Span<byte> buffer)
@@ -681,14 +797,10 @@ public sealed class RvzReader : IBlobReader
 
     private byte[] GetPartitionRegion(DataArea area, long regionIndex)
     {
-        var key = ((long)area.Index << 40) | ((long)area.Segment << 32) | regionIndex;
-        if (_cachedRegionKey != key || _cachedRegion == null)
-        {
-            _cachedRegion = BuildPartitionRegion(area, regionIndex);
-            _cachedRegionKey = key;
-        }
-
-        return _cachedRegion;
+        return _cache.GetOrAdd(
+            new CacheKey(KindPartitionRegion, area.Index, area.Segment, regionIndex),
+            _ => new CacheValue { Payload = BuildPartitionRegion(area, regionIndex) },
+            value => value.Payload.Length).Payload;
     }
 
     private byte[] BuildPartitionRegion(DataArea area, long regionIndex)
@@ -724,37 +836,15 @@ public sealed class RvzReader : IBlobReader
 
     private (byte[] Payload, HashExceptionEntry[][] Lists) GetPartitionChunk(DataArea area, long chunkIndex)
     {
-        var key = ((long)area.Index << 40) | ((long)area.Segment << 32) | chunkIndex;
-        if (_cachedChunkKey != key || _cachedChunkPayload == null)
-        {
-            var pd = Partitions[area.Index].Data[area.Segment];
-            var sectorsPerChunk = Disc.ChunkSize / WiaDisc.SectorSize;
-            var remainingSectors = pd.NumSectors - chunkIndex * sectorsPerChunk;
-            var expectedSize = (int)(Math.Min(sectorsPerChunk, remainingSectors) * WiiHashCalculator.SectorDataSize);
-
-            var groupIndex = pd.GroupIndex + chunkIndex;
-            if (groupIndex >= GroupEntries.Length)
+        var value = _cache.GetOrAdd(
+            new CacheKey(KindPartitionChunk, area.Index, area.Segment, chunkIndex),
+            _ =>
             {
-                throw new RvzFormatException(
-                    $"Partition data entry references group {groupIndex}, but only "
-                    + $"{GroupEntries.Length} groups exist.");
-            }
-
-            var group = GroupEntries[groupIndex];
-            var result = ChunkDecoder.DecodeChunk(_file, Disc, _codec,
-                new ChunkDecodeRequest
-                {
-                    Group = group,
-                    IsPartition = true,
-                    ExpectedSize = expectedSize,
-                    DataOffset = chunkIndex * PartitionChunkPayloadSize
-                });
-            _cachedChunkPayload = result.Payload;
-            _cachedChunkLists = result.ExceptionLists;
-            _cachedChunkKey = key;
-        }
-
-        return (_cachedChunkPayload, _cachedChunkLists);
+                var (payload, lists) = ReadAndDecodePartitionChunk(area, chunkIndex);
+                return new CacheValue { Payload = payload, Lists = lists };
+            },
+            cached => cached.Payload.Length);
+        return (value.Payload, value.Lists);
     }
 
     private HashExceptionEntry[] GetSectorExceptions(long chunkIndex, long regionIndex,
@@ -802,21 +892,26 @@ public sealed class RvzReader : IBlobReader
 
     private DataArea? FindArea(long offset)
     {
+        // _areas is sorted by Start and validated to be non-overlapping; find the last area
+        // whose Start is <= offset (binary search) and require the offset to fall inside it.
+        var low = 0;
+        var high = _areas.Length - 1;
         DataArea? candidate = null;
-        foreach (var area in _areas)
+        while (low <= high)
         {
-            if (area.Start > offset)
+            var mid = low + (high - low) / 2;
+            if (_areas[mid].Start <= offset)
             {
-                break;
+                candidate = _areas[mid];
+                low = mid + 1;
             }
-
-            if (offset < area.End)
+            else
             {
-                candidate = area;
+                high = mid - 1;
             }
         }
 
-        return candidate;
+        return candidate is { } area && offset < area.End ? area : null;
     }
 
     private static bool ReadExactlyAt(Stream stream, long position, Span<byte> buffer)

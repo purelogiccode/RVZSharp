@@ -5,6 +5,7 @@ using RVZSharp.Blobs;
 using RVZSharp.Files;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
+using RVZSharp.Verification;
 using RVZSharp.Wii;
 using Serilog;
 using RVZSharp.Cli.Logging;
@@ -332,7 +333,7 @@ internal static class Program
         ["user"] = new OptionSpec("-u", true, null),
         ["input"] = new OptionSpec("-i", true, null),
         ["output"] = new OptionSpec("-o", true, null),
-        ["format"] = new OptionSpec("-f", true, ["iso", "gcz", "wia", "rvz"]),
+        ["format"] = new OptionSpec("-f", true, ["iso", "gcz", "wia", "rvz", "ciso", "wbfs", "tgc"]),
         ["scrub"] = new OptionSpec("-s", false, null),
         ["block_size"] = new OptionSpec("-b", true, null),
         ["compression"] = new OptionSpec("-c", true, ["none", "zstd", "bzip2", "lzma", "lzma2", "purge"]),
@@ -355,7 +356,7 @@ internal static class Program
                     + "  -u, --user <dir>           user folder path (accepted for compatibility)\n"
                     + "  -i, --input <FILE>         path to disc image FILE\n"
                     + "  -o, --output <FILE>        path to the destination FILE\n"
-                    + "  -f, --format <format>      container format: iso, gcz, wia, rvz\n"
+                    + "  -f, --format <format>      container format: iso, gcz, wia, rvz, ciso, wbfs, tgc\n"
                     + "  -s, --scrub                scrub junk data as part of conversion\n"
                     + "  -b, --block_size <int>     block size in bytes (required for GCZ/WIA/RVZ)\n"
                     + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
@@ -398,7 +399,7 @@ internal static class Program
             }
 
             var format = options.Get("format");
-            if (format is not ("iso" or "gcz" or "wia" or "rvz"))
+            if (format is not ("iso" or "gcz" or "wia" or "rvz" or "ciso" or "wbfs" or "tgc"))
             {
                 return Fail("No output format set");
             }
@@ -464,16 +465,23 @@ internal static class Program
                     var decodeResult = DecodeBlob(input, outputPath, expectedSha1: null, maxThreads);
                     return decodeResult != 0 || inputHashes is null
                         ? decodeResult
-                        : VerifyOutput(inputHashes, outputPath);
+                        : VerifyOutput(inputHashes, outputPath, input.Length);
                 }
 
                 var blockSize = 0;
-                if (format is "gcz" or "wia" or "rvz")
+                if (format is "gcz" or "wia" or "rvz" or "ciso" or "wbfs")
                 {
                     var blockSizeArg = options.IsSet("block_size")
                         ? options.Get("block_size")
                         : options.Get("chunk-size");
-                    if (blockSizeArg == null || !int.TryParse(blockSizeArg, out blockSize))
+
+                    // CISO and WBFS have a natural default (2 MiB blocks/clusters); the RVZSharp
+                    // writers are the ones that benefit from an explicit -b for the others.
+                    if (blockSizeArg == null && (format is "ciso" or "wbfs"))
+                    {
+                        blockSize = 0x200000;
+                    }
+                    else if (blockSizeArg == null || !int.TryParse(blockSizeArg, out blockSize))
                     {
                         return Fail("Block size must be set for GCZ/RVZ/WIA");
                     }
@@ -570,6 +578,24 @@ internal static class Program
                                 MaxThreads = maxThreads
                             }, progress, Cancellation.Token);
                         }
+                        else if (format == "ciso")
+                        {
+                            CisoWriter.Write(input, output, new CisoWriteOptions
+                            {
+                                BlockSize = blockSize
+                            }, progress, Cancellation.Token);
+                        }
+                        else if (format == "wbfs")
+                        {
+                            WbfsWriter.Write(input, output, new WbfsWriteOptions
+                            {
+                                BlockSize = blockSize
+                            }, progress, Cancellation.Token);
+                        }
+                        else if (format == "tgc")
+                        {
+                            TgcWriter.Write(input, output, progress, Cancellation.Token);
+                        }
                         else if (format == "wia")
                         {
                             WiaWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
@@ -588,7 +614,7 @@ internal static class Program
                 }
 
                 ConsoleProgress.Clear();
-                return inputHashes is null ? 0 : VerifyOutput(inputHashes, outputPath);
+                return inputHashes is null ? 0 : VerifyOutput(inputHashes, outputPath, input.Length);
             }
         }
         catch (Exception e)
@@ -673,7 +699,7 @@ internal static class Program
     /// Reopens the written file and checks that it decodes to the same CRC-32/MD5/SHA-1 as
     /// the input (the convert command's --verify extension).
     /// </summary>
-    private static int VerifyOutput(DiscHashes inputHashes, string outputPath)
+    private static int VerifyOutput(DiscHashes inputHashes, string outputPath, long inputLength)
     {
         IBlobReader blob;
         try
@@ -694,8 +720,15 @@ internal static class Program
                 return Fail("Verification failed: the output file is not a GC/Wii disc image.");
             }
 
+            if (blob.Length < inputLength)
+            {
+                return Fail("Verification failed: the output image is smaller than the input.");
+            }
+
+            // CISO/WBFS decode to a padded image (map capacity / fixed Wii size); only the
+            // first inputLength bytes correspond to the input image, so hash the prefix.
             var progress = new ConsoleProgress("Verifying ");
-            var outputHashes = DiscHasher.Compute(blob, progress, Cancellation.Token);
+            var outputHashes = DiscHasher.Compute(blob, inputLength, progress, Cancellation.Token);
             ConsoleProgress.Clear();
 
             if (!inputHashes.Matches(outputHashes))
@@ -714,8 +747,10 @@ internal static class Program
     {
         return format switch
         {
-            // GCZ: block size "must" be a power of 2
-            "gcz" => blockSize > 0 && (blockSize & (blockSize - 1)) == 0,
+            // GCZ/CISO: block size "must" be a power of 2
+            "gcz" or "ciso" => blockSize > 0 && (blockSize & (blockSize - 1)) == 0,
+            // WBFS: clusters are a power of 2 of at least 32 KiB (the u16 map fits a Wii disc)
+            "wbfs" => blockSize >= 0x8000 && (blockSize & (blockSize - 1)) == 0,
             // WIA: not less than the minimum (2 MiB), and a multiple of it
             "wia" => blockSize >= 0x200000 && blockSize % 0x200000 == 0,
             // RVZ: not smaller than 32 KiB; below 2 MiB must be a power of 2;
@@ -815,7 +850,7 @@ internal static class Program
 
             using (blob)
             {
-                var volume = DiscVolumeInfo.TryRead(blob);
+                var volume = DiscInfo.TryRead(blob);
 
                 var blockSize = blob.BlockSize;
                 var compressionMethod = GetCompressionMethod(blob);
@@ -842,11 +877,7 @@ internal static class Program
                     if (volume is not null)
                     {
                         json["internal_name"] = volume.InternalName;
-                        if (volume.Revision is not null)
-                        {
-                            json["revision"] = volume.Revision.Value;
-                        }
-
+                        json["revision"] = volume.Revision;
                         json["game_id"] = volume.GameId;
                         if (volume.TitleId is not null)
                         {
@@ -900,11 +931,7 @@ internal static class Program
                 if (volume is not null)
                 {
                     Console.WriteLine($"Internal Name: {volume.InternalName}");
-                    if (volume.Revision is not null)
-                    {
-                        Console.WriteLine($"Revision: {volume.Revision}");
-                    }
-
+                    Console.WriteLine($"Revision: {volume.Revision}");
                     Console.WriteLine($"Game ID: {volume.GameId}");
                     if (volume.TitleId is not null)
                     {
@@ -963,7 +990,9 @@ internal static class Program
         ["input"] = new OptionSpec("-i", true, null),
         // Dolphin only offers rchash when built with RetroAchievements support
         // (VerifyCommand.cpp:134-137); without it, -a rchash is an invalid choice.
-        ["algorithm"] = new OptionSpec("-a", true, ["crc32", "md5", "sha1"])
+        ["algorithm"] = new OptionSpec("-a", true, ["crc32", "md5", "sha1"]),
+        // RVZSharp extension: walk the Wii hash trees like Dolphin's verify tab.
+        ["partitions"] = new OptionSpec("--partitions", false, null)
     };
 
     private static int VerifyCommand(IReadOnlyList<string> args)
@@ -976,7 +1005,8 @@ internal static class Program
                     "usage: verify [options]...\n"
                     + "  -u, --user <dir>           user folder path (accepted for compatibility)\n"
                     + "  -i, --input <FILE>         path to input file\n"
-                    + "  -a, --algorithm <algo>     compute one digest: crc32, md5, sha1");
+                    + "  -a, --algorithm <algo>     compute one digest: crc32, md5, sha1\n"
+                    + "  --partitions               verify the Wii partition hash trees and TMD/H3 tables");
                 return args.Count == 0 ? 1 : 0;
             }
 
@@ -1018,6 +1048,14 @@ internal static class Program
                     return Fail("The input file is not a GC/Wii disc.");
                 }
 
+                if (options.HasFlag("partitions"))
+                {
+                    var verifyProgress = new ConsoleProgress("Verifying ");
+                    var report = DiscVerifier.Verify(blob, verifyProgress, Cancellation.Token);
+                    ConsoleProgress.Clear();
+                    return PrintVerificationReport(report);
+                }
+
                 var progress = new ConsoleProgress("Verifying ");
                 var hashes = DiscHasher.Compute(blob, progress, Cancellation.Token);
                 ConsoleProgress.Clear();
@@ -1050,6 +1088,39 @@ internal static class Program
             Log.Error(e, "Verify command failed");
             return Fail(e.Message);
         }
+    }
+
+    /// <summary>
+    /// Prints a <see cref="DiscVerifier"/> report and returns 0 when the disc is valid, 1
+    /// otherwise (the verify command's --partitions extension).
+    /// </summary>
+    private static int PrintVerificationReport(VerificationReport report)
+    {
+        Console.WriteLine($"Disc type: {report.DiscType}");
+        if (report.TotalBlocks > 0)
+        {
+            Console.WriteLine($"Blocks verified: {report.VerifiedBlocks} of {report.TotalBlocks}");
+        }
+
+        foreach (var partition in report.Partitions)
+        {
+            Console.WriteLine(
+                $"{partition.Name} partition at 0x{partition.Partition.Offset:X8}: "
+                + $"{(partition.IsValid ? "OK" : "PROBLEMS")} "
+                + $"({partition.VerifiedBlocks} blocks verified, {partition.FailedBlocks} failed)");
+            foreach (var issue in partition.Issues)
+            {
+                Console.WriteLine($"  [{issue.Severity}] {issue.Message}");
+            }
+        }
+
+        foreach (var issue in report.Issues)
+        {
+            Console.WriteLine($"[{issue.Severity}] {issue.Message}");
+        }
+
+        Console.WriteLine(report.IsValid ? "Verification OK." : "Verification failed.");
+        return report.IsValid ? 0 : 1;
     }
 
     private static string ToLowerHex(byte[] bytes)
@@ -1535,303 +1606,6 @@ internal static class Program
         }
 
         return "P" + type;
-    }
-
-    // ------------------------------------------------------------------
-    // Disc volume info (the "game data" section of `header`).
-    // Matches Dolphin's VolumeDisc field reads.
-    // ------------------------------------------------------------------
-
-    private sealed record DiscVolumeInfo(
-        string GameId,
-        byte? Revision,
-        string InternalName,
-        ulong? TitleId,
-        string Region,
-        string Country)
-    {
-        public static DiscVolumeInfo? TryRead(IBlobReader disc)
-        {
-            if (disc.Length < 0x80)
-            {
-                return null;
-            }
-
-            Span<byte> header = stackalloc byte[0x80];
-            if (disc.ReadAt(0, header) != header.Length)
-            {
-                return null;
-            }
-
-            var isWii = Be32(header, 0x18) == WiiVolume.WII_MAGIC;
-            var isGc = Be32(header, 0x1C) == WiiVolume.GC_MAGIC;
-            if (!isWii && !isGc)
-            {
-                return null;
-            }
-
-            var gameId = FilterGameId(header[..6]);
-            var revision = header[7];
-
-            var region = ReadRegion(disc, isWii);
-            var internalName = DecodeInternalName(disc, region);
-            var titleId = isWii ? ReadTitleId(disc) : null;
-            var countryCode = gameId[3];
-            var country = CountryCodeToCountry(countryCode, isWii, region, revision);
-            // Dolphin falls back to the region's typical country when the country byte
-            // contradicts the region (VolumeDisc.cpp:93-99).
-            if (CountryCodeToRegion(countryCode, isWii, region, revision) != region)
-            {
-                country = TypicalCountryForRegion(region);
-            }
-
-            return new DiscVolumeInfo(gameId, revision, internalName, titleId, region, country);
-        }
-
-        /// <summary>
-        /// 6 bytes at offset 0; any non-alphanumeric byte becomes '-', including NUL and
-        /// the country byte (Dolphin: Volume.cpp:46-56).
-        /// </summary>
-        private static string FilterGameId(ReadOnlySpan<byte> id)
-        {
-            var chars = new char[id.Length];
-            for (var i = 0; i < id.Length; i++)
-            {
-                var c = (char)id[i];
-                chars[i] = c is >= '0' and <= '9' or >= 'A' and <= 'Z' or >= 'a' and <= 'z'
-                    ? c
-                    : '-';
-            }
-
-            return new string(chars);
-        }
-
-        /// <summary>0x60 bytes at 0x20, up to the first NUL; CP1252, or Shift-JIS for NTSC-J
-        /// (Dolphin: Volume.cpp:39-44).</summary>
-        private static string DecodeInternalName(IBlobReader disc, string region)
-        {
-            var raw = new byte[0x60];
-            if (disc.ReadAt(0x20, raw) != raw.Length)
-            {
-                return string.Empty;
-            }
-
-            var end = Array.IndexOf(raw, (byte)0);
-            if (end < 0)
-            {
-                end = raw.Length;
-            }
-
-            return NameEncoding(region).GetString(raw, 0, end);
-        }
-
-        private static Encoding NameEncoding(string region)
-        {
-            return region == "NTSC-J" ? ShiftJis : Cp1252;
-        }
-
-        private static readonly Encoding Cp1252 = GetCodePageEncoding(1252);
-        private static readonly Encoding ShiftJis = GetCodePageEncoding(932);
-
-        private static Encoding GetCodePageEncoding(int codePage)
-        {
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            return Encoding.GetEncoding(codePage);
-        }
-
-        /// <summary>
-        /// Title ID from the game partition's ticket (u64 BE at ticket + 0x1DC).
-        /// The game partition is the one with type 0 in the partition table.
-        /// </summary>
-        private static ulong? ReadTitleId(IBlobReader disc)
-        {
-            try
-            {
-                Span<byte> value = stackalloc byte[8];
-                foreach (var partition in WiiVolume.GetPartitions(disc))
-                {
-                    if (partition.Type != 0)
-                    {
-                        continue;
-                    }
-
-                    if (disc.ReadAt((long)partition.Offset + 0x1DC, value) == value.Length)
-                    {
-                        return Be64(value, 0);
-                    }
-                }
-            }
-            catch (RvzException ex)
-            {
-                Log.Warning(ex, "Failed to read title ID from partition");
-            }
-
-            return null;
-        }
-
-        private static string ReadRegion(IBlobReader disc, bool isWii)
-        {
-            // GC: region word at 0x458; Wii: region word at 0x4E000.
-            var offset = isWii ? 0x4E000 : 0x458;
-            if (disc.Length < offset + 4)
-            {
-                return "Unknown";
-            }
-
-            Span<byte> value = stackalloc byte[4];
-            if (disc.ReadAt(offset, value) != value.Length)
-            {
-                return "Unknown";
-            }
-
-            var code = Be32(value, 0);
-            return code switch
-            {
-                0 => "NTSC-J",
-                1 => "NTSC-U",
-                2 => "PAL",
-                4 => "NTSC-K",
-                _ => "Unknown"
-            };
-        }
-
-        /// <summary>Dolphin's CountryCodeToRegion (Enums.cpp:213-268).</summary>
-        private static string CountryCodeToRegion(char code, bool isWii, string region, byte revision)
-        {
-            var isGc = !isWii;
-            switch (code)
-            {
-                case '\x02':
-                    return region; // Wii Menu (same title ID for all regions)
-                case 'J':
-                    return "NTSC-J";
-                case 'W':
-                    // Only the Nordic version of Ratatouille (Wii) is PAL; otherwise Korean
-                    // GC games in English or Taiwanese Wii games.
-                    return region == "PAL" ? "PAL" : "NTSC-J";
-                case 'E':
-                    if (!isGc)
-                    {
-                        return "NTSC-U"; // the most common country code for NTSC-U
-                    }
-
-                    return revision >= 0x30 ? "NTSC-J" : "NTSC-U"; // Korean GC games in English
-                case 'B':
-                case 'N':
-                    return "NTSC-U";
-                case 'X':
-                case 'Y':
-                case 'Z':
-                    // Additional language versions, store-exclusive versions, special versions.
-                    return region == "NTSC-U" ? "NTSC-U" : "PAL";
-                case 'D':
-                case 'F':
-                case 'H':
-                case 'I':
-                case 'L':
-                case 'M':
-                case 'P':
-                case 'R':
-                case 'S':
-                case 'U':
-                case 'V':
-                    return "PAL";
-                case 'K':
-                case 'Q':
-                case 'T':
-                    // All Korean, but the NTSC-K region does not exist on GC.
-                    return isGc ? "NTSC-J" : "NTSC-K";
-                default:
-                    return "Unknown";
-            }
-        }
-
-        /// <summary>Dolphin's TypicalCountryForRegion (Enums.cpp:173-187).</summary>
-        private static string TypicalCountryForRegion(string region)
-        {
-            return region switch
-            {
-                "NTSC-J" => "Japan",
-                "NTSC-U" => "USA",
-                "PAL" => "Europe",
-                "NTSC-K" => "Korea",
-                _ => "Unknown"
-            };
-        }
-
-        /// <summary>Dolphin's CountryCodeToCountry (Enums.cpp).</summary>
-        private static string CountryCodeToCountry(char code, bool isWii, string region, byte revision)
-        {
-            var isGc = !isWii;
-            switch (code)
-            {
-                case 'A':
-                    return "World";
-                case 'X':
-                case 'Y':
-                case 'Z':
-                    return region == "NTSC-U" ? "USA" : "Europe";
-                case 'W':
-                    if (isGc)
-                    {
-                        return "Korea";
-                    }
-
-                    return region == "PAL" ? "Europe" : "Taiwan";
-                case 'D':
-                    return "Germany";
-                case 'L':
-                case 'M':
-                case 'V':
-                case 'P':
-                    return "Europe";
-                case 'U':
-                    return "Australia";
-                case 'F':
-                    return "France";
-                case 'I':
-                    return "Italy";
-                case 'H':
-                    return "Netherlands";
-                case 'R':
-                    return "Russia";
-                case 'S':
-                    return "Spain";
-                case 'E':
-                    if (!isGc)
-                    {
-                        return "USA";
-                    }
-
-                    if (revision >= 0x30)
-                    {
-                        return "Korea";
-                    }
-
-                    return region == "NTSC-J" ? "Korea" : "USA";
-                case 'B':
-                case 'N':
-                    return "USA";
-                case 'J':
-                    return "Japan";
-                case 'K':
-                case 'Q':
-                case 'T':
-                    return "Korea";
-                default:
-                    return "Unknown";
-            }
-        }
-    }
-
-    private static uint Be32(ReadOnlySpan<byte> data, int offset)
-    {
-        return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
-    }
-
-    private static ulong Be64(ReadOnlySpan<byte> data, int offset)
-    {
-        return ((ulong)Be32(data, offset) << 32) | Be32(data, offset + 4);
     }
 
     // ------------------------------------------------------------------

@@ -1,4 +1,5 @@
 using RVZSharp.Interfaces;
+using RVZSharp.IO;
 using RVZSharp.Models;
 
 namespace RVZSharp.Blobs;
@@ -250,110 +251,6 @@ public sealed class WbfsBlob : IBlobReader
         else if (!_leaveOpen)
         {
             _file.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Concatenates the parts of a split WBFS image (game.wbfs + game.wbf1 + ...) into one
-    /// seekable stream. Owns the continuation parts; the first part follows the caller's
-    /// leaveOpen choice.
-    /// </summary>
-    private sealed class MultiPartStream : Stream
-    {
-        private readonly Stream[] _parts;
-        private readonly long[] _starts;
-        private readonly bool _leaveOpen;
-
-        public MultiPartStream(List<Stream> parts, bool leaveOpen)
-        {
-            _parts = parts.ToArray();
-            _leaveOpen = leaveOpen;
-            _starts = new long[parts.Count];
-            var running = 0L;
-            for (var i = 0; i < parts.Count; i++)
-            {
-                _starts[i] = running;
-                running += parts[i].Length;
-            }
-
-            Length = running;
-        }
-
-        public override bool CanRead => true;
-        public override bool CanSeek => true;
-        public override bool CanWrite => false;
-        public override long Length { get; }
-
-        public override long Position { get; set; }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var total = 0;
-            while (total < count && Position < Length)
-            {
-                var partIndex = Array.BinarySearch(_starts, Position);
-                if (partIndex < 0)
-                {
-                    partIndex = ~partIndex - 1;
-                }
-
-                var part = _parts[partIndex];
-                var local = Position - _starts[partIndex];
-                if (part.Position != local)
-                {
-                    part.Position = local;
-                }
-
-                var take = (int)Math.Min(count - total, part.Length - local);
-                var read = part.Read(buffer, offset + total, take);
-                if (read <= 0)
-                {
-                    break;
-                }
-
-                total += read;
-                Position += read;
-            }
-
-            return total;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            Position = origin switch
-            {
-                SeekOrigin.Begin => offset,
-                SeekOrigin.Current => Position + offset,
-                _ => Length + offset
-            };
-            return Position;
-        }
-
-        public override void Flush()
-        {
-        }
-
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                for (var i = _leaveOpen ? 1 : 0; i < _parts.Length; i++)
-                {
-                    _parts[i].Dispose();
-                }
-            }
-
-            base.Dispose(disposing);
         }
     }
 }

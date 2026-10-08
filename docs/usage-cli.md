@@ -35,15 +35,16 @@ Every command opens its input through `Blob.Open`, which recognises formats by m
 | `AE 0F 38 A2` | TGC |
 | anything else | plain ISO |
 
-(`WBFS` inputs may be split across `game.wbfs` + `game.wbf1…` continuation files, like
-Dolphin; the parts are found from the file path.)
+(`WBFS` inputs may be split across `game.wbfs` + `game.wbf1…` continuation files, and plain
+ISOs across `game.part0.iso` + `game.part1.iso…`, like Dolphin; the parts are found from the
+file path.)
 
 ## `convert`
 
 Converts a disc image to another container format (DolphinTool semantics):
 
 ```
-convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
+convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz|ciso|wbfs|tgc] [-s]
         [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
         [--threads <int>] [--verify]
 ```
@@ -53,8 +54,8 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
 | `-i`, `--input` | path to the input disc image (any supported format). Required. |
 | `-o`, `--output` | path to the destination file. Required. |
 | `-u`, `--user` | user folder path; accepted for DolphinTool compatibility (RVZSharp needs no user directory). |
-| `-f`, `--format` | container format: `iso`, `gcz`, `wia`, `rvz`. Required. |
-| `-b`, `--block_size` | block size in **bytes**. Required for GCZ/WIA/RVZ. |
+| `-f`, `--format` | container format: `iso`, `gcz`, `wia`, `rvz`, `ciso`, `wbfs`, `tgc` (the last three are RVZSharp extensions). Required. |
+| `-b`, `--block_size` | block size in **bytes**. Required for GCZ/WIA/RVZ; optional for CISO/WBFS (defaults to 2 MiB). |
 | `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`, and `purge` (WIA only, RVZSharp extension). Required for WIA/RVZ; ignored for GCZ (always zlib deflate). |
 | `-l`, `--compression_level` | compression level. Required unless `-c none`. |
 | `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso`/`-f gcz` a warning notes that scrubbing gains little. |
@@ -69,6 +70,9 @@ Block-size validation follows Dolphin's `IsDiscImageBlockSizeValid`:
 | `gcz` | power of two |
 | `wia` | ≥ 2 MiB and a multiple of 2 MiB |
 | `rvz` | ≥ 32 KiB; below 2 MiB a power of two; above 2 MiB a multiple of 2 MiB |
+| `ciso` | power of two (2 MiB default; the decoded image is `block × 0x7FF8`) |
+| `wbfs` | power of two ≥ 32 KiB (2 MiB default; the u16 map caps the disc at 65535 clusters) |
+| `tgc` | ignored (GameCube only) |
 
 Compression levels: `bzip2`/`lzma`/`lzma2` accept 1–9; `zstd` accepts −131072..22
 (negative levels select Zstd's fast modes, 0 means the default — the same range as
@@ -91,6 +95,14 @@ Notes:
   raw when compression saves fewer than 10 bytes, with a per-block Adler-32 of the stored
   bytes. `-c`/`-l` are ignored (GCZ is always zlib). Converting a Wii disc without `-s`
   prints Dolphin's "may not offer space advantages over ISO" warning.
+- **`-f ciso`** (RVZSharp extension) writes a CISO/WBI: a presence map plus only the blocks
+  that contain data; all-zero blocks are stored absent, so `-s` shrinks the file. The
+  decoded image is always `block × 0x7FF8` bytes (the map capacity), like Dolphin.
+- **`-f wbfs`** (RVZSharp extension, Wii only) writes a standalone WBFS: all-zero clusters
+  share one zero-filled volume cluster. The decoded image is the fixed Wii double-layer
+  size. GameCube inputs fail.
+- **`-f tgc`** (RVZSharp extension, GameCube only) writes a TGC: the ISO bytes after the
+  56-byte header, with the DOL/FST offsets relocated. Wii inputs fail.
 - **`--threads`** (RVZSharp extension) controls the writer's compression pool (RVZ/WIA
   group compression and packing, GCZ block deflate) and the decoder's chunk pool for
   `-f iso`/`decode`. The default `0` uses the processor count; results are appended in disc
@@ -152,7 +164,7 @@ Country: USA
 Hashes the decoded disc content (DolphinTool semantics):
 
 ```
-verify -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
+verify -i <FILE> [-u <dir>] [-a crc32|md5|sha1] [--partitions]
 ```
 
 - With no `-a`, prints the full report:
@@ -173,6 +185,17 @@ SHA1: 2fe83205d928407f049be5d2181cfb6e5ca44465
   partition regions rebuilt), so the digests match the plain ISO.
 - Unlike Dolphin's structural verifier, the digests verify decodability + content; exit
   code 1 on any decode failure (Dolphin exits 0 after recording problems).
+- **`--partitions`** (RVZSharp extension) runs `DiscVerifier` instead: it walks every Wii
+  partition's h0/h1/h2/h3 hash tree plus the TMD/H3 tables (Dolphin's verify tab) and
+  prints a per-partition summary with every issue. GameCube discs report `Verification OK`;
+  exit code 1 when any `High` problem (corrupt data) is found:
+
+```
+Disc type: Wii
+Blocks verified: 143360 of 143360
+game partition at 0x00100000: OK (143360 blocks verified, 0 failed)
+Verification OK.
+```
 
 ## `extract`
 

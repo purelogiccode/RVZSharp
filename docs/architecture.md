@@ -11,7 +11,8 @@
 │                                                                     │
 │  Blobs ── RvzReader ── Chunks/Compression/Packing/Wii  (read path)  │
 │  Blobs ── RvzWriter/WiaWriter ── WiaRvzWriter core     (write path) │
-│  Blobs ── GczWriter ── zlib deflate blocks             (write path) │
+│  Blobs ── GczWriter / CisoWriter / WbfsWriter / TgcWriter (writers) │
+│  Blobs ── DiscHasher / DiscVerifier ── Wii hash trees   (verify)    │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -26,6 +27,7 @@
 | `Packing/` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator`, `LaggedFibonacciPrng` | RVZ junk packing: segment streams and PRNG seed recovery |
 | `Wii/` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor`, `PartitionReader` | Wii partition encryption, hash tree, exceptions, decrypted partition views |
 | `Files/` | `DiscFileSystem`, `DiscFileInfo` | GameCube/Wii FST parsing, case-insensitive lookup, file data streaming |
+| `Verification/` | `DiscVerifier` | Dolphin VolumeVerifier equivalent: partition headers, TMD/H3 tables and the h0/h1/h2/h3 hash tree walk |
 
 ## Read path
 
@@ -113,6 +115,18 @@ Key points:
   in power-of-two blocks, each block is deflated (stored raw when deflate does not fit or
   saves fewer than 10 bytes), the per-block Adler-32 covers the stored bytes, and the
   header/block tables are written last through a backward seek.
+- `CisoWriter`, `WbfsWriter` and `TgcWriter` are independent too: CISO writes only non-zero
+  blocks and fills the presence map with a backward seek; WBFS maps each disc cluster to a
+  volume cluster and points every all-zero cluster at one shared zero cluster; TGC copies
+  the GameCube ISO verbatim after a header carrying the relocated DOL/FST offsets.
+
+## Verification
+
+`DiscVerifier.Verify` (Dolphin: `VolumeVerifier`) parses each partition header, validates
+the TMD structure and the H3 table against the TMD content hash, then walks every data
+sector: it decrypts the hash area (zero IV) and data (IV = ciphertext at 0x3D0), recomputes
+h0 from the 31 data blocks, compares the embedded h1/h2 slots and the h3 entry, and reports
+every mismatch with a severity. GameCube discs have no hash trees and are reported valid.
 
 ## Design decisions
 

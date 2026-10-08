@@ -27,7 +27,9 @@ public sealed class Bzip2Decoder : ICompressionDecoder
             throw new RvzFormatException("BZip2 compression must not have compressor data.");
         }
 
-        // BZip2InputStream disposes its underlying stream; wrap to keep ownership with the caller.
-        return new BZip2InputStream(new NonDisposingStream(input));
+        // BZip2InputStream disposes its underlying stream; wrap to keep ownership with the
+        // caller, and guard construction (it parses the first block eagerly).
+        return CodecErrorStream.Create(
+            () => new BZip2InputStream(new NonDisposingStream(input)), "bzip2");
     }
 }

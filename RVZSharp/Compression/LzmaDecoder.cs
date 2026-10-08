@@ -74,9 +74,12 @@ public sealed class LzmaDecoder : ICompressionDecoder
             }
         }
 
-        return Lzma.LzmaStream.Create(
-            properties.ToArray(), input, inputSize, outputSize,
-            presetDictionary: null, isLzma2: _useLzma2, leaveOpen: true);
+        var props = properties.ToArray();
+        return CodecErrorStream.Create(
+            () => Lzma.LzmaStream.Create(
+                props, input, inputSize, outputSize,
+                presetDictionary: null, isLzma2: _useLzma2, leaveOpen: true),
+            _useLzma2 ? "LZMA2" : "LZMA");
     }
 
     private static uint BinaryPrimitivesUInt32(ReadOnlySpan<byte> properties)

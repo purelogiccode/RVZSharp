@@ -1,6 +1,8 @@
+using RVZSharp.Interfaces;
+
 namespace RVZSharp.Models;
 
-/// <summary>Options for <see cref="GczWriter.Write"/>.</summary>
+/// <summary>Options for <see cref="GczWriter.Write(IBlobReader, Stream, GczWriteOptions, IProgress{double}, CancellationToken)"/>.</summary>
 public sealed record GczWriteOptions
 {
     /// <summary>The default options: 16 KiB blocks, processor-count threads.</summary>
@@ -18,4 +20,11 @@ public sealed record GczWriteOptions
     /// disc order (Dolphin: MultithreadedCompressor).
     /// </summary>
     public int MaxThreads { get; init; }
+
+    /// <summary>
+    /// Whether to zero the data of non-game Wii partitions (update/channel) before encoding,
+    /// like Dolphin's DiscScrubber and the CLI's <c>--scrub</c>. Ignored for GameCube discs
+    /// and Wii images without a game partition (ScrubbedBlob.Create returns null).
+    /// </summary>
+    public bool Scrub { get; init; }
 }

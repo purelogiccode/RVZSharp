@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using Serilog;
 
 namespace RVZSharp.Cli.Logging;
@@ -20,12 +20,6 @@ internal sealed class BugReportApiClient : IDisposable
     private readonly string _applicationName;
     private readonly string _version;
     private int _failureReporting;
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
-    };
 
     /// <summary>
     /// Creates a client with a 15-second HTTP timeout, the API key header, and the
@@ -52,16 +46,17 @@ internal sealed class BugReportApiClient : IDisposable
         try
         {
             var details = BuildBugReportDetails(errorMessage, exception);
-            var payload = new
+            // JsonObject (not reflection-based serialization) keeps the CLI trim/AOT-safe.
+            var payload = new JsonObject
             {
-                message = Truncate(details, MaxMessageLength),
-                applicationName = _applicationName,
-                version = _version,
-                environment = RuntimeInformation.OSDescription,
-                stackTrace = Truncate(exception?.ToString(), MaxStackTraceLength)
+                ["message"] = Truncate(details, MaxMessageLength),
+                ["applicationName"] = _applicationName,
+                ["version"] = _version,
+                ["environment"] = RuntimeInformation.OSDescription,
+                ["stackTrace"] = Truncate(exception?.ToString(), MaxStackTraceLength)
             };
 
-            var json = JsonSerializer.Serialize(payload, JsonOptions);
+            var json = payload.ToJsonString();
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await _httpClient.PostAsync(ApiUrl, content).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)

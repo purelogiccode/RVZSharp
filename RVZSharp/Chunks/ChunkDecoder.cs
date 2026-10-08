@@ -99,8 +99,10 @@ public static class ChunkDecoder
         }
         else if (group.RvzPackedSize != 0)
         {
-            var packed = ReadExactly(input, (int)group.RvzPackedSize, "RVZ packed data");
-            payload = DecodePacking(packed, expectedSize, request.DataOffset);
+            // Read the packed section with a growing buffer: allocating rvz_packed_size
+            // upfront would let a hostile header request a huge array, while the packed
+            // section is always bounded by the group stream itself.
+            payload = DecodePacking(input, group.RvzPackedSize, expectedSize, request.DataOffset);
         }
         else
         {
@@ -185,10 +187,32 @@ public static class ChunkDecoder
         return lists;
     }
 
-    private static byte[] DecodePacking(byte[] packed, int expectedSize, long dataOffset)
+    /// <summary>
+    /// Reads exactly <paramref name="packedSize"/> bytes from <paramref name="input"/> into a
+    /// growing buffer (never trusting the declared size for an upfront allocation), then
+    /// decodes the RVZ packing into exactly <paramref name="expectedSize"/> bytes.
+    /// </summary>
+    private static byte[] DecodePacking(Stream input, uint packedSize, int expectedSize, long dataOffset)
     {
-        using var input = new MemoryStream(packed, writable: false);
-        using var decoder = new RvzPackingDecoder(input, dataOffset);
+        using var packed = new MemoryStream();
+        Span<byte> buffer = stackalloc byte[8192];
+        var remaining = (long)packedSize;
+        while (remaining > 0)
+        {
+            var take = (int)Math.Min(buffer.Length, remaining);
+            var read = input.Read(buffer[..take]);
+            if (read <= 0)
+            {
+                throw new RvzFormatException(
+                    $"Truncated RVZ packed data: got {packedSize - remaining} of {packedSize} bytes.");
+            }
+
+            packed.Write(buffer[..read]);
+            remaining -= read;
+        }
+
+        packed.Position = 0;
+        using var decoder = new RvzPackingDecoder(packed, dataOffset, leaveOpen: true);
         return ReadExactly(decoder, expectedSize, "RVZ packing output");
     }
 

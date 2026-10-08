@@ -14,9 +14,12 @@ compatible 0x00080000). RVZ adds Zstd, chunk packing and the `rvz_packed_size` f
 drops Purge. RVZSharp reads both and writes both (`RvzWriter` / `WiaWriter`).
 
 **Can RVZSharp write the legacy formats too?**
-GCZ is supported as an output (`GczWriter`, CLI `convert -f gcz`): 16 KiB zlib blocks by
-default, power-of-two block sizes, Dolphin-compatible. CISO/WBFS/TGC/NFS are read-only —
-converting to ISO and back through RVZ/WIA/GCZ is the recommended path.
+Yes, except NFS: `GczWriter` (16 KiB zlib blocks by default), `CisoWriter` (all-zero blocks
+stored absent), `WbfsWriter` (Wii only, all-zero clusters share one zero cluster) and
+`TgcWriter` (GameCube only, ISO stored verbatim) — also available as
+`convert -f gcz|ciso|wbfs|tgc`. NFS is read-only (writing it needs the Wii U ticket/HIF
+key handling); converting to ISO and back through RVZ/WIA/GCZ is the recommended path for
+NFS.
 
 **Can Dolphin open files created by RVZSharp?**
 The writer mirrors Dolphin's `ConvertToWIAOrRVZ` byte-for-byte at the container level
@@ -35,7 +38,9 @@ are decoded to the same canonical ISO view — see [Legacy formats](format/legac
 rvzsharp decode game.rvz game.iso --sha1 $(sha1sum game.iso | cut -d' ' -f1)
 ```
 or, for an original source image: compute the SHA-1 of the source ISO once, then use
-`--sha1` on every decode. The suite itself proves byte-exactness via round trips.
+`--sha1` on every decode. The suite itself proves byte-exactness via round trips. For Wii
+discs, `rvzsharp verify -i game.rvz --partitions` walks the partition hash trees and
+TMD/H3 tables like Dolphin's verify tab and reports per-partition problems.
 
 **Why is WBFS conversion slow?**
 WBFS has a fixed ~9.4 GiB logical size; converting reads the whole logical image even when

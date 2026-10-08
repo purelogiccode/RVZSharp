@@ -33,6 +33,10 @@
         <NeutralLanguage>en</NeutralLanguage>
         <!-- No XML docs for the CLI: the publish output ships the single binary only. -->
         <GenerateDocumentationFile>false</GenerateDocumentationFile>
+        <!-- Keep the CLI clean under Native AOT / trimming (validated with
+         `dotnet publish -p:PublishAot=true`); regressions fail the build. -->
+        <EnableAotAnalyzer>true</EnableAotAnalyzer>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     </PropertyGroup>
 
     <!-- Single-file distribution: drop the (*.xml) documentation sidecars from the publish

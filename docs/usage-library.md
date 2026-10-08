@@ -15,7 +15,7 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 | Namespace | Contents |
 |---|---|
 | `RVZSharp.Blobs` | `IBlobReader`, `Blob` (factory), `BlobType`, per-format readers |
-| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `DiscHasher`, `RvzWriteOptions`, `GczWriteOptions` |
+| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `DiscHasher`, `DiscInfo`, `BlobStream`, `RvzWriteOptions`, `GczWriteOptions` |
 | `RVZSharp.Models` | container structs: `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`, `CompressionType` |
 | `RVZSharp.Chunks` | `ChunkDecoder`, `ExceptionListParser` |
 | `RVZSharp.Compression` | codec factories: `CompressionCodecFactory`, `CompressionEncoderFactory` (the vendored 7-Zip LZMA port is internal) |
@@ -88,9 +88,11 @@ Notes:
 
 - `Blob.Open(Stream, ...)` requires a **seekable** stream (`ArgumentException` otherwise).
 - The `filePath` argument is consulted for NFS (locating `code/htk.bin` and the
-  `hif_00000X.nfs` continuation files) and for **split WBFS** images (`game.wbfs` +
+  `hif_00000X.nfs` continuation files), for **split WBFS** images (`game.wbfs` +
   `game.wbf1…` parts are opened like Dolphin; the declared size is checked against the sum
-  of the parts). NFS files must be named `hif_000000.nfs` and live in a directory named
+  of the parts) and for **split plain ISOs** (`game.part0.iso` + `game.part1.iso…`,
+  concatenated like Dolphin's `SplitPlainFileReader`; a zero-size continuation falls back to
+  the first part). NFS files must be named `hif_000000.nfs` and live in a directory named
   `content`; use the key overload to bypass the on-disk lookup.
 - `leaveOpen` controls whether disposing the reader also disposes the stream.
 - **What `Blob.Open` accepts and rejects:** a file that starts with a *recognized*
@@ -124,12 +126,51 @@ DiscType type = Blob.GetDiscType(blob); // DiscType.Wii / DiscType.GameCube / Di
 format (plain ISO or any container). `RvzWriter.Write` rejects inputs that fail this check
 with `RvzFormatException` before writing a byte.
 
+### Disc metadata
+
+`DiscInfo.TryRead(blob)` reads the volume metadata from the decoded disc header (Dolphin:
+`VolumeDisc`); `DiscInfo.Read` throws `RvzFormatException` for non-discs:
+
+```csharp
+var info = DiscInfo.TryRead(blob);
+if (info is not null)
+{
+    Console.WriteLine($"{info.GameId} {info.MakerId} rev {info.Revision}");
+    Console.WriteLine($"{info.InternalName} ({info.Region}, {info.Country})");
+    if (info.TitleId is ulong titleId)
+        Console.WriteLine($"title 0x{titleId:X16}");
+}
+```
+
+| Property | Meaning |
+|---|---|
+| `DiscType` | `GameCube` / `Wii` (from the header magic) |
+| `GameId` / `MakerId` | 6- and 2-character IDs; non-alphanumeric bytes become `-` |
+| `Revision` | revision byte (header offset 7) |
+| `InternalName` | name at 0x20 (CP1252, or Shift-JIS for NTSC-J) |
+| `Region` | `NTSC-J`, `NTSC-U`, `PAL`, `NTSC-K` or `Unknown` |
+| `Country` | `Japan`, `USA`, `Europe`, … (with Dolphin's region fallback) |
+| `CountryCode` | raw country byte (header offset 3) |
+| `TitleId` | Wii title ID from the game partition's ticket, or null |
+
+### As a `Stream`
+
+`BlobStream` exposes any blob as a read-only, seekable `Stream` of any size:
+
+```csharp
+using var blob = Blob.Open(path);
+using var stream = new BlobStream(blob);   // leaveOpen defaults to false
+var reader = new BinaryReader(stream);
+```
+
 ### Scrubbing
 
 `ScrubbedBlob.Create(blob)` wraps any disc image and zeroes the data of every non-game Wii
 partition (update/channel) — the safe subset of Dolphin's `DiscScrubber` that needs no
 filesystem (FST) parser. It returns `null` for discs that cannot be scrubbed (non-Wii, or
-no game partition). The CLI's `convert -s/--scrub` uses it.
+no game partition). The CLI's `convert -s/--scrub` uses it, and the writers expose the same
+behavior through `RvzWriteOptions.Scrub` / `GczWriteOptions.Scrub` (ignored for GameCube
+discs and Wii images without a game partition).
 
 ### Lifetime
 
@@ -320,9 +361,10 @@ The writer mirrors Dolphin's converter:
 | Member | Default | Notes |
 |---|---|---|
 | `Compression` | `Zstd` | `None`, `Bzip2`, `Lzma`, `Lzma2`, `Zstd`. `Purge` throws `RvzUnsupportedException` (use `WiaWriter` for PURGE). |
-| `CompressionLevel` | `3` | `Bzip2`/`Lzma`/`Lzma2`: 1–9. `Zstd`: −131072..22 (negative levels = fast modes, 0 = default). |
+| `CompressionLevel` | `5` | `Bzip2`/`Lzma`/`Lzma2`: 1–9. `Zstd`: −131072..22 (negative levels = fast modes, 0 = default). Dolphin's converter default. |
 | `ChunkSize` | `0x200000` | Power of two between 0x8000 (32 KiB) and 0x200000 (2 MiB), or a multiple of 0x200000 above that (Dolphin's rule). |
 | `Packing` | `true` | Set `false` to store junk literally (larger file, no packing overhead). |
+| `Scrub` | `false` | Zero the data of non-game Wii partitions before encoding (Dolphin's DiscScrubber). No-op for GameCube discs. |
 | `MaxThreads` | `0` | Compression/packing worker count; `0` uses the processor count. Output bytes do not depend on this value. |
 
 ```csharp
@@ -387,6 +429,36 @@ For RVZ/WIA the container's own integrity (all SHA-1s, structure rules) is alrea
 validated by `RvzReader.Open` / `RvzReader.OpenWia`, so `DiscHasher` only needs to hash the
 decoded bytes.
 
+### Verifying Wii partitions
+
+`DiscVerifier.Verify` mirrors Dolphin's verify tab: it enumerates the disc's Wii partitions,
+checks each partition header, TMD structure and H3 table, and walks every data sector's
+h0/h1/h2/h3 hash tree. Problems are reported per partition with a severity; only
+`VerificationSeverity.High` problems (corrupt data) make a report invalid.
+
+```csharp
+using RVZSharp.Verification;
+
+VerificationReport report = DiscVerifier.Verify(blob, progress);
+foreach (var partition in report.Partitions)
+{
+    Console.WriteLine($"{partition.Name}: {partition.VerifiedBlocks} blocks, "
+        + $"{partition.FailedBlocks} failed, tmd={partition.TmdValid}, h3={partition.H3TableValid}");
+}
+
+if (!report.IsValid)
+{
+    foreach (var issue in report.Issues.Concat(report.Partitions.SelectMany(p => p.Issues)))
+        Console.Error.WriteLine($"[{issue.Severity}] {issue.Message}");
+}
+```
+
+- GameCube discs have no hash trees and are always valid; a non-disc image is a single
+  `High` issue.
+- The walk is CPU-bound (AES + SHA-1 per sector) but never materializes the image; it is
+  sequential and observes cancellation between sectors.
+- `RVZSharp.Cli` exposes it as `verify --partitions`.
+
 ---
 
 ## Writing WIA
@@ -410,7 +482,7 @@ WiaWriter.Write(input, output, new RvzWriteOptions
   DolphinTool, whose `-c` choices do not include it).
 - `RvzWriteOptions.Packing` is RVZ-only and ignored for WIA.
 - The chunk size must be a multiple of 2 MiB (Dolphin's `IsDiscImageBlockSizeValid`).
-- `options` defaults to `RvzWriteOptions.WiaDefault` (LZMA2, level 3, 2 MiB chunks).
+- `options` defaults to `RvzWriteOptions.WiaDefault` (LZMA2, level 5, 2 MiB chunks).
 - Input validation, progress and cancellation behave exactly like `RvzWriter.Write`.
 
 ---
@@ -440,6 +512,42 @@ GczWriter.Write(input, output, new GczWriteOptions
   GCZ-specific warning ("may not offer space advantages") is a CLI concern.
 - Unlike WIA/RVZ, GCZ stores the image as-is (no partition decryption or packing): Wii
   discs compress poorly unless scrubbed first.
+
+---
+
+## Writing CISO / WBFS / TGC
+
+`CisoWriter`, `WbfsWriter` and `TgcWriter` complete the container matrix; all three accept
+any input format (`IBlobReader`) or path and take an optional `IProgress<double>` and
+cancellation token.
+
+```csharp
+using var input = Blob.Open(@"C:\games\game.iso");
+
+// CISO/WBI: a presence map + only the blocks that contain data.
+CisoWriter.Write(input, ciso, new CisoWriteOptions
+{
+    BlockSize = 0x200000, // power of two; the decoded image is BlockSize × 0x7FF8 bytes
+    Scrub = true,         // zero non-game Wii partitions; all-zero blocks are not stored
+});
+
+// WBFS: Wii only. All-zero clusters share one zero-filled volume cluster.
+WbfsWriter.Write(input, wbfs, new WbfsWriteOptions
+{
+    BlockSize = 0x200000, // power of two ≥ 32 KiB; the u16 map caps the disc at 65535 clusters
+});
+
+// TGC: GameCube only. The ISO is stored verbatim after the 56-byte header.
+TgcWriter.Write(input, tgc);
+```
+
+- CISO and WBFS output streams **must be seekable** (the map/table is written after the
+  data); TGC output can be any stream.
+- A CISO's decoded length is always `BlockSize × 0x7FF8` (the map capacity), so a small
+  image decodes with a zero tail — exactly Dolphin's semantics.
+- WBFS decodes to the fixed Wii double-layer size; clusters past the input are zero.
+- `CisoWriteOptions.Scrub` / `WbfsWriteOptions.Scrub` behave like the RVZ/GCZ `Scrub`
+  option; the CLI applies `--scrub` before calling the writers.
 
 ---
 
@@ -596,10 +704,11 @@ foreach (var partition in WiiVolume.GetPartitions(blob))
 
 ## Thread safety
 
-- `IBlobReader` instances are **not thread-safe**: `ReadAt` mutates internal caches
-  (`RvzReader` caches the last raw chunk and partition region). Use one reader per thread,
-  or synchronize access. The parallel `CopyTo` overload uses its own workers and does not
-  make concurrent `ReadAt` calls safe.
+- `RvzReader.ReadAt` is **thread-safe**: concurrent reads share decoded units through a
+  bounded LRU cache (16 MiB, `RvzReader.DefaultCacheSize`) and only serialize the short
+  file reads. Do not dispose the reader while another thread is reading.
+- The other `IBlobReader` implementations read through a single stream and are **not**
+  thread-safe; use one reader per thread or synchronize access.
 - The writers and the parallel decode path manage their own worker pools; progress reports
   are raised on the calling thread between groups/batches, and cancellation is observed at
   the same points.

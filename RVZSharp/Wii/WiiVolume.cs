@@ -104,11 +104,27 @@ public static class WiiVolume
         // covers the whole structure like TicketReader::IsValid (Formats.cpp:368-377):
         // signature type + a complete ticket buffer (the key sits at 0x1BF).
         Span<byte> ticket = stackalloc byte[0x2A4];
+        // A real Wii disc has a handful of partition entries; a hostile table count would
+        // otherwise drive a multi-billion-iteration read loop. Unused groups often carry
+        // garbage (their table offset points outside the file), so only a huge count with a
+        // readable table is rejected — a bad offset is skipped like Dolphin.
+        const uint maxEntriesPerGroup = 4096;
         for (var group = 0; group < 4; group++)
         {
             disc.ReadAt((long)(PartitionTableAddress + (ulong)group * 8), tableInfo);
             var count = ReadBe32(tableInfo, 0);
             var tableOffset = (ulong)ReadBe32(tableInfo, 4) << 2;
+            if (count > maxEntriesPerGroup)
+            {
+                if (tableOffset >= (ulong)disc.Length)
+                {
+                    continue;
+                }
+
+                throw new RvzFormatException(
+                    $"The partition table group {group} declares {count} entries.");
+            }
+
 
             for (var i = 0; i < count; i++)
             {

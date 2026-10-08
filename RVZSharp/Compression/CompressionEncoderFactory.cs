@@ -13,10 +13,10 @@ public static class CompressionEncoderFactory
     /// Creates an encoder; for PURGE also returns the props (always empty).
     /// </summary>
     /// <param name="type">The compression method to use.</param>
-    /// <param name="level">Compression level; only used by bzip2, zstd and LZMA (default 3).</param>
+    /// <param name="level">Compression level; only used by bzip2, zstd and LZMA (default 5, Dolphin's converter default).</param>
     /// <returns>The encoder and its compressor properties (compr_data) for the disc header.</returns>
     public static (ICompressionEncoder Encoder, byte[] Properties) Create(
-        CompressionType type, int level = 3)
+        CompressionType type, int level = 5)
     {
         switch (type)
         {

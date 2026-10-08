@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using RVZSharp.Blobs;
 using RVZSharp.Interfaces;
 using RVZSharp.Compression;
 using RVZSharp.Models;
@@ -143,6 +144,14 @@ internal static class WiaRvzWriter
         // would hide the RvzReader type and lose the container-key preference for callers
         // that pass progress or a cancellation token.
         var containerRz = input as RvzReader;
+
+        // Optional scrubbing: zero the non-game Wii partitions (Dolphin: DiscScrubber). The
+        // wrapper is a no-op for GameCube discs and Wii images without a game partition.
+        if (options.Scrub)
+        {
+            input = ScrubbedBlob.Create(input) ?? input;
+        }
+
         if (progress is not null || cancellationToken.CanBeCanceled)
         {
             input = new ProgressReader(input, progress, cancellationToken);

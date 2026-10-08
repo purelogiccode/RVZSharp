@@ -23,10 +23,17 @@ public class ScrubbedBlobTests
         Array.Fill(iso, (byte)0x33);
         WriteBe32(iso, 0x18, WiiVolume.WII_MAGIC);
 
-        // Partition table group 0 at 0x40000: { count, table offset }, entries { offset, type }.
-        const int tableAddress = 0x40008;
+        // Partition table groups at 0x40000 (4 × { count, table offset }); group 0 has the
+        // entries, the unused groups are empty.
+        const int tableAddress = 0x40020;
         WriteBe32(iso, 0x40000, (uint)partitions.Length);
         WriteBe32(iso, 0x40004, tableAddress >> 2);
+        for (var group = 1; group < 4; group++)
+        {
+            WriteBe32(iso, 0x40000 + group * 8, 0);
+            WriteBe32(iso, 0x40004 + group * 8, 0);
+        }
+
         for (var i = 0; i < partitions.Length; i++)
         {
             WriteBe32(iso, tableAddress + i * 8, (uint)(partitions[i].Offset >> 2));

@@ -7,7 +7,7 @@ namespace RVZSharp.Tests;
 /// <summary>
 /// End-to-end <see cref="WiaWriter"/> tests: convert a synthetic disc image (GameCube or Wii,
 /// with random data, zero regions and hash exceptions) to WIA and decode it back byte-exactly
-/// through <see cref="RvzReader.OpenWia"/>.
+/// through <see cref="RvzReader.OpenWia(Stream, bool)"/>.
 /// </summary>
 public class WiaWriterTests
 {

@@ -136,4 +136,26 @@ public class CompressionCodecTests
         Assert.Throws<RvzFormatException>(() =>
             decoder.CreateDecompressor(new MemoryStream(), [1], -1, -1));
     }
+
+    [Fact]
+    public void Bzip2_CorruptStream_ThrowsFormatException()
+    {
+        // SharpZipLib's BZip2InputStream can throw IndexOutOfRangeException while parsing a
+        // corrupt stream (sometimes in its constructor); the decoder must map that to
+        // RvzFormatException so consumers never see codec-internal exceptions.
+        var garbage = new byte[256];
+        new Random(7).NextBytes(garbage);
+        "BZh9"u8.CopyTo(garbage);
+
+        var decoder = CompressionCodecFactory.Create(CompressionType.Bzip2);
+        Assert.Throws<RvzFormatException>(() =>
+        {
+            using var stream = decoder.CreateDecompressor(
+                new MemoryStream(garbage), [], garbage.Length, -1);
+            var buffer = new byte[128];
+            while (stream.Read(buffer, 0, buffer.Length) > 0)
+            {
+            }
+        });
+    }
 }

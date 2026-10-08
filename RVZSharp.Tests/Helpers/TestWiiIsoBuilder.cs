@@ -32,9 +32,19 @@ public static class TestWiiIsoBuilder
         iso[0x60] = 0; // hashes present
         iso[0x61] = 0; // encrypted
 
-        // Partition table at 0x40000: { offset << 2, type }.
-        WriteBe32(iso, 0x40000, PartitionOffset >> 2);
-        WriteBe32(iso, 0x40004, 0);
+        // Partition table groups at 0x40000 (4 × { count, table offset }); group 0 has the
+        // partition entry, the unused groups are empty (the rest of the header is random).
+        const int tableAddress = 0x40020;
+        WriteBe32(iso, 0x40000, 1);
+        WriteBe32(iso, 0x40004, tableAddress >> 2);
+        for (var group = 1; group < 4; group++)
+        {
+            WriteBe32(iso, 0x40000 + group * 8, 0);
+            WriteBe32(iso, 0x40004 + group * 8, 0);
+        }
+
+        WriteBe32(iso, tableAddress, PartitionOffset >> 2);
+        WriteBe32(iso, tableAddress + 4, 0);
 
         // Partition header at PartitionOffset: ticket + data offset/size + FST fields.
         WriteBe32(iso, PartitionOffset, 0x10001u); // RSA2048 signature type
@@ -86,6 +96,62 @@ public static class TestWiiIsoBuilder
         var data = new byte[sectorCount * 0x7C00];
         new Random(seed).NextBytes(data);
         return data;
+    }
+
+    /// <summary>The game partition offset of <see cref="BuildWithUpdatePartition"/>.</summary>
+    public const int GamePartitionOffset = 0x100000;
+
+    /// <summary>The update partition offset of <see cref="BuildWithUpdatePartition"/>.</summary>
+    public const int UpdatePartitionOffset = 0x220000;
+
+    /// <summary>Size of each partition's data area in <see cref="BuildWithUpdatePartition"/>.</summary>
+    public const int PartitionDataSize = 0x40000;
+
+    /// <summary>
+    /// Builds a small Wii ISO with a game partition (type 0) and an update partition (type 1),
+    /// both with valid tickets and random data. Used by scrub tests: the update partition's
+    /// data is the only region a scrubber zeroes.
+    /// </summary>
+    public static byte[] BuildWithUpdatePartition()
+    {
+        const int dataOffset = DataOffset;
+        var imageSize = UpdatePartitionOffset + dataOffset + PartitionDataSize + 0x10000;
+        var iso = new byte[imageSize];
+        new Random(54321).NextBytes(iso);
+
+        WriteBe32(iso, 0x18, 0x5D1C9EA3);
+        iso[0x60] = 0; // hashes present
+        iso[0x61] = 0; // encrypted
+
+        const int tableAddress = 0x40020;
+        WriteBe32(iso, 0x40000, 2);
+        WriteBe32(iso, 0x40004, tableAddress >> 2);
+        for (var group = 1; group < 4; group++)
+        {
+            WriteBe32(iso, 0x40000 + group * 8, 0);
+            WriteBe32(iso, 0x40004 + group * 8, 0);
+        }
+
+        WriteBe32(iso, tableAddress, (uint)(GamePartitionOffset >> 2));
+        WriteBe32(iso, tableAddress + 4, 0);
+        WriteBe32(iso, tableAddress + 8, (uint)(UpdatePartitionOffset >> 2));
+        WriteBe32(iso, tableAddress + 12, 1);
+
+        WritePartitionHeader(iso, GamePartitionOffset);
+        WritePartitionHeader(iso, UpdatePartitionOffset);
+        return iso;
+    }
+
+    private static void WritePartitionHeader(byte[] iso, int partitionOffset)
+    {
+        WriteBe32(iso, partitionOffset, 0x10001u); // RSA2048 signature type
+        for (var i = 0; i < 16; i++)
+        {
+            iso[partitionOffset + 0x1BF + i] = (byte)(i + 1); // title key
+        }
+
+        WriteBe32(iso, partitionOffset + 0x2B8, DataOffset >> 2);
+        WriteBe32(iso, partitionOffset + 0x2BC, (uint)(PartitionDataSize >> 2));
     }
 
     private static void WriteBe32(byte[] data, int offset, uint value)

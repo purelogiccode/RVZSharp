@@ -11,6 +11,13 @@ namespace RVZSharp;
 /// </summary>
 public static class TableParser
 {
+    /// <summary>
+    /// Upper bound for a table's in-memory size. Real tables are a few MiB (a 9.4 GiB Wii
+    /// disc with 32 KiB chunks needs ~286k group entries = ~3.4 MiB); the cap keeps hostile
+    /// counts from requesting multi-gigabyte allocations before any hash is verified.
+    /// </summary>
+    private const long MaxTableBytes = 64L * 1024 * 1024;
+
     /// <summary>Reads and validates the Wii partition table (uncompressed, at part_off).</summary>
     public static WiaPartEntry[] ParsePartitions(Stream file, WiaDisc disc)
     {
@@ -28,7 +35,16 @@ public static class TableParser
             return [];
         }
 
-        var tableSize = checked((long)count * disc.PartitionEntrySize);
+        // Guard before multiplying so a hostile count/entry size cannot overflow the size.
+        if (disc.PartitionEntrySize != 0 && count > MaxTableBytes / disc.PartitionEntrySize)
+        {
+            throw new RvzFormatException(
+                $"The partition table of {count} × {disc.PartitionEntrySize} bytes exceeds the "
+                + $"{MaxTableBytes}-byte limit.");
+        }
+
+        var tableSize = (long)count * disc.PartitionEntrySize;
+
         using var section = new SectionStream(file, (long)disc.PartitionEntriesOffset, tableSize);
         var raw = new byte[tableSize];
         section.ReadExactly(raw);
@@ -129,6 +145,12 @@ public static class TableParser
     private static byte[] ReadCompressedTable(Stream file, WiaDisc disc, long offset,
         uint compressedSize, long expectedSize, string name)
     {
+        if (expectedSize > MaxTableBytes)
+        {
+            throw new RvzFormatException(
+                $"The {name} table is {expectedSize} bytes, larger than the {MaxTableBytes}-byte limit.");
+        }
+
         using var section = new SectionStream(file, offset, compressedSize);
 
         // PURGE is not a streaming codec; the table is a single PURGE stream with a SHA-1 trailer.

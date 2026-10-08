@@ -2,7 +2,8 @@ namespace RVZSharp.Models;
 
 /// <summary>
 /// The CRC-32, MD5 and SHA-1 hashes of a decoded disc image, as computed by
-/// <see cref="DiscHasher.Compute"/> (Dolphin: VolumeVerifier / DolphinTool verify).
+/// <see cref="DiscHasher.Compute(Interfaces.IBlobReader, IProgress{double}, CancellationToken)"/>
+/// (Dolphin: VolumeVerifier / DolphinTool verify).
 /// </summary>
 public sealed record DiscHashes
 {

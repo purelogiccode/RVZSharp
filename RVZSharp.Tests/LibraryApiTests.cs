@@ -254,6 +254,28 @@ public class LibraryApiTests
     }
 
     [Fact]
+    public void DiscHasher_PrefixOverload_HashesOnlyTheRequestedBytes()
+    {
+        var iso = MakeGcIso(0x10000);
+        var prefix = iso.AsSpan(0, 0x8000).ToArray();
+        using IBlobReader blob = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+
+        var hashes = DiscHasher.Compute(blob, prefix.Length);
+        Assert.Equal(SHA1.HashData(prefix), hashes.Sha1);
+        Assert.Equal(MD5.HashData(prefix), hashes.Md5);
+        Assert.NotEqual(DiscHasher.Compute(blob).Sha1, hashes.Sha1);
+    }
+
+    [Fact]
+    public void DiscHasher_LengthOutsideTheImage_IsRejected()
+    {
+        var iso = MakeGcIso(0x1000);
+        using IBlobReader blob = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+        Assert.Throws<ArgumentOutOfRangeException>(() => DiscHasher.Compute(blob, -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DiscHasher.Compute(blob, iso.Length + 1));
+    }
+
+    [Fact]
     public void DiscHasher_ObservesCancellation()
     {
         var iso = MakeGcIso();
@@ -366,6 +388,162 @@ public class LibraryApiTests
         finally
         {
             cts.Dispose();
+        }
+    }
+
+    [Fact]
+    public void Blob_Open_SplitPlainIso_ConcatenatesParts()
+    {
+        var iso = MakeGcIso(0x10000);
+        var directory = Directory.CreateTempSubdirectory("rvzsharp-split-");
+        try
+        {
+            var part0 = Path.Combine(directory.FullName, "game.part0.iso");
+            File.WriteAllBytes(part0, iso[..0x8000]);
+            File.WriteAllBytes(Path.Combine(directory.FullName, "game.part1.iso"), iso[0x8000..]);
+
+            using var blob = Blob.Open(part0);
+            Assert.Equal(BlobType.Plain, blob.Type);
+            Assert.Equal(iso.Length, blob.Length);
+            Assert.Equal(iso, blob.ReadFully());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Blob_Open_SplitPlainIso_StreamOverload_WithPath()
+    {
+        var iso = MakeGcIso(0x10000);
+        var directory = Directory.CreateTempSubdirectory("rvzsharp-split-");
+        try
+        {
+            var part0 = Path.Combine(directory.FullName, "game.part0.iso");
+            File.WriteAllBytes(part0, iso[..0x4000]);
+            File.WriteAllBytes(Path.Combine(directory.FullName, "game.part1.iso"), iso[0x4000..]);
+
+            using var stream = File.OpenRead(part0);
+            using var blob = Blob.Open(stream, filePath: part0, leaveOpen: true);
+            Assert.Equal(iso.Length, blob.Length);
+            Assert.Equal(iso, blob.ReadFully());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Blob_Open_SplitPlainIso_ZeroSizeContinuation_FallsBackToFirstPart()
+    {
+        var iso = MakeGcIso(0x10000);
+        var directory = Directory.CreateTempSubdirectory("rvzsharp-split-");
+        try
+        {
+            var part0 = Path.Combine(directory.FullName, "game.part0.iso");
+            File.WriteAllBytes(part0, iso);
+            File.WriteAllBytes(Path.Combine(directory.FullName, "game.part1.iso"), []);
+
+            using var blob = Blob.Open(part0);
+            Assert.Equal(iso.Length, blob.Length);
+            Assert.Equal(iso, blob.ReadFully());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BlobStream_ReadsSeeksAndCopies()
+    {
+        var iso = MakeGcIso(0x10000);
+        using var blob = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+        using var stream = new BlobStream(blob, leaveOpen: true);
+
+        Assert.Equal(iso.Length, stream.Length);
+        Assert.True(stream.CanRead);
+        Assert.True(stream.CanSeek);
+        Assert.False(stream.CanWrite);
+
+        // Seek + read at an offset.
+        stream.Seek(0x1234, SeekOrigin.Begin);
+        var buffer = new byte[0x100];
+        Assert.Equal(buffer.Length, stream.Read(buffer));
+        Assert.Equal(iso.AsSpan(0x1234, buffer.Length).ToArray(), buffer);
+        Assert.Equal(0x1234 + buffer.Length, stream.Position);
+
+        // Seek from the end + copy the tail.
+        stream.Seek(-0x100, SeekOrigin.End);
+        using var tail = new MemoryStream();
+        stream.CopyTo(tail);
+        Assert.Equal(iso[^0x100..], tail.ToArray());
+
+        // Reading at the end returns 0.
+        Assert.Equal(0, stream.Read(new byte[16]));
+    }
+
+    [Fact]
+    public void BlobStream_Dispose_ClosesBlobUnlessLeaveOpen()
+    {
+        var iso = MakeGcIso(0x1000);
+
+        var closed = PlainBlob.Open(new MemoryStream(iso));
+        new BlobStream(closed).Dispose();
+        Assert.Throws<ObjectDisposedException>(() => closed.ReadAt(0, new byte[4]));
+
+        var kept = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+        new BlobStream(kept, leaveOpen: true).Dispose();
+        Assert.Equal(4, kept.ReadAt(0, new byte[4]));
+    }
+
+    [Fact]
+    public void BlobStream_Write_IsNotSupported()
+    {
+        var iso = MakeGcIso(0x1000);
+        using var blob = PlainBlob.Open(new MemoryStream(iso), leaveOpen: true);
+        using var stream = new BlobStream(blob, leaveOpen: true);
+
+        Assert.Throws<NotSupportedException>(() => stream.Write(new byte[4], 0, 4));
+        Assert.Throws<NotSupportedException>(() => stream.SetLength(1));
+    }
+
+    [Fact]
+    public void WriterPathOverloads_RoundTrip_ThroughReaders()
+    {
+        var iso = MakeGcIso(0x10000);
+        var directory = Directory.CreateTempSubdirectory("rvzsharp-paths-");
+        try
+        {
+            var isoPath = Path.Combine(directory.FullName, "game.iso");
+            var rvzPath = Path.Combine(directory.FullName, "game.rvz");
+            var wiaPath = Path.Combine(directory.FullName, "game.wia");
+            var gczPath = Path.Combine(directory.FullName, "game.gcz");
+            File.WriteAllBytes(isoPath, iso);
+
+            RvzWriter.Write(isoPath, rvzPath, new RvzWriteOptions { Compression = CompressionType.None });
+            using (var rvz = RvzReader.Open(rvzPath))
+            {
+                Assert.Equal(iso, rvz.ReadFully());
+            }
+
+            WiaWriter.Write(isoPath, wiaPath, new RvzWriteOptions { Compression = CompressionType.None });
+            using (var wia = RvzReader.OpenWia(wiaPath))
+            {
+                Assert.Equal(iso, wia.ReadFully());
+            }
+
+            GczWriter.Write(isoPath, gczPath, new GczWriteOptions());
+            using (IBlobReader gcz = GczBlob.Open(File.OpenRead(gczPath), leaveOpen: false))
+            {
+                Assert.Equal(iso, gcz.ReadFully());
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
         }
     }
 }

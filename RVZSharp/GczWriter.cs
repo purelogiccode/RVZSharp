@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using ICSharpCode.SharpZipLib.Zip.Compression;
+using RVZSharp.Blobs;
 using RVZSharp.Interfaces;
 using RVZSharp.IO;
 using RVZSharp.Models;
@@ -80,6 +81,13 @@ public static class GczWriter
         {
             throw new RvzFormatException(
                 "The input is not a GameCube or Wii disc image (no disc header magic at 0x18/0x1C).");
+        }
+
+        // Optional scrubbing: zero the non-game Wii partitions (Dolphin: DiscScrubber). The
+        // wrapper is a no-op for GameCube discs and Wii images without a game partition.
+        if (options.Scrub)
+        {
+            input = ScrubbedBlob.Create(input) ?? input;
         }
 
         // Round upwards like Dolphin: the last block is zero-padded to the block size.
@@ -196,7 +204,7 @@ public static class GczWriter
     }
 
     /// <summary>
-    /// Asynchronous form of <see cref="Write"/>. Compression is synchronous and CPU-bound, so
+    /// Asynchronous form of <see cref="Write(IBlobReader, Stream, GczWriteOptions, IProgress{double}, CancellationToken)"/>. Compression is synchronous and CPU-bound, so
     /// the work runs on the thread pool; the returned task completes when the file has been
     /// written.
     /// </summary>
@@ -221,6 +229,53 @@ public static class GczWriter
     {
         return Task.Run(
             () => Write(input, output, options, progress, cancellationToken), cancellationToken);
+    }
+
+    /// <summary>
+    /// Writes the disc image at <paramref name="inputPath"/> (any supported format,
+    /// auto-detected by <see cref="Blob.Open(string)"/>) as a GCZ file at
+    /// <paramref name="outputPath"/>. The output file is created or truncated; a partial
+    /// file can remain when the operation fails.
+    /// </summary>
+    /// <param name="inputPath">Path of a GameCube or Wii disc image in any supported format.</param>
+    /// <param name="outputPath">Path of the GCZ file to create.</param>
+    /// <param name="options">Writer options; <see cref="GczWriteOptions.Default"/> when null.</param>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the blocks processed.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between block batches.</param>
+    /// <exception cref="IOException">The input cannot be opened or the output cannot be written.</exception>
+    /// <exception cref="ArgumentException">Invalid block size or an input too small for the format.</exception>
+    /// <exception cref="RvzFormatException">
+    /// The input is not a GameCube or Wii disc image (no disc header magic at 0x18/0x1C).
+    /// </exception>
+    /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
+    public static void Write(string inputPath, string outputPath, GczWriteOptions? options = null,
+        IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        using var input = Blob.Open(inputPath);
+        using var output = File.Create(outputPath);
+        Write(input, output, options, progress, cancellationToken);
+    }
+
+    /// <summary>
+    /// Asynchronous form of
+    /// <see cref="Write(string, string, GczWriteOptions?, IProgress{double}?, CancellationToken)"/>.
+    /// </summary>
+    /// <param name="inputPath">Path of a GameCube or Wii disc image in any supported format.</param>
+    /// <param name="outputPath">Path of the GCZ file to create.</param>
+    /// <param name="options">Writer options; <see cref="GczWriteOptions.Default"/> when null.</param>
+    /// <param name="progress">
+    /// Optional progress reporter; receives a fraction in [0, 1] of the blocks processed.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation is observed between block batches.</param>
+    /// <returns>A task that completes when the file has been written.</returns>
+    public static Task WriteAsync(string inputPath, string outputPath, GczWriteOptions? options = null,
+        IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        return Task.Run(
+            () => Write(inputPath, outputPath, options, progress, cancellationToken),
+            cancellationToken);
     }
 
     /// <summary>The outcome of compressing one block: the stored bytes and whether they are deflated.</summary>

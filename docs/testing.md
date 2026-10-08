@@ -2,8 +2,8 @@
 
 The test suite is split into **two projects**, so the default run is always the fast one:
 
-- **`RVZSharp.Tests`** — **395 synthetic tests** (unit + end-to-end round trips), ~30
-  seconds per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
+- **`RVZSharp.Tests`** — **464 synthetic tests** (unit + end-to-end round trips), ~1
+  minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
 - **`RVZSharp.Slow.Tests`** — **97 real-file tests** (full decode, structural checks,
   writer round trips against real game images), ~12 minutes when the games are mounted.
   It is deliberately kept **out of the solution**, so a plain `dotnet test` / solution run
@@ -45,6 +45,12 @@ byte-for-byte against their official No-Intro SHA-1s:
    overlapping-window hash exceptions, overlap/ordering validation, empty-table hashes,
    decompressed-size probes, split WBFS, scrubbing, truncated packing headers, and the CLI
    option surface.
+5. **Mutation/fuzz robustness** (`ParserRobustnessTests`): every container is truncated,
+   bit-flipped, extended and size-patched (80 mutations per format, seeded) and fed through
+   `Blob.Open` + reads; only `RvzException` subclasses may escape. Set
+   `RVZSHARP_FUZZ_ITERATIONS=2000` for a deeper local pass (CI keeps the default).
+6. **Concurrency** (`ConcurrentReadTests`): parallel random `ReadAt` calls on GC/Wii
+   containers (mixed with `ReadFully`) must match the reference ISO byte-for-byte.
 
 ## Test files
 
@@ -67,11 +73,22 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, junk-only image, >2 MiB chunks, overlapping/odd partitions, scrubbing, raw-table group counts, `MaxThreads` determinism |
 | `WiaWriterTests` | WIA round trips across all five codecs (GC + Wii with hash exceptions), 4/6 MiB chunks, magic/version, PURGE, option validation, `MaxThreads` determinism |
 | `GczWriterTests` | GCZ round trips (GC + Wii), last-block zero padding, header fields, raw/compressed block storage, `MaxThreads` determinism, option validation |
+| `CisoWriterTests` | CISO round trips (GC + Wii), presence map, absent all-zero blocks, scrub shrinking, header fields, option validation |
+| `WbfsWriterTests` | WBFS round trips (Wii), shared zero cluster, header fields, scrub, cluster-size/map limits, option validation |
+| `TgcWriterTests` | TGC round trips (GC), DOL/FST header fields and relocation, random access, GameCube-only validation |
+| `DiscVerifierTests` | Wii hash-tree verification: valid unencrypted + encrypted partitions, corrupt data/hash areas, H3/TMD mismatches, truncation, GameCube/non-disc reports |
 | `ParallelDecodeTests` | parallel `CopyTo` equals sequential for GC/Wii/WIA (multi-batch, multi-region chunks, exceptions), progress, cancellation, non-RVZ fallback |
+| `ConcurrentReadTests` | thread-safe `ReadAt`: parallel random reads on GC/Wii match the reference ISO; concurrent `ReadFully` + `ReadAt` |
+| `LruCacheTests` | decoded-unit LRU: hits, eviction, recency refresh, oversized values, concurrent misses |
+| `ParserRobustnessTests` | mutation/fuzz: corrupt containers and magic-prefixed garbage fail only with `RvzException`; hostile table counts are capped |
+| `DiscInfoTests` | disc metadata: game/maker ID, revision, name, region, country, title ID, fallbacks |
+| `ScrubOptionTests` | `RvzWriteOptions.Scrub` zeroes non-game partitions while keeping the game partition byte-exact |
 | `AsyncApiTests` | `ReadFullyAsync`/`CopyToAsync`/`WriteAsync` equal their synchronous forms, cancellation |
 | `DiscFileSystemTests` | FST parsing (GC + decrypted Wii partitions), case-insensitive lookup, file reads, `PartitionReader` decryption, invalid FST rejection |
 | `RVZSharp.Slow.Tests/RealRvzFileTests.cs` | 97 real-file tests (see below) |
 | `RVZSharp.Slow.Tests/RealFileDecodeTests.cs` | env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`) |
+| `RVZSharp.Slow.Tests/RealLegacyFileTests.cs` | real GCZ/CISO/WBFS/TGC/WIA/NFS decode to their expected SHA-1 (`RVZ_REAL_GCZ` … `RVZ_REAL_NFS`/`RVZ_REAL_NFS_KEY`) |
+| `RVZSharp.Slow.Tests/DifferentialToolTests.cs` | optional cross-checks against `dolphin-tool`/`wit`/`wwt` (`RVZ_DOLPHIN_TOOL`/`RVZ_WIT`/`RVZ_WWT` + `RVZ_DIFF_ISO`) |
 
 ## Real-file suite
 
@@ -95,6 +112,13 @@ machines without the games. Running the real Wii round-trip against genuine imag
 and pinned a production writer bug (default 2 MiB chunks used the ISO ticket key instead of
 the RVZ partition-table key on re-signed No-Intro tickets); `RvzWriter` now prefers the
 container key and falls back to the ticket key for plain ISO inputs.
+
+Legacy-format real files are covered by `RealLegacyFileTests` through environment variables
+(`RVZ_REAL_GCZ`, `RVZ_REAL_CISO`, `RVZ_REAL_WBFS`, `RVZ_REAL_TGC`, `RVZ_REAL_WIA`, and
+`RVZ_REAL_NFS` + `RVZ_REAL_NFS_KEY`; each with an optional `<VAR>_SHA1` expectation), and
+`DifferentialToolTests` optionally cross-checks our writers/reader against `dolphin-tool`
+(RVZ, both directions) and `wit`/`wwt` (our CISO/TGC output) when those tools are installed
+and `RVZ_DIFF_ISO` points at a real ISO. All of them no-op when unset.
 
 ## Synthetic builders (`RVZSharp.Tests/Helpers/`)
 

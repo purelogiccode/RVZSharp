@@ -25,6 +25,7 @@ public sealed class ZstdDecoder : ICompressionDecoder
             throw new RvzFormatException("Zstandard compression must not have compressor data.");
         }
 
-        return new ZstdSharp.DecompressionStream(input, leaveOpen: true);
+        return CodecErrorStream.Create(
+            () => new ZstdSharp.DecompressionStream(input, leaveOpen: true), "Zstandard");
     }
 }

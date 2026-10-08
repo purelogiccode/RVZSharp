@@ -21,7 +21,10 @@ dotnet add package RVZSharp
 - Wii partition reconstruction: SHA-1 hash trees (h0/h1/h2), hash exceptions, and
   AES-128-CBC re-encryption with the partition key — the output is identical to the
   original encrypted disc image;
-- full container validation (magic, versions, all SHA-1 integrity checks, structure rules).
+- full container validation (magic, versions, all SHA-1 integrity checks, structure rules);
+- thread-safe random access (`RvzReader.ReadAt`) with a bounded 16 MiB LRU cache of decoded
+  units, and Native AOT/trimming compatibility (the library is annotated and the CLI
+  publishes clean with `PublishTrimmed`/`PublishAot`).
 
 ## Usage
 
@@ -95,9 +98,11 @@ RvzWriter.Write(input: input, output: output, options: options);
 
 Wii partitions are stored decrypted with hash exceptions, exactly like Dolphin produces.
 `options` defaults to the Dolphin-compatible settings (Zstd / level 5 / 2 MiB chunks,
-packing on). Group packing/compression runs on a worker pool (`MaxThreads`; `0` = processor
-count) and the output is byte-identical for any thread count. To get a plain ISO back, use
-the CLI's `convert -f iso` (or a reader + copy).
+packing on). Set `Scrub = true` to zero non-game Wii partitions (Dolphin's DiscScrubber).
+Group packing/compression runs on a worker pool (`MaxThreads`; `0` = processor count) and
+the output is byte-identical for any thread count. To get a plain ISO back, use the CLI's
+`convert -f iso` (or a reader + copy). `RvzWriter.Write(inputPath, outputPath, options)`
+(and the WIA/GCZ equivalents) opens and creates the files for you.
 
 **4. Write WIA** (`WiaWriter`, sharing the same writer core; PURGE supported, no packing,
 chunk size a multiple of 2 MiB):
@@ -114,7 +119,21 @@ using var gcz = File.Create(@"C:\games\game.gcz");
 GczWriter.Write(input, gcz, new GczWriteOptions { BlockSize = 0x4000 });
 ```
 
-**6. Progress and cancellation** for long conversions (encode *and* decode):
+**6. Write the legacy formats** (`CisoWriter`, `WbfsWriter` — Wii only, `TgcWriter` —
+GameCube only; all-zero blocks/clusters are stored absent, so scrubbed images shrink):
+
+```csharp
+using var ciso = File.Create(@"C:\games\game.ciso");
+CisoWriter.Write(input, ciso, new CisoWriteOptions { BlockSize = 0x200000 });
+
+using var wbfs = File.Create(@"C:\games\game.wbfs");
+WbfsWriter.Write(wiiInput, wbfs); // 2 MiB clusters by default
+
+using var tgc = File.Create(@"C:\games\game.tgc");
+TgcWriter.Write(gcInput, tgc);
+```
+
+**7. Progress and cancellation** for long conversions (encode *and* decode):
 
 ```csharp
 using var cts = new CancellationTokenSource();
@@ -127,15 +146,23 @@ RvzWriter.Write(input: input, output: output, options: options,
 blob.CopyTo(isoStream, progress, cts.Token);
 ```
 
-**7. Verify a decode** without materializing the ISO — `DiscHasher.Compute(blob)` returns
-the CRC-32, MD5 and SHA-1 in one streaming pass (the digests Dolphin's verifier reports):
+**8. Verify a decode** without materializing the ISO — `DiscHasher.Compute(blob)` returns
+the CRC-32, MD5 and SHA-1 in one streaming pass (the digests Dolphin's verifier reports).
+`DiscVerifier.Verify(blob)` goes further and walks every Wii partition's h0/h1/h2/h3 hash
+tree plus the TMD/H3 tables (Dolphin's VolumeVerifier), reporting per-partition issues:
 
 ```csharp
 var hashes = DiscHasher.Compute(blob);
 Console.WriteLine(Convert.ToHexString(hashes.Sha1));
+
+var report = DiscVerifier.Verify(blob);
+foreach (var issue in report.Issues.Concat(report.Partitions.SelectMany(p => p.Issues)))
+{
+    Console.WriteLine($"[{issue.Severity}] {issue.Message}");
+}
 ```
 
-**8. Handling errors** — every format problem raises `RvzException` subclasses:
+**9. Handling errors** — every format problem raises `RvzException` subclasses:
 
 ```csharp
 try
@@ -147,13 +174,30 @@ catch (RvzHashMismatchException) { /* a SHA-1 failed (corrupt container) */ }
 catch (RvzFormatException)       { /* structural damage / unsupported feature */ }
 ```
 
+**9. Read disc metadata** — `DiscInfo.TryRead(blob)` returns the game ID, maker ID, revision,
+internal name, region, country and Wii title ID from any container (Dolphin: `VolumeDisc`):
+
+```csharp
+var info = DiscInfo.TryRead(blob);
+Console.WriteLine($"{info?.GameId} {info?.InternalName} ({info?.Region}, {info?.Country})");
+```
+
+**10. Use a decoded image as a `Stream`** — `new BlobStream(blob)` is a read-only, seekable
+stream over any blob (any size) for `BinaryReader`/serializer-style code:
+
+```csharp
+using var stream = new BlobStream(blob);
+var reader = new BinaryReader(stream);
+```
+
 **What `Blob.Open` accepts and rejects:** a file that starts with a recognized container
 magic (RVZ/WIA/CISO/GCZ/WBFS/TGC/NFS) is always parsed as that container — a parse failure
 throws an `RvzException` (`RvzFormatException`, `RvzHashMismatchException`, or
 `RvzUnsupportedException` for newer container versions), never a silent fallback. Only
-files with **no recognizable magic** are treated as a plain ISO. CISO is validated lazily
-like Dolphin (a plausible block size opens, absent blocks decode to zeroes); `RvzWriter`
-handles the rest.
+files with **no recognizable magic** are treated as a plain ISO — including split plain ISOs
+(`game.part0.iso` + `game.part1.iso` + …, found from the path, like Dolphin's
+`SplitPlainFileReader`). CISO is validated lazily like Dolphin (a plausible block size opens,
+absent blocks decode to zeroes); `RvzWriter` handles the rest.
 
 **`RvzWriter` validates the input:** the decoded bytes must carry the GameCube/Wii disc
 header magic (Wii `5D 1C 9E A3` at offset `0x18`, GameCube `C2 33 9F 3D` at offset `0x1C`,
@@ -207,12 +251,13 @@ The full documentation lives in [`docs/`](docs/README.md) — a multi-page wiki 
   codec contracts), `IO` (big-endian reading, section streams), `Compression` (codecs +
   factories), `Chunks` (group decoding, exception lists), `Packing` (RVZ packing + PRNG,
   encoder and decoder), `Wii` (hash tree + region rebuild, partition extraction, decrypted
-  `PartitionReader`), `Files` (`DiscFileSystem` FST parser), `RvzReader`, `RvzWriter`,
-  `WiaWriter`, `GczWriter`. Every public and internal type and member carries XML
-  documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
+  `PartitionReader`), `Files` (`DiscFileSystem` FST parser), `Verification` (`DiscVerifier`
+  Wii hash-tree/TMD/H3 verifier), `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`,
+  `CisoWriter`, `WbfsWriter`, `TgcWriter`. Every public and internal type and member carries
+  XML documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
 - `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
   surface, plus the legacy `info`/`decode` commands).
-- `RVZSharp.Tests` — 395 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 464 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
   synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
   packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), GCZ writer tests, parallel
@@ -249,13 +294,15 @@ the games. The real Wii round-trip exposed and pinned a writer bug (see Status b
 
 RVZ **and** the legacy disc formats (WIA, GCZ, CISO/WBI, WBFS incl. split files, TGC, NFS)
 are decoded byte-for-byte and covered by tests; the CLI `info`/`decode` commands accept any
-of them (auto-detected by magic). The writers (`rvzsharp convert -f rvz|wia|gcz`) encode any
-of them back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules — including
-negative Zstd "fast" levels — optional packing, chunks of 32 KiB–2 MiB powers of two or
-multiples of 2 MiB), WIA (None/PURGE/Bzip2/LZMA1/LZMA2, chunks that are multiples of
-2 MiB) or GCZ (16 KiB zlib blocks by default, power-of-two sizes), with the same SHA-1s
-Dolphin produces. Decode supports progress/cancellation and
-`DiscHasher` computes CRC-32/MD5/SHA-1 in one pass. The codebase was audited against the
+of them (auto-detected by magic). The writers (`rvzsharp convert -f rvz|wia|gcz|ciso|wbfs|tgc`)
+encode any of them back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules —
+including negative Zstd "fast" levels — optional packing, chunks of 32 KiB–2 MiB powers of
+two or multiples of 2 MiB), WIA (None/PURGE/Bzip2/LZMA1/LZMA2, chunks that are multiples of
+2 MiB), GCZ (16 KiB zlib blocks by default, power-of-two sizes), CISO (all-zero blocks
+absent), WBFS (Wii only, shared zero cluster) or TGC (GameCube only), with the same SHA-1s
+Dolphin produces. Decode supports progress/cancellation;
+`DiscHasher` computes CRC-32/MD5/SHA-1 in one pass and `DiscVerifier` walks the Wii hash
+trees and TMD/H3 tables. The codebase was audited against the
 reference implementations (Dolphin `WIABlob`/`WIACompression` and the Go `rvz-1.0.3` tool)
 and every finding was fixed or explicitly documented.
 

@@ -1,4 +1,5 @@
 using RVZSharp.Interfaces;
+using RVZSharp.IO;
 using RVZSharp.Models;
 using RVZSharp.Wii;
 
@@ -9,19 +10,23 @@ namespace RVZSharp.Blobs;
 /// CreateBlobReader). Every supported container starts with a 4-byte magic; a file that
 /// starts with a recognized magic is always parsed as that container (a parse failure
 /// throws an <see cref="RvzException"/>), and only files with no recognizable magic are
-/// treated as a plain ISO. Whether the bytes are a real GameCube/Wii disc is answered by
-/// <see cref="RvzWriter.Write"/>'s disc-header validation.
+/// treated as a plain ISO — including split plain ISOs (<c>game.part0.iso</c> +
+/// <c>game.part1.iso</c> + …, Dolphin: SplitPlainFileReader). Whether the bytes are a real
+/// GameCube/Wii disc is answered by <see cref="RvzWriter.Write(IBlobReader, Stream, RvzWriteOptions, IProgress{double}, CancellationToken)"/>'s disc-header validation.
 /// </summary>
 public static class Blob
 {
+    private const string SplitPlainPart0Suffix = ".part0.iso";
+
     /// <summary>
     /// Detects and opens the container format of <paramref name="stream"/> and returns a reader
     /// that decodes the original disc image bytes.
     /// </summary>
     /// <param name="stream">Seekable stream of the disc image file.</param>
     /// <param name="filePath">
-    /// Optional path of the file. Only needed for NFS, to locate <c>code/htk.bin</c> and the
-    /// <c>hif_00000X.nfs</c> continuation files.
+    /// Optional path of the file. Used to locate NFS <c>code/htk.bin</c> and
+    /// <c>hif_00000X.nfs</c> files, split WBFS continuation parts, and split plain ISO parts
+    /// (a path ending in <c>.part0.iso</c>).
     /// </param>
     /// <param name="leaveOpen">Whether disposing the reader leaves <paramref name="stream"/> open.</param>
     /// <exception cref="RvzFormatException">
@@ -83,7 +88,69 @@ public static class Blob
             return TgcBlob.Open(stream, leaveOpen);
         }
 
-        return PlainBlob.Open(stream, leaveOpen);
+        return OpenSplitPlain(stream, filePath, leaveOpen);
+    }
+
+    /// <summary>
+    /// Opens a plain ISO, concatenating the continuation parts of a split image
+    /// (<c>game.part0.iso</c> + <c>game.part1.iso</c> + …) when the path carries the split
+    /// naming (Dolphin: SplitPlainFileReader). A zero-size part or an unreadable
+    /// continuation makes the image fall back to the first part alone, like Dolphin.
+    /// </summary>
+    private static IBlobReader OpenSplitPlain(Stream firstPart, string? filePath, bool leaveOpen)
+    {
+        if (filePath is null || !filePath.EndsWith(SplitPlainPart0Suffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return PlainBlob.Open(firstPart, leaveOpen);
+        }
+
+        var basePath = filePath[..^SplitPlainPart0Suffix.Length];
+        var parts = new List<Stream> { firstPart };
+        try
+        {
+            for (var index = 1; ; index++)
+            {
+                var partPath = $"{basePath}.part{index}.iso";
+                if (!File.Exists(partPath))
+                {
+                    break;
+                }
+
+                var part = File.OpenRead(partPath);
+                if (part.Length == 0)
+                {
+                    // Dolphin treats a zero-size part as "not a split file" and falls back
+                    // to the first part alone (SplitFileBlob.cpp:40-41).
+                    part.Dispose();
+                    DisposeParts(parts, 1);
+                    return PlainBlob.Open(firstPart, leaveOpen);
+                }
+
+                parts.Add(part);
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            DisposeParts(parts, 1);
+            return PlainBlob.Open(firstPart, leaveOpen);
+        }
+
+        if (parts.Count == 1)
+        {
+            return PlainBlob.Open(firstPart, leaveOpen);
+        }
+
+        // The wrapper owns the continuation parts and follows leaveOpen for the first part;
+        // PlainBlob then owns the wrapper.
+        return PlainBlob.Open(new MultiPartStream(parts, leaveOpen), leaveOpen: false);
+    }
+
+    private static void DisposeParts(List<Stream> parts, int firstIndex)
+    {
+        for (var i = firstIndex; i < parts.Count; i++)
+        {
+            parts[i].Dispose();
+        }
     }
 
     /// <summary>
@@ -156,7 +223,7 @@ public static class Blob
     /// disc header (Wii at 0x18, GameCube at 0x1C; Dolphin: TryCreateDisc). Unlike the
     /// container magic sniffing in <see cref="Open(Stream, string?, bool)"/>, this inspects
     /// the decoded disc bytes, so it answers "is this actually a GameCube/Wii disc?" for
-    /// every input format. <see cref="RvzWriter.Write"/> uses the same check before writing.
+    /// every input format. <see cref="RvzWriter.Write(IBlobReader, Stream, RvzWriteOptions, IProgress{double}, CancellationToken)"/> uses the same check before writing.
     /// </summary>
     /// <param name="reader">The blob to inspect.</param>
     /// <returns><see cref="DiscType.Wii"/>, <see cref="DiscType.GameCube"/>, or
@@ -170,7 +237,7 @@ public static class Blob
 
     /// <summary>
     /// True when the decoded disc image carries a GameCube or Wii disc header magic
-    /// (the same check <see cref="RvzWriter.Write"/> performs before encoding).
+    /// (the same check <see cref="RvzWriter.Write(IBlobReader, Stream, RvzWriteOptions, IProgress{double}, CancellationToken)"/> performs before encoding).
     /// </summary>
     /// <param name="reader">The blob to inspect.</param>
     /// <returns>True for a GameCube or Wii disc image; false otherwise.</returns>

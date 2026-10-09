@@ -242,8 +242,8 @@ disc header/region, ticket/TMD/cert/H3) per partition.
 
 ## Documentation
 
-The full documentation lives in [`docs/`](https://github.com/purelogiccode/RVZSharp/blob/master/docs/README.md) — a multi-page wiki (also
-published as the GitHub Pages site, with a side menu in both) covering
+The full documentation lives in [`docs/`](https://github.com/purelogiccode/RVZSharp/blob/master/docs/README.md) — published by CI to the
+[project wiki](https://github.com/purelogiccode/RVZSharp/wiki) and the GitHub Pages site (side menu in both) — covering
 [what's new](https://github.com/purelogiccode/RVZSharp/blob/master/docs/whats-new.md), the [CLI](https://github.com/purelogiccode/RVZSharp/blob/master/docs/usage-cli.md), the
 [library API](https://github.com/purelogiccode/RVZSharp/blob/master/docs/usage-library.md), [architecture](https://github.com/purelogiccode/RVZSharp/blob/master/docs/architecture.md), the
 [RVZ container format](https://github.com/purelogiccode/RVZSharp/blob/master/docs/format/rvz.md),

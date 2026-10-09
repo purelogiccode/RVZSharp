@@ -6,9 +6,11 @@ theme: jekyll-theme-cayman
 relative_links:
   enabled: true
   collections: false
+# Every page uses the sidebar layout. The page title is intentionally *not* defaulted
+# here so jekyll-titles-from-headings picks each page's own H1 (tab titles, SEO);
+# pages without a heading fall back to the site title.
 defaults:
   - scope:
       path: ""
     values:
       layout: default
-      title: RVZSharp Documentation

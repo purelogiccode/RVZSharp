@@ -9,6 +9,24 @@
 
 > No game files are required for the test suite — tests generate synthetic discs.
 
+## Install the CLI
+
+No SDK required: download `rvzsharp-<version>-<rid>.zip` from the
+[GitHub Releases](https://github.com/purelogiccode/RVZSharp/releases) page, unzip it
+and run `RVZSharp.Cli` (`RVZSharp.Cli.exe` on Windows):
+
+| | |
+|---|---|
+| `rvzsharp-<version>-win-x64.zip` | Windows 10/11, x64 |
+| `rvzsharp-<version>-linux-x64.zip` | Linux, x64 |
+| `rvzsharp-<version>-osx-x64.zip` | macOS, Intel |
+| `rvzsharp-<version>-osx-arm64.zip` | macOS, Apple Silicon |
+
+Verify with `RVZSharp.Cli --help` (also prints the product version). The bundles are
+self-contained single-file executables — no .NET runtime to install. Each release page
+also carries `SHA256SUMS.txt` to verify a download. To build from source instead, see
+[Building](#building) below.
+
 ## Repository layout
 
 ```

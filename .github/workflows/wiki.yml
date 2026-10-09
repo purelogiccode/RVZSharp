@@ -1,0 +1,97 @@
+name: Publish docs to GitHub Wiki
+
+# Mirrors docs/ into the repository wiki (<repo>.wiki.git) so the wiki always matches
+# the documentation in the repo. The wiki is fully generated: do not edit wiki pages
+# by hand, edit docs/ instead (manual edits are overwritten on the next sync).
+#
+# One-time setup (see docs/packaging.md):
+#   1. Enable Wikis under Settings > General > Features.
+#   2. Create a personal access token (classic) with the `repo` scope (a fine-grained
+#      token with Contents read/write on this repository also works) and save it as
+#      the `WIKI_TOKEN` repository secret (Settings > Secrets and variables > Actions).
+
+on:
+  push:
+    branches: [master]
+    paths: [docs/**]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync docs/ to the wiki
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check prerequisites
+        shell: pwsh
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIKI_TOKEN)) {
+            Write-Error 'The WIKI_TOKEN secret is not set. See the workflow header and docs/packaging.md for the one-time setup.'
+          }
+
+      - name: Build wiki staging tree
+        shell: pwsh
+        run: |
+          # Conversion rules (docs/ -> wiki page):
+          #   docs/README.md            -> Home.md (the wiki home page)
+          #   docs/index.md             -> dropped (Jekyll home stub that only includes README.md)
+          #   docs/_Sidebar.md          -> _Sidebar.md (kept as-is; the wiki sidebar)
+          #   docs/_config.yml, _data/, _layouts/ -> dropped (Jekyll/Pages-only)
+          #   every other *.md          -> same relative path (format/*.md included)
+          #   relative `page.md` links  -> `page` (wiki page names have no .md suffix;
+          #                              absolute URLs, #anchors and mailto: untouched)
+          $stage = 'artifacts/wiki'
+          Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $stage | Out-Null
+
+          $count = 0
+          Get-ChildItem -LiteralPath docs -Recurse -File -Filter *.md |
+            Where-Object { $_.Name -ne 'index.md' } | ForEach-Object {
+            $relative = [IO.Path]::GetRelativePath('docs', $_.FullName)
+            if ($relative -eq 'README.md') { $relative = 'Home.md' }
+            $dest = Join-Path $stage $relative
+            $null = New-Item -ItemType Directory -Path (Split-Path $dest) -Force
+            $text = Get-Content -LiteralPath $_.FullName -Raw
+            $text = $text -replace '\]\((?![A-Za-z][A-Za-z0-9+.-]*://|#|/|mailto:)(\./)?([^()\s]*?)\.md(#[^()\s]*)?\)', ']($2$3)'
+            Set-Content -LiteralPath $dest -Value $text -NoNewline
+            $count++
+          }
+          if ($count -eq 0) { throw 'No markdown pages found under docs/.' }
+          Write-Output "Staged $count wiki pages."
+          Get-ChildItem -LiteralPath $stage -Recurse -File | ForEach-Object {
+            Write-Output ([IO.Path]::GetRelativePath($stage, $_.FullName))
+          }
+
+      - name: Push to the wiki
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+        run: |
+          rm -rf wiki
+          if ! git clone "https://x-access-token:${WIKI_TOKEN}@github.com/${{ github.repository }}.wiki.git" wiki; then
+            echo '::error::Could not clone the wiki repository. Enable Wikis under Settings > General > Features, then re-run this workflow.'
+            exit 1
+          fi
+          cd wiki
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Full mirror: drop every tracked page, then lay the staged tree over it.
+          git ls-files -z '*.md' | xargs -0 -r git rm -q
+          cp -r ../artifacts/wiki/. .
+          git add -A
+          if [ -z "$(git status --porcelain)" ]; then
+            echo 'Wiki already up to date.'
+          else
+            git commit -m "Sync wiki from ${{ github.sha }}"
+            git push origin HEAD:master
+          fi

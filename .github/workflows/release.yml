@@ -1,0 +1,239 @@
+name: Release
+
+# Builds the release bundles and publishes them on GitHub.
+#
+#   Push a tag `v<version>` (e.g. `v1.1.0`, `v1.2.0-beta.1`; must be valid SemVer
+#   after the leading `v`) to:
+#     1. publish the self-contained single-file CLI for win-x64, linux-x64, osx-x64
+#        and osx-arm64, smoke-test each binary, and zip it with LICENSE,
+#        THIRD-PARTY-NOTICES.md and README.md -> rvzsharp-<version>-<rid>.zip
+#     2. pack the RVZSharp NuGet package (+ .snupkg symbols)
+#     3. create the GitHub Release with the zips, SHA256SUMS.txt and the packages;
+#        the release notes come from docs/release-notes-<version>.md when present
+#     4. push the package to nuget.org for stable versions (needs the NUGET_API_KEY
+#        repository secret from nuget.org -> API Keys)
+#
+#   Run it manually (workflow_dispatch) for a dry run: everything above runs except
+#   the GitHub Release creation and the nuget.org push, and the artifacts stay
+#   available on the workflow run for inspection.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 1.1.0 or 1.2.0-beta.1). Dry run only: no GitHub Release, no nuget.org push.'
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve version
+        id: resolve
+        shell: pwsh
+        run: |
+          $raw = '${{ github.event.inputs.version }}'
+          if ([string]::IsNullOrWhiteSpace($raw)) {
+            if ('${{ github.ref_type }}' -ne 'tag') { throw 'No version input and this is not a tag push.' }
+            $raw = '${{ github.ref_name }}'
+          }
+          $version = $raw.TrimStart('v')
+          if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$') { throw "Not SemVer: '$raw'." }
+          $prerelease = [bool]($version -match '-')
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$($prerelease.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+          Write-Output "version=$version prerelease=$prerelease"
+
+  cli:
+    name: Bundle CLI (${{ matrix.rid }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            exe: RVZSharp.Cli.exe
+            r2r: true
+          - rid: linux-x64
+            os: ubuntu-latest
+            exe: RVZSharp.Cli
+            r2r: true
+          - rid: osx-x64
+            os: macos-latest
+            exe: RVZSharp.Cli
+            r2r: false
+          - rid: osx-arm64
+            os: macos-latest
+            exe: RVZSharp.Cli
+            r2r: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RID: ${{ matrix.rid }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # Self-contained single-file CLI (no runtime required on the target machine).
+      # ReadyToRun is enabled where it is validated (win-x64, linux-x64).
+      - name: Publish
+        run: >
+          dotnet publish RVZSharp.Cli/RVZSharp.Cli.csproj -c Release -f net10.0
+          -r ${{ matrix.rid }} --self-contained true
+          -p:Version=${{ needs.version.outputs.version }}
+          -p:PublishSingleFile=true
+          ${{ matrix.r2r && '-p:PublishReadyToRun=true' || '' }}
+          -o artifacts/publish/${{ matrix.rid }}
+      - name: Smoke test
+        run: ./artifacts/publish/${{ matrix.rid }}/${{ matrix.exe }} --help
+      - name: Bundle zip
+        shell: pwsh
+        run: |
+          $bundle = "artifacts/bundle/rvzsharp-$env:VERSION-$env:RID"
+          New-Item -ItemType Directory -Path $bundle -Force | Out-Null
+          Copy-Item "artifacts/publish/$env:RID/*" $bundle
+          Copy-Item LICENSE, THIRD-PARTY-NOTICES.md, README.md $bundle
+          Compress-Archive -Path "$bundle/*" -DestinationPath "$bundle.zip" -CompressionLevel Optimal
+          Get-Item "$bundle.zip"
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: rvzsharp-${{ needs.version.outputs.version }}-${{ matrix.rid }}
+          path: artifacts/bundle/rvzsharp-${{ needs.version.outputs.version }}-${{ matrix.rid }}.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  package:
+    name: Pack NuGet
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # Runs EnablePackageValidation (baseline: last published release) and embeds the
+      # SPDX SBOM (Microsoft.Sbom.Targets, Release only).
+      - name: Pack
+        run: >
+          dotnet pack RVZSharp/RVZSharp.csproj -c Release
+          -p:Version=${{ needs.version.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+          -o artifacts/packages
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ needs.version.outputs.version }}
+          path: artifacts/packages/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: GitHub Release
+    needs: [version, cli, package]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+      - name: Download bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rvzsharp-${{ needs.version.outputs.version }}-*
+          path: artifacts/release
+          merge-multiple: true
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: packages-${{ needs.version.outputs.version }}
+          path: artifacts/release
+      - name: Checksums + release body
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          Set-Location artifacts/release
+          Get-ChildItem *.zip | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" >> SHA256SUMS.txt
+          }
+          Get-Content SHA256SUMS.txt
+          $notes = "../../docs/release-notes-$env:VERSION.md"
+          if (Test-Path -LiteralPath $notes) {
+            Copy-Item $notes body.md
+            Write-Output "Using $notes as the release body."
+          } else {
+            Set-Content body.md "# RVZSharp $env:VERSION`n`nNo release notes file found at docs/release-notes-$env:VERSION.md.`n`nSee the [documentation](https://github.com/purelogiccode/RVZSharp/wiki) for usage."
+            Write-Output 'No release notes file; using the fallback body.'
+          }
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: RVZSharp ${{ needs.version.outputs.version }}
+          body_path: artifacts/release/body.md
+          prerelease: ${{ needs.version.outputs.prerelease }}
+          draft: false
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/release/*.zip
+            artifacts/release/SHA256SUMS.txt
+            artifacts/release/*.nupkg
+            artifacts/release/*.snupkg
+
+  nuget:
+    name: Push to nuget.org
+    needs: [version, package, release]
+    if: github.ref_type == 'tag' && needs.version.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: packages-${{ needs.version.outputs.version }}
+          path: artifacts/packages
+      - name: Push (skipped without NUGET_API_KEY)
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "${NUGET_API_KEY}" ]; then
+            echo '::warning::NUGET_API_KEY is not set (nuget.org -> API Keys -> repository secret); the GitHub Release above is the only published artifact.'
+            exit 0
+          fi
+          shopt -s nullglob
+          for pkg in artifacts/packages/*.nupkg artifacts/packages/*.snupkg; do
+            dotnet nuget push "$pkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_API_KEY}" --skip-duplicate
+          done

@@ -66,10 +66,70 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
    that round-trip a disc image byte-exactly.
 6. **CI** — `.github/workflows/ci.yml` builds and runs the fast suite on all three
    frameworks (coverage artifact), packs with API validation + SBOM, and publishes a
-   ReadyToRun single-file CLI (win-x64) that is smoke-tested before upload. Dependabot
+   ReadyToRun single-file CLI (win-x64) that is smoke-tested before upload.
+   `.github/workflows/release.yml` builds the release bundles (below),
+   `.github/workflows/wiki.yml` mirrors `docs/` to the wiki and
+   `.github/workflows/pages.yml` deploys `docs/` to GitHub Pages. Dependabot
    (`.github/dependabot.yml`) keeps NuGet and GitHub Actions dependencies current.
 
+## Release process
+
+Releases are built by `.github/workflows/release.yml`. Push a tag `v<version>`
+(`v1.1.0`, `v1.2.0-beta.1`, … — valid SemVer after the leading `v`):
+
+1. **CLI bundles** — the self-contained single-file CLI is published, smoke-tested
+   (`--help` must exit 0) and zipped per runtime, each zip holding the executable
+   plus `LICENSE`, `THIRD-PARTY-NOTICES.md` and `README.md`:
+
+   | Asset | Runner | Notes |
+   |---|---|---|
+   | `rvzsharp-<version>-win-x64.zip` | Windows | ReadyToRun |
+   | `rvzsharp-<version>-linux-x64.zip` | Linux | ReadyToRun |
+   | `rvzsharp-<version>-osx-x64.zip` | macOS | Intel |
+   | `rvzsharp-<version>-osx-arm64.zip` | macOS | Apple Silicon |
+2. **NuGet package** — `dotnet pack` with API-compat validation and the embedded
+   SBOM (`RVZSharp.<version>.nupkg` + `.snupkg` symbols).
+3. **GitHub Release** — created with the four zips, `SHA256SUMS.txt` and both
+   packages. The notes come from `docs/release-notes-<version>.md` when that file
+   exists (`release-notes-1.0.0.md` shows the format); otherwise a fallback body
+   is used. Tags containing `-` are marked as pre-releases.
+4. **nuget.org** — stable versions are pushed automatically when the
+   `NUGET_API_KEY` repository secret is set (nuget.org → API Keys → repository
+   secret); without it the workflow logs a warning and the GitHub Release remains
+   the only published artifact.
+
+Run the workflow manually (`workflow_dispatch` with a `version` input) for a dry
+run: everything builds and uploads as run artifacts for inspection, but no GitHub
+Release is created and nothing is pushed to nuget.org.
+
+## Wiki and Pages automation
+
+`docs/` is the single source of the documentation and is published twice by CI:
+
+- **GitHub Pages** — `.github/workflows/pages.yml` builds `docs/` with Jekyll on
+  every `master` push touching `docs/` (plus manual runs). `_config.yml` selects
+  the Cayman theme, `index.md` renders this folder's `README.md` as the home
+  page, `_data/nav.yml` + `_layouts/default.html` render the side menu, and
+  internal links use the `.md` form (`[CLI](usage-cli.md)`), which Jekyll converts
+  to `.html`.
+- **GitHub Wiki** — `.github/workflows/wiki.yml` mirrors `docs/` into the
+  repository wiki on the same trigger: `README.md` → `Home.md`, `format/*.md` →
+  `format/…` subpages, `_Sidebar.md` kept as-is (the wiki sidebar), Jekyll-only
+  files (`index.md`, `_config.yml`, `_data/`, `_layouts/`) dropped, and relative
+  `page.md` links rewritten to the extensionless wiki form (`[CLI](usage-cli)`;
+  anchors and absolute URLs untouched). The wiki is fully generated — edit
+  `docs/`, never the wiki pages (manual edits are overwritten on the next sync).
+
+One-time setup: enable Wikis (Settings → General → Features) and save a personal
+access token with the `repo` scope (or a fine-grained token with Contents
+read/write on this repository) as the `WIKI_TOKEN` repository secret; without it
+the workflow fails with setup instructions.
+
 ## Publishing to nuget.org
+
+Pushing a stable `v<version>` tag does this automatically (see [Release
+process](#release-process) — the `NUGET_API_KEY` secret must be set). The manual
+equivalent is:
 
 ```bash
 # 1. Build the package and the symbols package.
@@ -128,3 +188,9 @@ dotnet publish RVZSharp.Cli -c Release -f net10.0 -r win-x64 -p:PublishAot=true
 dotnet publish RVZSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained true \
     -p:PublishSingleFile=true -p:PublishReadyToRun=true
 ```
+
+End users do not need the SDK: each GitHub Release (see [Release
+process](#release-process)) ships `rvzsharp-<version>-<rid>.zip` bundles
+(`win-x64`, `linux-x64`, `osx-x64`, `osx-arm64`) — unzip and run `RVZSharp.Cli`
+(`RVZSharp.Cli.exe` on Windows); see [Getting
+started](getting-started.md#install-the-cli).

@@ -30,12 +30,14 @@ internal sealed class StatsApiClient : IDisposable
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiKey);
         var assembly = typeof(StatsApiClient).Assembly.GetName();
         _applicationId = assembly.Name ?? "rvzsharp-cli";
-        _version = assembly.Version?.ToString(3) ?? "0.0.0";
+        _version = CliVersion.Product;
     }
 
     /// <summary>
-    /// Asynchronously POSTs a usage hit to the stats endpoint. Best-effort: network failures
-    /// and non-429 responses are logged at debug level and are never thrown to the caller.
+    /// Asynchronously POSTs a usage hit to the stats endpoint. Best-effort: network failures,
+    /// rejected hits (HTTP 200 with an error body) and unexpected status codes are logged at
+    /// debug level and are never thrown to the caller. HTTP 429 (the hourly rate limit) is
+    /// expected and silently ignored.
     /// </summary>
     /// <returns>A task that completes when the usage hit has been handled.</returns>
     public async Task ReportUsageAsync()
@@ -51,11 +53,30 @@ internal sealed class StatsApiClient : IDisposable
             var json = payload.ToJsonString();
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await _httpClient.PostAsync(ApiUrl, content).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode &&
-                (int)response.StatusCode != (int)System.Net.HttpStatusCode.TooManyRequests)
+
+            // One hit per hour per IP and application is the expected outcome for extra
+            // launches; the server drops them with 429 and they are not failures.
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
             {
                 ReportFailure($"Stats API returned HTTP {(int)response.StatusCode}");
+                return;
             }
+
+            // The stats endpoint reports authentication problems as HTTP 200 with an
+            // {"error": "..."} body (see the API instructions), so inspect the body too.
+            var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            if (body.Contains("\"error\"", StringComparison.OrdinalIgnoreCase))
+            {
+                ReportFailure($"Stats API rejected the hit: {body}");
+                return;
+            }
+
+            Log.Debug("Stats hit recorded for {ApplicationId} {Version}", _applicationId, _version);
         }
         catch (Exception ex)
         {

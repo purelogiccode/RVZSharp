@@ -5,14 +5,19 @@ The command-line tool accepts the **same command surface as Dolphin's `dolphin-t
 The legacy `info` and `decode` commands are kept as RVZSharp extensions.
 
 ```
-rvzsharp convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz] [-s]
-                 [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2] [-l <level>]
+rvzsharp convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz|ciso|wbfs|tgc] [-s]
+                 [-b <block_size>] [-c none|zstd|bzip2|lzma|lzma2|purge] [-l <level>]
+                 [--chunk-size <int>] [--no-packing] [--threads <int>] [--verify] [--json]
 rvzsharp header -i <FILE> [-j] [-b] [-c] [-l]
-rvzsharp verify -i <FILE> [-u <dir>] [-a crc32|md5|sha1]
+rvzsharp verify -i <FILE> [-u <dir>] [-a crc32|md5|sha1] [--partitions] [--json]
 rvzsharp extract -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l] [-q] [-g]
 rvzsharp info <FILE>                              (legacy alias of header)
-rvzsharp decode <FILE> <OUT> [--sha1 <hex>]       (decode any blob to a plain ISO)
+rvzsharp decode <FILE> <OUT> [--sha1 <hex>] [--threads <int>]  (decode any blob to a plain ISO)
 ```
+
+A FILE argument of `-` reads the disc image from stdin (`convert`, `header`, `verify`,
+`extract`, `info`, `decode`); `convert -o -` and `decode <in> -` write the image to stdout.
+Help works per command (`rvzsharp convert -h` prints the command's usage and exits 0).
 
 Run the CLI with:
 
@@ -58,7 +63,7 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz|ciso|wbfs|tgc] [-s]
 | `-b`, `--block_size` | block size in **bytes**. Required for GCZ/WIA/RVZ; optional for CISO/WBFS (defaults to 2 MiB). |
 | `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`, and `purge` (WIA only, RVZSharp extension). Required for WIA/RVZ; ignored for GCZ (always zlib deflate). |
 | `-l`, `--compression_level` | compression level. Required unless `-c none`. |
-| `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz`/`-f iso`/`-f gcz` a warning notes that scrubbing gains little. |
+| `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz` and `-f iso` a warning notes that scrubbing gains little (converting a Wii disc to `-f gcz` without `-s` warns separately). |
 | `--threads` | compression threads (RVZSharp extension). `0` (default) uses the processor count; the output is byte-identical for any value. |
 | `--verify` | after writing, decode the output and compare its CRC-32/MD5/SHA-1 with the input (RVZSharp extension); prints `Verification: OK (<sha1>)` or fails. With `-s` the scrubbed input is the reference. |
 | `--json` | print a single JSON object with the conversion result on stdout (RVZSharp extension): `input`, `output`, `format`, `input_bytes`, `output_bytes`, plus `verified`/`sha1` with `--verify`. Cannot be combined with `-o -`. |
@@ -138,7 +143,7 @@ header -i <FILE> [-j] [-b] [-c] [-l]
 |---|---|
 | `-i`, `--input` | path to the disc image. Required. |
 | `-j`, `--json` | print the information as JSON and exit (overrides the other options). |
-| `-b`, `--block_size` | print only the block size of GCZ/WIA/RVZ formats (`N/A` if none). |
+| `-b`, `--block_size` | print only the container's block size — GCZ/WIA/RVZ chunk or block size, CISO block, WBFS cluster, NFS block (`N/A` for formats without one). |
 | `-c`, `--compression` | print only the compression method (`N/A` if none). |
 | `-l`, `--compression_level` | print only the compression level (`N/A` if none). |
 
@@ -299,9 +304,9 @@ rvzsharp convert -i game.iso -o game.rvz -f rvz -b 131072 -c zstd -l 5 --verify 
 ```
 
 `-` is accepted wherever a disc image file is read (`convert`, `verify`, `header`,
-`extract`, `info`, `decode` input) and for `convert -o`. Because every container reader
-and writer needs random access, stdin/stdout are staged through a temp file under
-`%TEMP%/RVZSharp`, so large images cost one extra copy.
+`extract`, `info`, `decode` input) and for `convert -o` and `decode <in> -`. Because every
+container reader and writer needs random access, stdin/stdout are staged through a temp file
+under `%TEMP%/RVZSharp`, so large images cost one extra copy.
 
 ## Shell completions
 
@@ -315,3 +320,20 @@ rvzsharp completions powershell | Out-String | Invoke-Expression   # or add to $
 The scripts complete commands, per-command options, `-f` formats, `-c` compression
 methods, `-a` algorithms and file paths. They are static, so when the command surface
 changes the completion scripts are updated in the same change (release checklist).
+
+## Update check
+
+At launch the CLI asks the GitHub API for the latest release of
+[purelogiccode/RVZSharp](https://github.com/purelogiccode/RVZSharp/releases) while the
+command runs. When a newer version exists and the console is interactive, the command
+finishes with a notice and a prompt to open the release page:
+
+```
+A new version of RVZSharp.Cli is available: v1.2.0 (you have 1.1.0).
+Release page: https://github.com/purelogiccode/RVZSharp/releases/tag/v1.2.0
+Open the release page in your browser? [y/N]
+```
+
+The check is best-effort and silent on any failure, never changes the exit code, and never
+prompts when stdin/stderr are redirected (scripts and pipelines stay clean). Set the
+`RVZSHARP_NO_UPDATE_CHECK` environment variable to disable it entirely.

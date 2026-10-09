@@ -43,6 +43,9 @@ internal sealed class BugReportSink : ILogEventSink
         _pending.Enqueue(_client.SendBugReportAsync(message, exception));
     }
 
+    /// <summary>True when bug-report requests are still queued (nothing to wait for otherwise).</summary>
+    public bool HasPending => !_pending.IsEmpty;
+
     /// <summary>Awaits all submitted bug-report requests (fire-and-forget HTTP sends
     /// are otherwise dropped when the process exits or the client is disposed).</summary>
     public async Task FlushAsync()

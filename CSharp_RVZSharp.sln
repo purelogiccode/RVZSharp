@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp.Tests", "RVZSharp.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp.Benchmarks", "RVZSharp.Benchmarks\RVZSharp.Benchmarks.csproj", "{1EEFA281-544A-47A5-961E-3D240432BB37}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RVZSharp.Cli.Tests", "RVZSharp.Cli.Tests\RVZSharp.Cli.Tests.csproj", "{7859375D-67DF-4682-8F4E-9F23A949237B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{1EEFA281-544A-47A5-961E-3D240432BB37}.Release|x64.Build.0 = Release|Any CPU
 		{1EEFA281-544A-47A5-961E-3D240432BB37}.Release|x86.ActiveCfg = Release|Any CPU
 		{1EEFA281-544A-47A5-961E-3D240432BB37}.Release|x86.Build.0 = Release|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Debug|x64.Build.0 = Debug|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Debug|x86.Build.0 = Debug|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Release|x64.ActiveCfg = Release|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Release|x64.Build.0 = Release|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Release|x86.ActiveCfg = Release|Any CPU
+		{7859375D-67DF-4682-8F4E-9F23A949237B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -40,9 +40,20 @@ internal static class Program
         var statsClient = new StatsApiClient();
         var statsReport = statsClient.ReportUsageAsync();
 
+        // Update check: asks GitHub for the latest release while the command runs; after
+        // the command finishes an interactive console is offered the download page.
+        var updateChecker = new UpdateChecker();
+        var updateCheck = updateChecker.CheckAsync();
+
+        // Only a bare "-h"/"--help" (or no arguments) prints the global usage here; a help
+        // flag inside a command reaches that command's own usage block (and exits 0).
+        var usageOnly = args.Length == 0 || args[0] is "-h" or "--help" ||
+                        args[0] is not ("convert" or "header" or "verify" or "extract" or
+                            "completions" or "info" or "decode");
+
         try
         {
-            if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
+            if (args.Length == 0 || args[0] is "-h" or "--help")
             {
                 PrintUsage();
                 return args.Length == 0 ? 1 : 0;
@@ -74,9 +85,16 @@ internal static class Program
         }
         finally
         {
-            // Best-effort: give the launch hit a moment to reach the API before exiting.
-            statsReport.Wait(TimeSpan.FromSeconds(3));
+            // Usage/help runs are side-effect free: no telemetry wait and no update prompt.
+            if (!usageOnly)
+            {
+                // Best-effort: give the launch hit a moment to reach the API before exiting.
+                statsReport.Wait(TimeSpan.FromSeconds(3));
+                updateChecker.NotifyIfAvailable(updateCheck);
+            }
+
             statsClient.Dispose();
+            updateChecker.Dispose();
             LogSetup.Shutdown();
         }
     }
@@ -130,6 +148,49 @@ internal static class Program
         Log.Warning("Command failed: {Message}", message);
         Console.Error.WriteLine($"Error: {message}");
         return 1;
+    }
+
+    /// <summary>
+    /// Opens a disc image by path, disposing the file stream when parsing fails (the reader
+    /// only takes ownership on success).
+    /// </summary>
+    private static IBlobReader OpenBlob(string path)
+    {
+        var stream = File.OpenRead(path);
+        try
+        {
+            return Blob.Open(stream, filePath: path, leaveOpen: false);
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// True when <paramref name="input"/> and <paramref name="output"/> resolve to the same
+    /// file, which would truncate the source while it is still being read.
+    /// </summary>
+    private static bool SameFile(string input, string output)
+    {
+        if (input == "-" || output == "-")
+        {
+            return false;
+        }
+
+        try
+        {
+            var comparison = OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+            return string.Equals(
+                Path.GetFullPath(input), Path.GetFullPath(output), comparison);
+        }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -326,14 +387,22 @@ internal static class Program
         }
 
         /// <summary>Spools the entire standard input into a seekable temp file.</summary>
-        public static TemporaryFile SpoolStdin()
+        /// <param name="cancellationToken">Observed between reads (Ctrl+C aborts the spool).</param>
+        public static TemporaryFile SpoolStdin(CancellationToken cancellationToken = default)
         {
             var file = Create();
             try
             {
                 using var stdin = Console.OpenStandardInput();
                 using var output = File.Create(file.Path);
-                stdin.CopyTo(output);
+                var buffer = new byte[1 << 20];
+                int read;
+                while ((read = stdin.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    output.Write(buffer, 0, read);
+                }
+
                 return file;
             }
             catch
@@ -368,12 +437,12 @@ internal static class Program
     // Minimal optparse-style option parser (DolphinTool uses optparse).
     // ------------------------------------------------------------------
 
-    private sealed record OptionSpec(string Short, bool TakesValue, string[]? Choices);
+    internal sealed record OptionSpec(string Short, bool TakesValue, string[]? Choices);
 
-    private sealed class ParsedArgs
+    internal sealed class ParsedArgs
     {
-        internal readonly Dictionary<string, string> Values = new();
-        internal readonly HashSet<string> Flags = new();
+        public readonly Dictionary<string, string> Values = new();
+        public readonly HashSet<string> Flags = new();
         public List<string> Positionals { get; } = new();
 
         public bool IsSet(string longName)
@@ -392,7 +461,7 @@ internal static class Program
         }
     }
 
-    private static ParsedArgs ParseArgs(IReadOnlyList<string> args,
+    internal static ParsedArgs ParseArgs(IReadOnlyList<string> args,
         IReadOnlyDictionary<string, OptionSpec> spec)
     {
         var result = new ParsedArgs();
@@ -437,6 +506,12 @@ internal static class Program
 
             if (!takesValue)
             {
+                if (inlineValue is not null)
+                {
+                    // e.g. --scrub=no must not silently enable scrubbing.
+                    throw new CliErrorException($"option --{name} does not take an argument");
+                }
+
                 result.Flags.Add(name);
                 continue;
             }
@@ -460,7 +535,7 @@ internal static class Program
     }
 
     [SuppressMessage("Roslynator", "RCS1194", Justification = "Only the message constructor is used.")]
-    private sealed class CliErrorException : Exception
+    internal sealed class CliErrorException : Exception
     {
         public CliErrorException(string message)
             : base(message)
@@ -514,15 +589,21 @@ internal static class Program
                 return args.Count == 0 ? 1 : 0;
             }
 
-            // Legacy positional form: convert <input> <output> [options]
-            if (!args[0].StartsWith('-'))
+            // Legacy positional form: convert <input> <output> [options]. A leading "-" means
+            // stdin (it starts with '-', so it must be special-cased before the option check).
+            if (args[0] == "-" || !args[0].StartsWith('-'))
             {
-                if (args.Count < 2)
+                if (args.Count < 2 || (args[1].StartsWith('-') && args[1] != "-"))
                 {
-                    return Fail("No input set");
+                    return Fail("No output set");
                 }
 
-                using var legacyInput = args[0] == "-" ? TemporaryFile.SpoolStdin() : null;
+                if (SameFile(args[0], args[1]))
+                {
+                    return Fail("The input and output files must be different.");
+                }
+
+                using var legacyInput = args[0] == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
                 using var legacyOutput = args[1] == "-" ? TemporaryFile.Create() : null;
                 var legacyResult = ConvertLegacy(legacyInput?.Path ?? args[0],
                     legacyOutput?.Path ?? args[1], args.Skip(2).ToArray());
@@ -570,7 +651,106 @@ internal static class Program
                 return Fail("--json cannot be combined with writing the image to stdout");
             }
 
-            using var spooledInput = originalInput == "-" ? TemporaryFile.SpoolStdin() : null;
+            if (SameFile(originalInput, originalOutput))
+            {
+                return Fail("The input and output files must be different.");
+            }
+
+            // Validate every option before touching stdin or hashing the disc, so an invalid
+            // invocation fails immediately instead of after minutes of I/O.
+            var maxThreads = 0;
+            if (options.IsSet("threads") &&
+                (!int.TryParse(options.Get("threads"), out maxThreads) || maxThreads < 0))
+            {
+                return Fail("Threads must be a non-negative integer (0 = processor count)");
+            }
+
+            var blockSize = 0;
+            if (format is "gcz" or "wia" or "rvz" or "ciso" or "wbfs")
+            {
+                var blockSizeArg = options.IsSet("block_size")
+                    ? options.Get("block_size")
+                    : options.Get("chunk-size");
+
+                // CISO and WBFS have a natural default (2 MiB blocks/clusters); the RVZSharp
+                // writers are the ones that benefit from an explicit -b for the others.
+                if (blockSizeArg == null && (format is "ciso" or "wbfs"))
+                {
+                    blockSize = 0x200000;
+                }
+                else if (blockSizeArg == null)
+                {
+                    return Fail("Block size must be set for GCZ/RVZ/WIA");
+                }
+                else if (!int.TryParse(blockSizeArg, out blockSize))
+                {
+                    return Fail($"Block size '{blockSizeArg}' is not a number");
+                }
+
+                if (!IsDiscImageBlockSizeValid(blockSize, format))
+                {
+                    return Fail("Block size is not valid for this format");
+                }
+
+                if (blockSize is < 0x8000 or > 0x200000)
+                {
+                    Log.Warning("Block size is not ideal for performance. Continuing anyway.");
+                }
+            }
+
+            var compression = CompressionType.Zstd;
+            var level = 0;
+            var packing = true;
+            switch (format)
+            {
+                case "rvz":
+                case "wia":
+                {
+                    var compressionName = options.Get("compression");
+                    if (compressionName is null)
+                    {
+                        return Fail("Compression method must be set for WIA or RVZ");
+                    }
+
+                    compression = ParseCompression(compressionName);
+                    if ((format == "rvz" && compression == CompressionType.Purge) ||
+                        (format == "wia" && compression == CompressionType.Zstd))
+                    {
+                        return Fail("Compression type is not supported for the container format");
+                    }
+
+                    // PURGE has no level (it stores hash exceptions plus a raw stream) and
+                    // is a WIA-only method; the CLI exposes it as an RVZSharp extension.
+                    if (compression is CompressionType.None or CompressionType.Purge)
+                    {
+                        level = 0;
+                    }
+                    else
+                    {
+                        if (!options.IsSet("compression_level") ||
+                            !int.TryParse(options.Get("compression_level"), out level))
+                        {
+                            return Fail(
+                                "Compression level must be set when compression type is not 'none' or 'purge'");
+                        }
+
+                        var (min, max) = GetAllowedCompressionLevels(compression);
+                        if (level < min || level > max)
+                        {
+                            return Fail("Compression level not in acceptable range");
+                        }
+                    }
+
+                    if (options.IsSet("no-packing"))
+                    {
+                        packing = false;
+                    }
+
+                    break;
+                }
+            }
+
+            using var spooledInput = originalInput == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
             using var spooledOutput = originalOutput == "-" ? TemporaryFile.Create() : null;
             var inputPath = spooledInput?.Path ?? originalInput;
             var writePath = spooledOutput?.Path ?? originalOutput;
@@ -578,8 +758,7 @@ internal static class Program
             IBlobReader blob;
             try
             {
-                var file = File.OpenRead(inputPath);
-                blob = Blob.Open(file, filePath: inputPath, leaveOpen: false);
+                blob = OpenBlob(inputPath);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
@@ -621,13 +800,6 @@ internal static class Program
                     ConsoleProgress.Clear();
                 }
 
-                var maxThreads = 0;
-                if (options.IsSet("threads") &&
-                    (!int.TryParse(options.Get("threads"), out maxThreads) || maxThreads < 0))
-                {
-                    return Fail("Threads must be a non-negative integer (0 = processor count)");
-                }
-
                 if (format == "iso")
                 {
                     var decodeResult = DecodeBlob(input, writePath, expectedSha1: null, maxThreads,
@@ -636,87 +808,6 @@ internal static class Program
                         ? decodeResult
                         : FinishConvert(originalInput, originalOutput, writePath, format, input.Length,
                             inputHashes, json, spooledOutput);
-                }
-
-                var blockSize = 0;
-                if (format is "gcz" or "wia" or "rvz" or "ciso" or "wbfs")
-                {
-                    var blockSizeArg = options.IsSet("block_size")
-                        ? options.Get("block_size")
-                        : options.Get("chunk-size");
-
-                    // CISO and WBFS have a natural default (2 MiB blocks/clusters); the RVZSharp
-                    // writers are the ones that benefit from an explicit -b for the others.
-                    if (blockSizeArg == null && (format is "ciso" or "wbfs"))
-                    {
-                        blockSize = 0x200000;
-                    }
-                    else if (blockSizeArg == null || !int.TryParse(blockSizeArg, out blockSize))
-                    {
-                        return Fail("Block size must be set for GCZ/RVZ/WIA");
-                    }
-
-                    if (!IsDiscImageBlockSizeValid(blockSize, format))
-                    {
-                        return Fail("Block size is not valid for this format");
-                    }
-
-                    if (blockSize is < 0x8000 or > 0x200000)
-                    {
-                        Log.Warning("Block size is not ideal for performance. Continuing anyway.");
-                    }
-                }
-
-                var compression = CompressionType.Zstd;
-                var level = 0;
-                var packing = true;
-                switch (format)
-                {
-                    case "rvz":
-                    case "wia":
-                    {
-                        var compressionName = options.Get("compression");
-                        if (compressionName is null)
-                        {
-                            return Fail("Compression method must be set for WIA or RVZ");
-                        }
-
-                        compression = ParseCompression(compressionName);
-                        if ((format == "rvz" && compression == CompressionType.Purge) ||
-                            (format == "wia" && compression == CompressionType.Zstd))
-                        {
-                            return Fail("Compression type is not supported for the container format");
-                        }
-
-                        // PURGE has no level (it stores hash exceptions plus a raw stream) and
-                        // is a WIA-only method; the CLI exposes it as an RVZSharp extension.
-                        if (compression is CompressionType.None or CompressionType.Purge)
-                        {
-                            level = 0;
-                        }
-                        else
-                        {
-                            if (!options.IsSet("compression_level") ||
-                                !int.TryParse(options.Get("compression_level"), out level))
-                            {
-                                return Fail(
-                                    "Compression level must be set when compression type is not 'none' or 'purge'");
-                            }
-
-                            var (min, max) = GetAllowedCompressionLevels(compression);
-                            if (level < min || level > max)
-                            {
-                                return Fail("Compression level not in acceptable range");
-                            }
-                        }
-
-                        if (options.IsSet("no-packing"))
-                        {
-                            packing = false;
-                        }
-
-                        break;
-                    }
                 }
 
                 var writeOptions = new RvzWriteOptions
@@ -867,6 +958,8 @@ internal static class Program
                     case "--threads" when i + 1 < args.Count:
                         options = options with { MaxThreads = int.Parse(args[++i]) };
                         break;
+                    default:
+                        return Fail($"no such option: {args[i]}");
                 }
             }
 
@@ -875,10 +968,15 @@ internal static class Program
                 return Fail("PURGE compression is not supported for RVZ files.");
             }
 
-            var (min, max) = GetAllowedCompressionLevels(options.Compression);
-            if (options.CompressionLevel < min || options.CompressionLevel > max)
+            // NONE has no compression level; the default level (5) would otherwise fail the
+            // range check for every invocation with --compression none.
+            if (options.Compression != CompressionType.None)
             {
-                return Fail("Compression level not in acceptable range");
+                var (min, max) = GetAllowedCompressionLevels(options.Compression);
+                if (options.CompressionLevel < min || options.CompressionLevel > max)
+                {
+                    return Fail("Compression level not in acceptable range");
+                }
             }
 
             if (options.ChunkSize < 0x8000 ||
@@ -922,8 +1020,7 @@ internal static class Program
         IBlobReader blob;
         try
         {
-            var file = File.OpenRead(outputPath);
-            blob = Blob.Open(file, filePath: outputPath, leaveOpen: false);
+            blob = OpenBlob(outputPath);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
         {
@@ -1064,8 +1161,7 @@ internal static class Program
             IBlobReader blob;
             try
             {
-                var file = File.OpenRead(path);
-                blob = Blob.Open(file, filePath: path, leaveOpen: false);
+                blob = OpenBlob(path);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
@@ -1264,8 +1360,7 @@ internal static class Program
             IBlobReader blob;
             try
             {
-                var file = File.OpenRead(path);
-                blob = Blob.Open(file, filePath: path, leaveOpen: false);
+                blob = OpenBlob(path);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
@@ -1500,8 +1595,7 @@ internal static class Program
             IBlobReader blob;
             try
             {
-                var file = File.OpenRead(path);
-                blob = Blob.Open(file, filePath: path, leaveOpen: false);
+                blob = OpenBlob(path);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
@@ -1516,11 +1610,18 @@ internal static class Program
                     return Fail("The input is not a GameCube or Wii disc image.");
                 }
 
+                if (listOnly && quiet && !options.IsSet("output"))
+                {
+                    // Dolphin errors here: nothing would be printed (DolphinTool's
+                    // ExtractCommand requires an output file with --list --quiet).
+                    return Fail("--quiet is set but no output file was given; nothing would be printed");
+                }
+
                 var partitions = WiiVolume.GetPartitions(blob);
                 return listOnly
                     ? ExtractList(blob, partitions, singlePath, specificPartition, outputPath)
                     : ExtractToFolder(blob, partitions, singlePath, specificPartition, outputPath,
-                        quiet);
+                        quiet, Cancellation.Token);
             }
         }
         catch (Exception e)
@@ -1617,7 +1718,8 @@ internal static class Program
     }
 
     private static int ExtractToFolder(IBlobReader blob, IReadOnlyList<Partition> partitions,
-        string singlePath, string specificPartition, string outputFolder, bool quiet)
+        string singlePath, string specificPartition, string outputFolder, bool quiet,
+        CancellationToken cancellationToken)
     {
         var extracted = false;
 
@@ -1629,7 +1731,8 @@ internal static class Program
                     "--partition has a value even though this image doesn't have any partitions.");
             }
 
-            extracted = ExtractPartition(blob, null, string.Empty, singlePath, outputFolder, quiet);
+            extracted = ExtractPartition(blob, null, string.Empty, singlePath, outputFolder, quiet,
+                cancellationToken);
         }
         else
         {
@@ -1642,7 +1745,8 @@ internal static class Program
                     continue;
                 }
 
-                extracted |= ExtractPartition(blob, partition, name, singlePath, outputFolder, quiet);
+                extracted |= ExtractPartition(blob, partition, name, singlePath, outputFolder, quiet,
+                    cancellationToken);
             }
         }
 
@@ -1667,8 +1771,10 @@ internal static class Program
     }
 
     private static bool ExtractPartition(IBlobReader blob, Partition? partition,
-        string partitionName, string singlePath, string outputFolder, bool quiet)
+        string partitionName, string singlePath, string outputFolder, bool quiet,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var basePath = partitionName.Length > 0
             ? Path.Combine(outputFolder, partitionName)
             : outputFolder;
@@ -1691,7 +1797,7 @@ internal static class Program
                 singlePath.Replace('/', Path.DirectorySeparatorChar));
             if (info.IsDirectory)
             {
-                ExtractDirectory(fs, info, target, quiet);
+                ExtractDirectory(fs, info, target, quiet, cancellationToken);
             }
             else
             {
@@ -1702,7 +1808,7 @@ internal static class Program
                 }
 
                 using var output = File.Create(target);
-                fs.CopyFileTo(info, output);
+                fs.CopyFileTo(info, output, cancellationToken);
                 if (!quiet)
                 {
                     Console.Error.WriteLine($"Extracting: {info.Path}");
@@ -1714,29 +1820,30 @@ internal static class Program
 
         if (fs is not null)
         {
-            ExtractDirectory(fs, fs.Root, Path.Combine(basePath, "files"), quiet);
+            ExtractDirectory(fs, fs.Root, Path.Combine(basePath, "files"), quiet, cancellationToken);
         }
 
-        ExportSystemData(blob, fs, partition, basePath);
+        ExportSystemData(blob, fs, partition, basePath, cancellationToken);
         return true;
     }
 
     private static void ExtractDirectory(DiscFileSystem fs, DiscFileInfo directory,
-        string exportFolder, bool quiet)
+        string exportFolder, bool quiet, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(exportFolder);
         foreach (var child in directory.Children)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var path = Path.Combine(exportFolder,
                 child.Name + (child.IsDirectory ? Path.DirectorySeparatorChar.ToString() : string.Empty));
             if (child.IsDirectory)
             {
-                ExtractDirectory(fs, child, path, quiet);
+                ExtractDirectory(fs, child, path, quiet, cancellationToken);
             }
             else
             {
                 using var output = File.Create(path);
-                fs.CopyFileTo(child, output);
+                fs.CopyFileTo(child, output, cancellationToken);
                 if (!quiet)
                 {
                     Console.Error.WriteLine($"Extracting: {child.Path}");
@@ -1768,7 +1875,7 @@ internal static class Program
     /// partition ticket, TMD, certificate chain and H3 table.
     /// </summary>
     private static void ExportSystemData(IBlobReader blob, DiscFileSystem? fs,
-        Partition? partition, string basePath)
+        Partition? partition, string basePath, CancellationToken cancellationToken)
     {
         IBlobReader view = blob;
         PartitionReader? partitionView = null;
@@ -1782,22 +1889,25 @@ internal static class Program
         {
             var sys = Path.Combine(basePath, "sys");
             Directory.CreateDirectory(sys);
-            CopyData(view, 0x0, 0x440, Path.Combine(sys, "boot.bin"));
-            CopyData(view, 0x440, 0x2000, Path.Combine(sys, "bi2.bin"));
+            CopyData(view, 0x0, 0x440, Path.Combine(sys, "boot.bin"), cancellationToken);
+            CopyData(view, 0x440, 0x2000, Path.Combine(sys, "bi2.bin"), cancellationToken);
             if (WiiVolume.GetApploaderSize(view) is { } apploaderSize)
             {
-                CopyData(view, 0x2440, (long)apploaderSize, Path.Combine(sys, "apploader.img"));
+                CopyData(view, 0x2440, (long)apploaderSize, Path.Combine(sys, "apploader.img"),
+                    cancellationToken);
             }
 
             if (WiiVolume.GetBootDolOffset(view) is { } dolOffset &&
                 WiiVolume.GetBootDolSize(view, dolOffset) is { } dolSize)
             {
-                CopyData(view, (long)dolOffset, dolSize, Path.Combine(sys, "main.dol"));
+                CopyData(view, (long)dolOffset, dolSize, Path.Combine(sys, "main.dol"),
+                    cancellationToken);
             }
 
             if (fs is not null)
             {
-                CopyData(view, (long)fs.FstOffset, (long)fs.FstSize, Path.Combine(sys, "fst.bin"));
+                CopyData(view, (long)fs.FstOffset, (long)fs.FstSize, Path.Combine(sys, "fst.bin"),
+                    cancellationToken);
             }
 
             if (partition is null)
@@ -1807,20 +1917,20 @@ internal static class Program
 
             var disc = Path.Combine(basePath, "disc");
             Directory.CreateDirectory(disc);
-            CopyData(blob, 0x0, 0x100, Path.Combine(disc, "header.bin"));
-            CopyData(blob, 0x4E000, 0x20, Path.Combine(disc, "region.bin"));
+            CopyData(blob, 0x0, 0x100, Path.Combine(disc, "header.bin"), cancellationToken);
+            CopyData(blob, 0x4E000, 0x20, Path.Combine(disc, "region.bin"), cancellationToken);
 
             var offset = (long)partition.Value.Offset;
-            CopyData(blob, offset, 0x2A4, Path.Combine(basePath, "ticket.bin"));
+            CopyData(blob, offset, 0x2A4, Path.Combine(basePath, "ticket.bin"), cancellationToken);
             CopyPartitionBlob(blob, offset, offset + 0x2A4, offset + 0x2A8,
-                Path.Combine(basePath, "tmd.bin"));
+                Path.Combine(basePath, "tmd.bin"), cancellationToken);
             CopyPartitionBlob(blob, offset, offset + 0x2AC, offset + 0x2B0,
-                Path.Combine(basePath, "cert.bin"));
+                Path.Combine(basePath, "cert.bin"), cancellationToken);
             // Hashless discs (NKit/decrypted) have no H3 table (Dolphin: DiscExtractor.cpp).
             if (WiiVolume.HasWiiHashes(blob))
             {
                 CopyPartitionBlob(blob, offset, offset + 0x2B4, null,
-                    Path.Combine(basePath, "h3.bin"), fixedSize: 0x18000);
+                    Path.Combine(basePath, "h3.bin"), cancellationToken, fixedSize: 0x18000);
             }
         }
         finally
@@ -1835,7 +1945,7 @@ internal static class Program
     /// to them (Dolphin: DiscExtractor).
     /// </summary>
     private static void CopyPartitionBlob(IBlobReader blob, long partitionOffset, long sizeAddress,
-        long? offsetAddress, string path, int fixedSize = 0)
+        long? offsetAddress, string path, CancellationToken cancellationToken, int fixedSize = 0)
     {
         var size = fixedSize;
         if (size == 0 && !TryReadBe32(blob, sizeAddress, out size))
@@ -1850,11 +1960,13 @@ internal static class Program
                 return;
             }
 
-            CopyData(blob, partitionOffset + (long)((ulong)offset << 2), size, path);
+            CopyData(blob, partitionOffset + (long)((ulong)offset << 2), size, path,
+                cancellationToken);
         }
         else if (TryReadBe32(blob, sizeAddress, out var rawOffset))
         {
-            CopyData(blob, partitionOffset + (long)((ulong)rawOffset << 2), size, path);
+            CopyData(blob, partitionOffset + (long)((ulong)rawOffset << 2), size, path,
+                cancellationToken);
         }
     }
 
@@ -1871,7 +1983,8 @@ internal static class Program
         return false;
     }
 
-    private static void CopyData(IBlobReader reader, long offset, long size, string path)
+    private static void CopyData(IBlobReader reader, long offset, long size, string path,
+        CancellationToken cancellationToken)
     {
         using var output = File.Create(path);
         var buffer = new byte[1 << 20];
@@ -1879,6 +1992,7 @@ internal static class Program
         var remaining = size;
         while (remaining > 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var take = (int)Math.Min(buffer.Length, remaining);
             var read = reader.ReadAt(position, buffer.AsSpan(0, take));
             if (read <= 0)
@@ -1998,26 +2112,46 @@ internal static class Program
         }
     }
 
+    private static readonly Dictionary<string, OptionSpec> DecodeSpec = new()
+    {
+        ["sha1"] = new OptionSpec("--sha1", true, null),
+        ["threads"] = new OptionSpec("--threads", true, null)
+    };
+
     private static int Decode(string inputPath, string outputPath, IReadOnlyList<string> args)
     {
         try
         {
-            string? expectedSha1 = null;
-            var maxThreads = 1;
-            for (var i = 0; i < args.Count - 1; i++)
+            ParsedArgs options;
+            try
             {
-                if (args[i] == "--sha1")
-                {
-                    expectedSha1 = args[i + 1];
-                }
-                else if (args[i] == "--threads" &&
-                         (!int.TryParse(args[i + 1], out maxThreads) || maxThreads < 0))
-                {
-                    return Fail("Threads must be a non-negative integer (0 = processor count)");
-                }
+                options = ParseArgs(args, DecodeSpec);
+            }
+            catch (CliErrorException e)
+            {
+                Log.Warning(e, "CLI parse error in Decode");
+                return Fail(e.Message);
             }
 
-            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin() : null;
+            if (options.Positionals.Count > 0)
+            {
+                return Fail($"unexpected argument: {options.Positionals[0]}");
+            }
+
+            var expectedSha1 = options.Get("sha1");
+            var maxThreads = 1;
+            if (options.IsSet("threads") &&
+                (!int.TryParse(options.Get("threads"), out maxThreads) || maxThreads < 0))
+            {
+                return Fail("Threads must be a non-negative integer (0 = processor count)");
+            }
+
+            if (SameFile(inputPath, outputPath))
+            {
+                return Fail("The input and output files must be different.");
+            }
+
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
             using var spooledOutput = outputPath == "-" ? TemporaryFile.Create() : null;
             var readPath = spooledInput?.Path ?? inputPath;
             var writePath = spooledOutput?.Path ?? outputPath;

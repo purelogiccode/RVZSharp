@@ -36,9 +36,9 @@ jobs:
         run: dotnet restore CSharp_RVZSharp.sln
       - name: Build
         run: dotnet build CSharp_RVZSharp.sln -c Release --no-restore
-      - name: Fast tests (net8.0 + net9.0 + net10.0) with coverage
+      - name: Fast tests (library net8.0 + net9.0 + net10.0, CLI net10.0) with coverage
         run: >
-          dotnet test RVZSharp.Tests -c Release --no-build
+          dotnet test CSharp_RVZSharp.sln -c Release --no-build
           --collect:"XPlat Code Coverage"
           --results-directory artifacts/coverage
       - name: Upload coverage

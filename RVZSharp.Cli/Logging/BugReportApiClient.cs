@@ -31,7 +31,7 @@ internal sealed class BugReportApiClient : IDisposable
         _httpClient.DefaultRequestHeaders.Add("X-API-KEY", ApiKey);
         var assembly = typeof(BugReportApiClient).Assembly.GetName();
         _applicationName = assembly.Name ?? "RVZSharp";
-        _version = assembly.Version?.ToString(3) ?? "0.0.0";
+        _version = CliVersion.Product;
     }
 
     /// <summary>
@@ -106,7 +106,7 @@ internal sealed class BugReportApiClient : IDisposable
         sb.AppendLine($"OS Version: {Environment.OSVersion}");
         sb.AppendLine($"Architecture: {RuntimeInformation.OSArchitecture}");
         sb.AppendLine($"Bitness: {(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")}");
-        sb.AppendLine($"Windows Version: {GetWindowsVersion()}");
+        sb.AppendLine($"{PlatformLabel()} Version: {RuntimeInformation.OSDescription}");
         sb.AppendLine($"Processor Count: {Environment.ProcessorCount}");
         sb.AppendLine($"Base Directory: {AppContext.BaseDirectory}");
         sb.AppendLine($"Temp Path: {Path.GetTempPath()}");
@@ -133,11 +133,19 @@ internal sealed class BugReportApiClient : IDisposable
         return sb.ToString();
     }
 
-    private static string GetWindowsVersion()
+    private static string PlatformLabel()
     {
-        return OperatingSystem.IsWindows()
-            ? $"{Environment.OSVersion} ({RuntimeInformation.OSDescription})"
-            : RuntimeInformation.OSDescription;
+        if (OperatingSystem.IsWindows())
+        {
+            return "Windows";
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return "macOS";
+        }
+
+        return OperatingSystem.IsLinux() ? "Linux" : "OS";
     }
 
     private static string? Truncate(string? value, int maxLength)

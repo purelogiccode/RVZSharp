@@ -46,9 +46,17 @@ internal static class Completions
                                           return
                                       fi
 
+                                      command="${COMP_WORDS[1]}"
                                       case "$prev" in
-                                          -i|--input|-o|--output|-u|--user|-s|--single)
+                                          -i|--input|-o|--output|-u|--user)
                                               COMPREPLY=( $(compgen -f -- "$cur") )
+                                              return
+                                              ;;
+                                          -s|--single)
+                                              # convert's -s is --scrub (a flag); only extract's -s takes a path.
+                                              if [[ "$command" == "extract" ]]; then
+                                                  COMPREPLY=( $(compgen -f -- "$cur") )
+                                              fi
                                               return
                                               ;;
                                           -f|--format)
@@ -65,7 +73,6 @@ internal static class Completions
                                               ;;
                                       esac
 
-                                      command="${COMP_WORDS[1]}"
                                       case "$command" in
                                           convert) COMPREPLY=( $(compgen -W "$convert_opts" -- "$cur") ) ;;
                                           header) COMPREPLY=( $(compgen -W "$header_opts" -- "$cur") ) ;;
@@ -118,18 +125,22 @@ internal static class Completions
                                                  '--json[print the result as JSON]' \
                                                  '*:file:_files'
                                              ;;
-                                         header)
-                                             _arguments '-i[input file]:file:_files' '-j[print JSON]' \
-                                                 '-b[print block size]' '-c[print compression]' \
-                                                 '-l[print compression level]' '*:file:_files'
-                                             ;;
-                                         verify)
-                                             _arguments '-i[input file]:file:_files' \
-                                                 '-u[user folder]:directory:_directories' \
-                                                 '-a[digest]:algorithm:({{Algorithms}})' \
-                                                 '--partitions[verify Wii hash trees]' \
-                                                 '--json[print the result as JSON]' '*:file:_files'
-                                             ;;
+                                        header)
+                                            _arguments '(-i --input)'{-i,--input}'[input file]:file:_files' \
+                                                '(-j --json)'{-j,--json}'[print JSON]' \
+                                                '(-b --block_size)'{-b,--block_size}'[print block size]' \
+                                                '(-c --compression)'{-c,--compression}'[print compression]' \
+                                                '(-l --compression_level)'{-l,--compression_level}'[print compression level]' \
+                                                '(-h --help)'{-h,--help}'[show help]' '*:file:_files'
+                                            ;;
+                                        verify)
+                                            _arguments '(-i --input)'{-i,--input}'[input file]:file:_files' \
+                                                '(-u --user)'{-u,--user}'[user folder]:directory:_directories' \
+                                                '(-a --algorithm)'{-a,--algorithm}'[digest]:algorithm:({{Algorithms}})' \
+                                                '--partitions[verify Wii hash trees]' \
+                                                '--json[print the result as JSON]' \
+                                                '(-h --help)'{-h,--help}'[show help]' '*:file:_files'
+                                            ;;
                                          extract)
                                              _arguments '-i[input file]:file:_files' \
                                                  '-o[output directory]:directory:_directories' \
@@ -223,6 +234,23 @@ internal static class Completions
 
                                           $elements = @($commandAst.CommandElements | ForEach-Object { $_.Extent.Text })
                                           $command = if ($elements.Count -ge 2) { $elements[1] } else { $null }
+
+                                          # Complete option values for -f/-c/-a like the POSIX scripts do.
+                                          $last = if ($elements.Count -ge 1) { $elements[-1] } else { $null }
+                                          $previous = if ($last -and $last.StartsWith('-')) { $last }
+                                                      elseif ($elements.Count -ge 2) { $elements[-2] } else { $null }
+                                          $values = switch ($previous) {
+                                              { $_ -in '-f', '--format' } { @('iso', 'gcz', 'wia', 'rvz', 'ciso', 'wbfs', 'tgc') }
+                                              { $_ -in '-c', '--compression' } { @('none', 'zstd', 'bzip2', 'lzma', 'lzma2', 'purge') }
+                                              { $_ -in '-a', '--algorithm' } { @('crc32', 'md5', 'sha1') }
+                                              default { $null }
+                                          }
+                                          if ($values) {
+                                              $values |
+                                                  Where-Object { $_ -like "$wordToComplete*" } |
+                                                  ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+                                              return
+                                          }
 
                                           if ($null -eq $command -or $command.StartsWith('-')) {
                                               @('convert', 'header', 'verify', 'extract', 'info', 'decode', 'completions') |

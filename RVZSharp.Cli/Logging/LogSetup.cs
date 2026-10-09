@@ -40,14 +40,21 @@ internal static class LogSetup
     }
 
     /// <summary>
-    /// Flushes and closes Serilog, waits up to 20 seconds for queued bug reports to reach
-    /// the API, and disposes the bug-report client. Call once at shutdown.
+    /// Flushes and closes Serilog, waits up to 5 seconds for queued bug reports to reach
+    /// the API (only when something is actually queued), and disposes the bug-report client.
+    /// Call once at shutdown.
     /// </summary>
     public static void Shutdown()
     {
         Log.CloseAndFlush();
-        // Wait for the queued bug reports to reach the API before disposing the client.
-        _bugReportSink?.FlushAsync().Wait(TimeSpan.FromSeconds(20));
+        // Wait for the queued bug reports to reach the API before disposing the client, but
+        // only when there is something to wait for: best-effort telemetry must not hold a
+        // finished command open.
+        if (_bugReportSink?.HasPending == true)
+        {
+            _bugReportSink.FlushAsync().Wait(TimeSpan.FromSeconds(5));
+        }
+
         _bugReportClient?.Dispose();
     }
 }

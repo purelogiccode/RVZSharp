@@ -45,11 +45,13 @@ internal static class Program
         var updateChecker = new UpdateChecker();
         var updateCheck = updateChecker.CheckAsync();
 
-        // Only a bare "-h"/"--help" (or no arguments) prints the global usage here; a help
-        // flag inside a command reaches that command's own usage block (and exits 0).
-        var usageOnly = args.Length == 0 || args[0] is "-h" or "--help" ||
+        // Help/usage runs print text and do no work: no telemetry wait and no update
+        // prompt in the finally block below. That is no arguments, an unknown command,
+        // or any -h/--help flag (bare or inside a command, whose own usage then exits 0).
+        var usageOnly = args.Length == 0 ||
                         args[0] is not ("convert" or "header" or "verify" or "extract" or
-                            "completions" or "info" or "decode");
+                            "completions" or "info" or "decode") ||
+                        args.Any(a => a is "-h" or "--help");
 
         try
         {
@@ -67,7 +69,9 @@ internal static class Program
                 "extract" => ExtractCommand(args[1..]),
                 "completions" when args.Length >= 2 => CompletionsCommand(args[1]),
                 "info" when args.Length >= 2 => Info(args[1]),
-                "decode" when args.Length >= 3 => Decode(args[1], args[2], args[3..]),
+                "decode" when args.Length >= 2 => Decode(args[1],
+                    args.Length > 2 ? args[2] : string.Empty,
+                    args.Length > 2 ? args[3..] : []),
                 _ => PrintUsageAndFail()
             };
         }
@@ -1155,7 +1159,7 @@ internal static class Program
                 return Fail("No input set");
             }
 
-            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin() : null;
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
             var path = spooledInput?.Path ?? inputPath;
 
             IBlobReader blob;
@@ -1354,7 +1358,7 @@ internal static class Program
             var json = options.HasFlag("json");
 
             var inputPath = options.Get("input")!;
-            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin() : null;
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
             var path = spooledInput?.Path ?? inputPath;
 
             IBlobReader blob;
@@ -1583,13 +1587,19 @@ internal static class Program
             var quiet = options.HasFlag("quiet");
             var listOnly = options.HasFlag("list");
             var singlePath = options.Get("single") ?? string.Empty;
+            if (singlePath.Length > 0 &&
+                !singlePath.Split('/', StringSplitOptions.RemoveEmptyEntries).All(IsSafePathSegment))
+            {
+                return Fail($"Invalid -s path '{singlePath}': use '/' separators, a relative path without '..'.");
+            }
+
             var specificPartition = options.Get("partition") ?? string.Empty;
             if (options.HasFlag("gameonly"))
             {
                 specificPartition = "DATA";
             }
 
-            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin() : null;
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
             var path = spooledInput?.Path ?? inputPath;
 
             IBlobReader blob;
@@ -1770,6 +1780,39 @@ internal static class Program
         return 0;
     }
 
+    /// <summary>
+    /// True when a single file/folder name cannot escape its parent directory: non-empty,
+    /// not "." or "..", with no separators, no drive/root qualifier and no invalid chars.
+    /// </summary>
+    internal static bool IsSafePathSegment(string segment) =>
+        segment.Length > 0 && segment is not "." and not ".." &&
+        segment.IndexOfAny(['/', '\\']) < 0 && !Path.IsPathRooted(segment) &&
+        segment.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+
+    /// <summary>
+    /// Builds the output path for a user-supplied <c>-s</c> path (Dolphin-style, e.g.
+    /// "/sys/boot.bin") under <paramref name="basePath"/>/files, one safe segment at a
+    /// time, so an absolute path or ".." can never escape the output folder. Throws
+    /// <see cref="CliErrorException"/> when a segment is unsafe (validated up front in
+    /// <see cref="ExtractCommand"/>; this is defense in depth).
+    /// </summary>
+    internal static string BuildSingleTarget(string basePath, string singlePath)
+    {
+        var target = Path.Combine(basePath, "files");
+        foreach (var segment in singlePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!IsSafePathSegment(segment))
+            {
+                throw new CliErrorException(
+                    $"The -s path '{singlePath}' is not a valid relative file path.");
+            }
+
+            target = Path.Combine(target, segment);
+        }
+
+        return target;
+    }
+
     private static bool ExtractPartition(IBlobReader blob, Partition? partition,
         string partitionName, string singlePath, string outputFolder, bool quiet,
         CancellationToken cancellationToken)
@@ -1793,8 +1836,7 @@ internal static class Program
                 return false;
             }
 
-            var target = Path.Combine(basePath, "files",
-                singlePath.Replace('/', Path.DirectorySeparatorChar));
+            var target = BuildSingleTarget(basePath, singlePath);
             if (info.IsDirectory)
             {
                 ExtractDirectory(fs, info, target, quiet, cancellationToken);
@@ -1834,6 +1876,14 @@ internal static class Program
         foreach (var child in directory.Children)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            // Names come from the image itself: a hostile FST could otherwise write
+            // outside the export folder ("..", separators, rooted paths).
+            if (!IsSafePathSegment(child.Name))
+            {
+                throw new RvzFormatException(
+                    $"The image names a file or folder '{child.Name}' that cannot be extracted safely.");
+            }
+
             var path = Path.Combine(exportFolder,
                 child.Name + (child.IsDirectory ? Path.DirectorySeparatorChar.ToString() : string.Empty));
             if (child.IsDirectory)
@@ -2043,7 +2093,7 @@ internal static class Program
     {
         try
         {
-            using var spooledInput = path == "-" ? TemporaryFile.SpoolStdin() : null;
+            using var spooledInput = path == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
             var readPath = spooledInput?.Path ?? path;
 
             using var file = File.OpenRead(readPath);
@@ -2122,6 +2172,20 @@ internal static class Program
     {
         try
         {
+            if (inputPath is "-h" or "--help")
+            {
+                Console.Error.WriteLine(
+                    "usage: decode <FILE> <OUT> [--sha1 <hex>] [--threads <int>]\n"
+                    + "  decode any blob (RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, ISO) to a plain ISO.\n"
+                    + "  - as FILE reads stdin; - as OUT writes stdout.");
+                return 0;
+            }
+
+            if (outputPath.Length == 0)
+            {
+                return Fail("No output set. usage: decode <FILE> <OUT> [--sha1 <hex>] [--threads <int>]");
+            }
+
             ParsedArgs options;
             try
             {

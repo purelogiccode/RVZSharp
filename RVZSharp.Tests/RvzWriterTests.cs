@@ -544,6 +544,20 @@ public class RvzWriterTests
         Assert.All(reader.RawDataEntries, entry => Assert.True(entry.NumGroups > 0));
     }
 
+    /// <summary>Verifies that an all-zero Wii partition round trips.</summary>
+    [Theory]
+    [MemberData(nameof(CompressionCases))]
+    public void WiiIso_AllZeroPartitionData_RoundTrips(CompressionType compression, bool packing)
+    {
+        // All-zero decrypted data with matching hashes: the writer stores every chunk as a
+        // zero group (stored size 0, no exception lists) and the reader must decode those
+        // back to zeroes instead of rejecting the missing lists.
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        var iso = TestWiiIsoBuilder.Build(key, 130, new byte[130 * 0x7C00]);
+        var rvz = Convert(iso, compression, packing);
+        Assert.Equal(iso, Decode(rvz));
+    }
+
     /// <summary>Verifies that Wii ISO junk in partition data round trips.</summary>
     [Fact]
     public void WiiIso_JunkInPartitionData_RoundTrips()

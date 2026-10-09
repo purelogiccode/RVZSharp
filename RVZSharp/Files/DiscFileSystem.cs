@@ -221,9 +221,15 @@ public sealed class DiscFileSystem : IDisposable
         stack.Push(0);
         for (uint i = 1; i < totalEntries; i++)
         {
-            while (i >= ends[stack.Peek()])
+            while (stack.Count > 0 && i >= ends[stack.Peek()])
             {
                 stack.Pop();
+            }
+
+            if (stack.Count == 0)
+            {
+                throw new RvzFormatException(
+                    $"File system entry {i} lies outside every directory's subtree range.");
             }
 
             var parentIndex = stack.Peek();

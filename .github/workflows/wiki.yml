@@ -37,7 +37,9 @@ jobs:
           WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WIKI_TOKEN)) {
-            Write-Error 'The WIKI_TOKEN secret is not set. See the workflow header and docs/packaging.md for the one-time setup.'
+            # NOTE: Write-Error alone does not fail a pwsh step; throw so a missing
+            # secret fails fast here instead of obscurely at the wiki clone below.
+            throw 'The WIKI_TOKEN secret is not set. See the workflow header and docs/packaging.md for the one-time setup.'
           }
 
       - name: Build wiki staging tree

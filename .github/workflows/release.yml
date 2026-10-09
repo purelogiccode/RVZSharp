@@ -2,8 +2,8 @@ name: Release
 
 # Builds the release bundles and publishes them on GitHub.
 #
-#   Push a tag `v<version>` (e.g. `v1.1.0`, `v1.2.0-beta.1`; must be valid SemVer
-#   after the leading `v`) to:
+#   Push a tag `v<version>` (e.g. `v1.1.0`, `v1.2.0-beta.1`; valid SemVer after the
+#   leading `v`, no `+build` metadata) to:
 #     1. publish the self-contained single-file CLI for win-x64, linux-x64, osx-x64
 #        and osx-arm64, smoke-test each binary, and zip it with LICENSE,
 #        THIRD-PARTY-NOTICES.md and README.md -> rvzsharp-<version>-<rid>.zip
@@ -57,7 +57,9 @@ jobs:
             if ('${{ github.ref_type }}' -ne 'tag') { throw 'No version input and this is not a tag push.' }
             $raw = '${{ github.ref_name }}'
           }
-          $version = $raw.TrimStart('v')
+          # Strip exactly one leading 'v' (TrimStart would eat them all: 'vv1.2.3').
+          # Build metadata ('+...') is rejected: -p:Version cannot represent it.
+          $version = $raw.StartsWith('v') ? $raw.Substring(1) : $raw
           if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$') { throw "Not SemVer: '$raw'." }
           $prerelease = [bool]($version -match '-')
           "version=$version" >> $env:GITHUB_OUTPUT

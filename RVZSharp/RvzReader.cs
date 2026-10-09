@@ -868,6 +868,14 @@ public sealed class RvzReader : IBlobReader
     private HashExceptionEntry[] GetSectorExceptions(long chunkIndex, long regionIndex,
         long sector, HashExceptionEntry[][] lists)
     {
+        if (lists.Length == 0)
+        {
+            // Stored-size-0 groups ("all zeroes" in the format) carry no exception lists;
+            // every sector of such a chunk is exception-free (see DecodeStoredGroup, and
+            // the writer's zero-group optimization in WiaRvzWriter.CompressGroup).
+            return [];
+        }
+
         var chunkRegionBase = chunkIndex * PartitionChunkPayloadSize / RegionDataSize;
         var listIndex = (int)(regionIndex - chunkRegionBase);
         if (listIndex < 0 || listIndex >= lists.Length)

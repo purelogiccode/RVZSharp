@@ -3,8 +3,8 @@ using RVZSharp.Models;
 namespace RVZSharp.Interfaces;
 
 /// <summary>
-/// Creates streaming decompressors for one RVZ compression method. The RVZ container only needs
-/// decompression; encoding support (for writing RVZ files) can be added later behind the same type.
+/// Creates streaming decompressors for one RVZ compression method. The write side is
+/// <see cref="ICompressionEncoder"/> / <see cref="RVZSharp.Compression.CompressionEncoderFactory"/>.
 /// </summary>
 public interface ICompressionDecoder
 {

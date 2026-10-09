@@ -167,6 +167,26 @@ public readonly struct WiaFileHead
         {
             throw new RvzHashMismatchException("The file head SHA-1 does not match its contents.");
         }
+
+        // Bound the disc struct before the caller allocates it: a hostile head can otherwise
+        // request a multi-gigabyte allocation (the SHA-1 is unkeyed and recomputable).
+        if (DiscSize < WiaDisc.MinSize)
+        {
+            throw new RvzFormatException(
+                $"The disc struct size {DiscSize} is smaller than the minimum {WiaDisc.MinSize}.");
+        }
+
+        if ((ulong)DiscSize > (ulong)actualFileSize - Size)
+        {
+            throw new RvzFormatException(
+                $"The disc struct size {DiscSize} does not fit the {actualFileSize}-byte file.");
+        }
+
+        if (IsoFileSize > long.MaxValue)
+        {
+            throw new RvzFormatException(
+                $"The declared ISO size {IsoFileSize} is not representable.");
+        }
     }
 
     /// <summary>

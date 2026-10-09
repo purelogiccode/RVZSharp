@@ -10,7 +10,7 @@ namespace RVZSharp.Wii;
 /// decrypted data plus the hash exceptions (every 20-byte hash that differs from the
 /// original, with chunk-relative offsets — Dolphin: ProcessAndCompress).
 /// </summary>
-public sealed class WiiPartitionExtractor
+public sealed class WiiPartitionExtractor : IDisposable
 {
     private readonly Interfaces.IBlobReader _input;
     private readonly byte[] _key;
@@ -42,14 +42,29 @@ public sealed class WiiPartitionExtractor
     public (byte[] Data, List<HashExceptionEntry> Exceptions) ExtractRegion(
         long discOffset, int blockCount)
     {
+        if (blockCount is < 1 or > PartitionRegionBuilder.SectorsPerRegion)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(blockCount),
+                $"A region has 1 to {PartitionRegionBuilder.SectorsPerRegion} sectors, got {blockCount}.");
+        }
+
         try
         {
             return ExtractRegionCore(discOffset, blockCount);
         }
-        catch (Exception e)
+        catch (Exception e) when (e is not (OperationCanceledException or RvzException))
         {
+            // Cancellation and format errors keep their documented exception types; only
+            // unexpected failures are wrapped for context.
             throw new InvalidOperationException($"ExtractRegion(0x{discOffset:X}, {blockCount}): {e}", e);
         }
+    }
+
+    /// <summary>Releases the AES context.</summary>
+    public void Dispose()
+    {
+        _aes.Dispose();
     }
 
     private (byte[] Data, List<HashExceptionEntry> Exceptions) ExtractRegionCore(

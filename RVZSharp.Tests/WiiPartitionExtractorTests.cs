@@ -145,12 +145,13 @@ public class WiiPartitionExtractorTests
         Assert.NotEmpty(exceptions);
     }
 
-    /// <summary>Verifies that short input throws.</summary>
+    /// <summary>Verifies that short input throws the documented format exception.</summary>
     [Fact]
     public void ShortInput_Throws()
     {
         using var blob = CreateDisc(new byte[0x8000], 0);
-        var extractor = CreateExtractor(blob, Key());
-        Assert.Throws<InvalidOperationException>(() => extractor.ExtractRegion(0, 2));
+        using var extractor = CreateExtractor(blob, Key());
+        // Format errors keep their type (only unexpected failures are wrapped).
+        Assert.Throws<RvzFormatException>(() => extractor.ExtractRegion(0, 2));
     }
 }

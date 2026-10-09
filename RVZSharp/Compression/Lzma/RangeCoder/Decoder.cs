@@ -48,21 +48,6 @@ internal class Decoder
     // next chunk header read. Set via SetFastLimit once the caller knows the chunk/stream size.
     private long _fastLimit = -1;
 
-    // Whether it is safe to bulk-read ahead of the decoder even without a known _fastLimit.
-    // This is only true for streams that are guaranteed to self-clamp Read() to their own
-    // logical end and never return bytes that belong to something else - e.g. 7Zip's
-    // per-folder BufferedSubStream, which limits every Read() to its own remaining pack size.
-    // It is false for everything else, notably a shared streaming Zip reader stream with an
-    // unknown compressed size (data-descriptor entries): that stream keeps handing out bytes
-    // past the logical end of this LZMA stream (the next entry's header, etc.) with no self
-    // clamping and no way to give unread bytes back, so bulk-buffering there would
-    // desynchronize the stream. Note a stream reporting a queryable Length is NOT a reliable
-    // signal here: some wrapper streams (e.g. SharpCompressStream's ring-buffer mode used for
-    // over-read recording on non-seekable Zip streams) expose a Length without actually
-    // bounding Read() to the current logical stream's end. In the unsafe case we fall back to
-    // reading exactly one byte at a time, matching a plain per-byte read of the stream.
-    private bool _fastBufferSafeUnbounded;
-
     /// <summary>Sets the byte limit of the fast buffered reader (in total bytes); -1 means unbounded.</summary>
     /// <param name="limit">The maximum total number of bytes to read from the stream.</param>
     public void SetFastLimit(long limit)
@@ -88,7 +73,6 @@ internal class Decoder
         FastBufferPos = 0;
         FastBufferLen = 0;
         _fastEndOfStream = false;
-        _fastBufferSafeUnbounded = false;
     }
 
     /// <summary>Returns the fast read buffer to the pool, drops the buffered data and detaches the stream.</summary>
@@ -141,8 +125,10 @@ internal class Decoder
             var remaining = _fastLimit - Total;
             requestSize = remaining <= 0 ? 1 : (int)Math.Min(requestSize, remaining);
         }
-        else if (!_fastBufferSafeUnbounded)
+        else
         {
+            // Without a known limit the stream may hand out bytes belonging to something else
+            // (e.g. the next chunk's header), so read exactly one byte at a time.
             requestSize = 1;
         }
 

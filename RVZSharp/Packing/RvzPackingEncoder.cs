@@ -28,7 +28,9 @@ public static class RvzPackingEncoder
     /// <param name="bytesPerChunk">Chunk payload size; for partitions this is the payload per
     /// chunk (chunk_size × 0x7C00 / 0x8000).</param>
     /// <param name="chunks">Number of chunks in the enclosing data entry.</param>
-    /// <param name="allowJunkReuse">True when chunks cannot be re-paired (2 MiB chunks).</param>
+    /// <param name="allowJunkReuse">True when the packer may rely on junk reuse across chunks
+    /// (the packed-size-0 shortcut); false forces every chunk to carry an explicit segment
+    /// stream.</param>
     /// <param name="compression">Whether the disc uses a compression method (zero runs are only
     /// packed as zero-junk when this is false).</param>
     /// <param name="mainData">The segment stream is appended here.</param>
@@ -85,8 +87,9 @@ public static class RvzPackingEncoder
             // Dolphin disables the "no junk → store without size headers" shortcut for
             // multipart data entries (first_loop_iteration = !multipart, WIABlob.cpp:1237):
             // every chunk of a multi-chunk entry gets a proper segment stream, so the
-            // reader can always tell where one chunk's data ends.
-            var firstLoopIteration = chunks <= 1;
+            // reader can always tell where one chunk's data ends. The same shortcut is
+            // unavailable when junk reuse is disallowed (Dolphin: store_junk_efficiently).
+            var firstLoopIteration = chunks <= 1 && allowJunkReuse;
 
             while (currentOffset < endOffset)
             {

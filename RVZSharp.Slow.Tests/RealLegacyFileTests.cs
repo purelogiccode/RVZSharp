@@ -16,26 +16,34 @@ public class RealLegacyFileTests
 {
     private readonly ITestOutputHelper _testOutputHelper;
 
+    /// <summary>Creates the test class with xUnit's output helper.</summary>
+    /// <param name="testOutputHelper">The xUnit output helper for diagnostic messages.</param>
     public RealLegacyFileTests(ITestOutputHelper testOutputHelper)
     {
         _testOutputHelper = testOutputHelper;
     }
 
+    /// <summary>Verifies that the GCZ reader decodes <c>RVZ_REAL_GCZ</c> to its expected SHA-1.</summary>
     [Fact]
     public void DecodeRealGcz() => Decode("RVZ_REAL_GCZ");
 
+    /// <summary>Verifies that the CISO reader decodes <c>RVZ_REAL_CISO</c> to its expected SHA-1.</summary>
     [Fact]
     public void DecodeRealCiso() => Decode("RVZ_REAL_CISO");
 
+    /// <summary>Verifies that the WBFS reader decodes <c>RVZ_REAL_WBFS</c> to its expected SHA-1.</summary>
     [Fact]
     public void DecodeRealWbfs() => Decode("RVZ_REAL_WBFS");
 
+    /// <summary>Verifies that the TGC reader decodes <c>RVZ_REAL_TGC</c> to its expected SHA-1.</summary>
     [Fact]
     public void DecodeRealTgc() => Decode("RVZ_REAL_TGC");
 
+    /// <summary>Verifies that the WIA reader decodes <c>RVZ_REAL_WIA</c> to its expected SHA-1.</summary>
     [Fact]
     public void DecodeRealWia() => Decode("RVZ_REAL_WIA");
 
+    /// <summary>Verifies that the NFS reader decodes <c>RVZ_REAL_NFS</c> (with its key) to its expected SHA-1.</summary>
     [Fact]
     public void DecodeRealNfs()
     {

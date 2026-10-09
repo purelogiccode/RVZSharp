@@ -48,7 +48,7 @@ pack time against the published package via `PackageValidationBaselineVersion`).
 
 - GitHub Actions CI (fast tests on `net8.0`/`net9.0`/`net10.0` with coverage, pack with API
   validation + embedded SPDX 2.2 SBOM, smoke-tested ReadyToRun CLI artifact) and Dependabot.
-- **468 fast tests** on each target framework plus 276 real-file slow tests (90 RVZ games).
+- **602 library tests** on each target framework plus **40 CLI tests** and 276 real-file slow tests (90 RVZ games).
 
 ## 1.0.0 (2026-08-15)
 

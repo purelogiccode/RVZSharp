@@ -10,6 +10,8 @@ public class RealFileDecodeTests
 {
     private readonly ITestOutputHelper _testOutputHelper;
 
+    /// <summary>Creates the test class with xUnit's output helper.</summary>
+    /// <param name="testOutputHelper">The xUnit output helper for diagnostic messages.</param>
     public RealFileDecodeTests(ITestOutputHelper testOutputHelper)
     {
         _testOutputHelper = testOutputHelper;

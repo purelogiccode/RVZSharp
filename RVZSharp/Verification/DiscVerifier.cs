@@ -234,7 +234,9 @@ public static class DiscVerifier
 
         if (partition.Offset + header.TmdOffset + header.TmdSize > (ulong)disc.Length)
         {
-            issues.Add(new VerificationIssue(VerificationSeverity.Medium,
+            // Same condition as ParseHeader's High issue: only High problems invalidate the
+            // report, so both checks must agree.
+            issues.Add(new VerificationIssue(VerificationSeverity.High,
                 "The partition TMD is outside the image.", partition.Offset, partition.Type));
             return false;
         }
@@ -259,10 +261,13 @@ public static class DiscVerifier
         }
 
         var contentCount = ReadBe16(tmd, TmdContentCountOffset);
-        if (contentCount == 0)
+        if (contentCount != 1)
         {
+            // Dolphin's CheckH3TableIntegrity requires exactly one content: the H3 table is
+            // the single content, so any other count makes the H3 comparison meaningless.
             issues.Add(new VerificationIssue(VerificationSeverity.Medium,
-                "The partition TMD declares no contents.", partition.Offset, partition.Type));
+                $"The partition TMD declares {contentCount} contents (the H3 table requires exactly one).",
+                partition.Offset, partition.Type));
             return false;
         }
 

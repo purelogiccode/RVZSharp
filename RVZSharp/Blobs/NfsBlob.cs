@@ -134,17 +134,31 @@ public sealed class NfsBlob : IBlobReader
 
             var fileCount = (int)((expectedRawSize + MaxFileSize - 1) / MaxFileSize);
             var rawSize = stream.Length;
-            for (var i = 1; i < fileCount; i++)
+            try
             {
-                var childPath = Path.Combine(directory, $"hif_{i:D6}.nfs");
-                if (!File.Exists(childPath))
+                for (var i = 1; i < fileCount; i++)
                 {
-                    throw new RvzFormatException($"Failed to open the NFS continuation file {childPath}.");
+                    var childPath = Path.Combine(directory, $"hif_{i:D6}.nfs");
+                    if (!File.Exists(childPath))
+                    {
+                        throw new RvzFormatException($"Failed to open the NFS continuation file {childPath}.");
+                    }
+
+                    var child = File.OpenRead(childPath);
+                    files.Add(child);
+                    rawSize += child.Length;
+                }
+            }
+            catch
+            {
+                // The caller owns the first stream on failure; the internally opened
+                // continuation files must always be released.
+                foreach (var file in files.Skip(1))
+                {
+                    file.Dispose();
                 }
 
-                var child = File.OpenRead(childPath);
-                files.Add(child);
-                rawSize += child.Length;
+                throw;
             }
 
             if (rawSize < (long)expectedRawSize)

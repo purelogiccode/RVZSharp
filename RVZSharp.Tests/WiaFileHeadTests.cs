@@ -55,13 +55,17 @@ public class WiaFileHeadTests
     [Fact]
     public void Validate_WiaMagicWithRvzRules_ThrowsFormatException()
     {
-        var builder = new TestHeaderBuilder { Magic = WiaFileHead.WiaMagic.ToArray() };
+        var builder = new TestHeaderBuilder
+        {
+            Magic = WiaFileHead.WiaMagic.ToArray(),
+            RvzFileSize = WiaFileHead.Size + 0xDC
+        };
         var bytes = builder.Build();
         var head = WiaFileHead.Parse(bytes);
 
         // The RVZ overload rejects WIA magic; the WIA overload accepts it.
-        Assert.Throws<RvzFormatException>(() => head.Validate(bytes, bytes.Length));
-        head.Validate(bytes, bytes.Length, WiaRvzFormat.Wia); // must not throw
+        Assert.Throws<RvzFormatException>(() => head.Validate(bytes, bytes.Length + 0xDC));
+        head.Validate(bytes, bytes.Length + 0xDC, WiaRvzFormat.Wia); // must not throw
     }
 
     /// <summary>Verifies that validate version too old throws unsupported exception.</summary>
@@ -111,10 +115,37 @@ public class WiaFileHeadTests
     [Fact]
     public void Validate_ValidHeader_Passes()
     {
-        var bytes = new TestHeaderBuilder().Build();
+        var builder = new TestHeaderBuilder { RvzFileSize = WiaFileHead.Size + 0xDC };
+        var bytes = builder.Build();
         var head = WiaFileHead.Parse(bytes);
 
-        head.Validate(bytes, bytes.Length); // must not throw
+        head.Validate(bytes, bytes.Length + 0xDC); // must not throw
+    }
+
+    /// <summary>Verifies that an impossible disc struct size is rejected before allocation.</summary>
+    [Fact]
+    public void Validate_DiscSizeOutOfRange_ThrowsFormatException()
+    {
+        var builder = new TestHeaderBuilder
+        {
+            DiscSize = 0xFFFFFFFF,
+            RvzFileSize = WiaFileHead.Size + 0xDC
+        };
+        var bytes = builder.Build();
+        var head = WiaFileHead.Parse(bytes);
+
+        var exception = Assert.Throws<RvzFormatException>(
+            () => head.Validate(bytes, bytes.Length + 0xDC));
+        Assert.Contains("disc struct", exception.Message);
+
+        var tooSmall = new TestHeaderBuilder
+        {
+            DiscSize = 0x10,
+            RvzFileSize = WiaFileHead.Size + 0xDC
+        };
+        var smallBytes = tooSmall.Build();
+        var smallHead = WiaFileHead.Parse(smallBytes);
+        Assert.Throws<RvzFormatException>(() => smallHead.Validate(smallBytes, smallBytes.Length + 0xDC));
     }
 
     /// <summary>Verifies that format version matches dolphin style.</summary>

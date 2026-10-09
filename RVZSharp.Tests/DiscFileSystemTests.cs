@@ -135,7 +135,7 @@ public class DiscFileSystemTests
         var partition = WiiVolume.GetPartitions(blob)[0];
         using var view = new PartitionReader(blob, partition);
 
-        Assert.Equal(sectorCount * 0x8000, view.Length);
+        Assert.Equal(sectorCount * 0x7C00, view.Length);
 
         var firstSector = new byte[0x8000];
         Assert.Equal(firstSector.Length, view.ReadAt(0, firstSector));
@@ -155,6 +155,214 @@ public class DiscFileSystemTests
 
         using var blob = PlainBlob.Open(new MemoryStream(iso));
         Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+    }
+
+    /// <summary>Verifies that a boot header without FST fields is rejected.</summary>
+    [Fact]
+    public void GameCube_MissingFstFields_Throws()
+    {
+        var iso = new byte[0x100];
+        iso[0x1C] = 0xC2;
+        iso[0x1D] = 0x33;
+        iso[0x1E] = 0x9F;
+        iso[0x1F] = 0x3D;
+
+        using var blob = PlainBlob.Open(new MemoryStream(iso));
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("FST offset", exception.Message);
+    }
+
+    /// <summary>Verifies that an FST smaller than one entry is rejected.</summary>
+    [Fact]
+    public void GameCube_FstSizeTooSmall_Throws()
+    {
+        using var blob = OpenGcWithFst(BuildSingleFileFst(0x4000, 8), fstSize: 8);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("too small", exception.Message);
+    }
+
+    /// <summary>Verifies that an abnormally large FST size is rejected before reading.</summary>
+    [Fact]
+    public void GameCube_FstSizeAbnormallyLarge_Throws()
+    {
+        using var blob = OpenGcWithFst(BuildSingleFileFst(0x4000, 8), fstSize: 128 * 1024 * 1024 + 1);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("abnormally large", exception.Message);
+    }
+
+    /// <summary>Verifies that an FST extending past the image is rejected.</summary>
+    [Fact]
+    public void GameCube_TruncatedFst_Throws()
+    {
+        var fst = BuildSingleFileFst(0x4000, 8);
+        using var blob = OpenGcWithFst(fst, fstOffset: 0x1FFFF0, fstSize: (uint)fst.Length);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("truncated", exception.Message);
+    }
+
+    /// <summary>Verifies that an FST whose last byte is not NUL is rejected.</summary>
+    [Fact]
+    public void GameCube_FstWithoutTrailingNull_Throws()
+    {
+        var fst = BuildSingleFileFst(0x4000, 8);
+        fst[^1] = 1;
+        using var blob = OpenGcWithFst(fst);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("null byte", exception.Message);
+    }
+
+    /// <summary>Verifies that an FST declaring zero entries is rejected.</summary>
+    [Fact]
+    public void GameCube_ZeroEntryFst_Throws()
+    {
+        var fst = new byte[16];
+        WriteBe32(fst, 0, 0x01000000);
+        using var blob = OpenGcWithFst(fst);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("0 entries", exception.Message);
+    }
+
+    /// <summary>Verifies that an entry count that does not fit the FST size is rejected.</summary>
+    [Fact]
+    public void GameCube_EntryCountTooLarge_Throws()
+    {
+        var fst = new byte[16];
+        WriteBe32(fst, 0, 0x01000000);
+        WriteBe32(fst, 8, 1000);
+        using var blob = OpenGcWithFst(fst);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("do not fit", exception.Message);
+    }
+
+    /// <summary>Verifies that an impossible name offset is rejected.</summary>
+    [Fact]
+    public void GameCube_ImpossibleNameOffset_Throws()
+    {
+        var fst = new byte[16];
+        WriteBe32(fst, 0, 0x01FFFFFF); // directory with a huge name offset
+        WriteBe32(fst, 8, 1);
+        using var blob = OpenGcWithFst(fst);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("name offset", exception.Message);
+    }
+
+    /// <summary>Verifies that an FST whose root entry is a file is rejected.</summary>
+    [Fact]
+    public void GameCube_RootNotDirectory_Throws()
+    {
+        var fst = new byte[16];
+        WriteBe32(fst, 0, 0); // file, not directory
+        WriteBe32(fst, 8, 1);
+        using var blob = OpenGcWithFst(fst);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("root is not a directory", exception.Message);
+    }
+
+    /// <summary>Verifies that a directory naming the wrong parent is rejected.</summary>
+    [Fact]
+    public void GameCube_DirectoryParentMismatch_Throws()
+    {
+        var fst = BuildThreeEntryFst(directoryParent: 5, directoryEnd: 3);
+        using var blob = OpenGcWithFst(fst);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("as its parent", exception.Message);
+    }
+
+    /// <summary>Verifies that an impossible directory subtree range is rejected.</summary>
+    [Fact]
+    public void GameCube_ImpossibleSubtreeRange_Throws()
+    {
+        var fst = BuildThreeEntryFst(directoryParent: 0, directoryEnd: 1);
+        using var blob = OpenGcWithFst(fst);
+        var exception = Assert.Throws<RvzFormatException>(() => DiscFileSystem.Open(blob));
+        Assert.Contains("impossible subtree", exception.Message);
+    }
+
+    /// <summary>Verifies that copying a directory throws.</summary>
+    [Fact]
+    public void CopyFileTo_Directory_Throws()
+    {
+        var iso = BuildGcIso();
+        using var blob = PlainBlob.Open(new MemoryStream(iso));
+        using var fs = DiscFileSystem.Open(blob);
+
+        using var output = new MemoryStream();
+        Assert.Throws<ArgumentException>(() => fs.CopyFileTo(fs.Root, output));
+    }
+
+    /// <summary>Verifies that a file whose data ends early is rejected.</summary>
+    [Fact]
+    public void CopyFileTo_TruncatedData_Throws()
+    {
+        // The file claims 0x1000 bytes at 0x1FFFF0, but the image ends at 0x200000.
+        var fst = BuildSingleFileFst(fileOffset: 0x1FFFF0, fileSize: 0x1000);
+        using var blob = OpenGcWithFst(fst);
+        using var fs = DiscFileSystem.Open(blob);
+        var file = fs.Find("file.bin");
+        Assert.NotNull(file);
+
+        using var output = new MemoryStream();
+        var exception = Assert.Throws<RvzFormatException>(() => fs.CopyFileTo(file, output));
+        Assert.Contains("ended at", exception.Message);
+    }
+
+    /// <summary>Verifies that Find rejects a null path.</summary>
+    [Fact]
+    public void Find_Null_Throws()
+    {
+        var iso = BuildGcIso();
+        using var blob = PlainBlob.Open(new MemoryStream(iso));
+        using var fs = DiscFileSystem.Open(blob);
+        Assert.Throws<ArgumentNullException>(() => fs.Find(null!));
+    }
+
+    /// <summary>Opens a synthetic GameCube image carrying the given FST bytes.</summary>
+    private static PlainBlob OpenGcWithFst(byte[] fst, uint fstOffset = 0x3000, uint? fstSize = null)
+    {
+        var iso = new byte[0x200000];
+        iso[0x1C] = 0xC2;
+        iso[0x1D] = 0x33;
+        iso[0x1E] = 0x9F;
+        iso[0x1F] = 0x3D;
+        WriteBe32(iso, 0x424, fstOffset);
+        WriteBe32(iso, 0x428, fstSize ?? (uint)fst.Length);
+        if (fstOffset + (ulong)fst.Length <= (ulong)iso.Length)
+        {
+            fst.CopyTo(iso, (int)fstOffset);
+        }
+
+        return PlainBlob.Open(new MemoryStream(iso));
+    }
+
+    /// <summary>Builds a two-entry FST: root directory + one file.</summary>
+    private static byte[] BuildSingleFileFst(uint fileOffset, uint fileSize)
+    {
+        var names = "\0file.bin\0"u8.ToArray();
+        var fst = new byte[24 + names.Length + 2];
+        WriteBe32(fst, 0, 0x01000000);
+        WriteBe32(fst, 8, 2);
+        WriteBe32(fst, 12, 1); // file name offset
+        WriteBe32(fst, 16, fileOffset);
+        WriteBe32(fst, 20, fileSize);
+        names.CopyTo(fst, 24);
+        return fst;
+    }
+
+    /// <summary>Builds a three-entry FST: root, one directory and one file (for validation cases).</summary>
+    private static byte[] BuildThreeEntryFst(uint directoryParent, uint directoryEnd)
+    {
+        var names = "\0dir\0file.bin\0"u8.ToArray();
+        var fst = new byte[36 + names.Length + 2];
+        WriteBe32(fst, 0, 0x01000000); // root, subtree end 3
+        WriteBe32(fst, 8, 3);
+        WriteBe32(fst, 12, 0x01000000u | 1u); // directory "dir"
+        WriteBe32(fst, 16, directoryParent);
+        WriteBe32(fst, 20, directoryEnd);
+        WriteBe32(fst, 24, 5); // file "file.bin"
+        WriteBe32(fst, 28, 0x4000);
+        WriteBe32(fst, 32, 8);
+        names.CopyTo(fst, 36);
+        return fst;
     }
 
     private static readonly byte[] HelloText = "hello from the disc!\n"u8.ToArray();

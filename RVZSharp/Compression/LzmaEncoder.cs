@@ -5,8 +5,10 @@ namespace RVZSharp.Compression;
 
 /// <summary>
 /// LZMA1 and LZMA2 encoders built on the 7-Zip SDK (LZMA-SDK package). LZMA2 output is
-/// produced as a sequence of independent LZMA1 chunks with the properties repeated, which the
-/// 7-Zip decoder accepts and our <see cref="LzmaDecoder"/> handles (same as Dolphin's writer).
+/// produced as a sequence of independent LZMA1 chunks with the properties repeated (each
+/// chunk resets the dictionary), which the 7-Zip decoder accepts and our
+/// <see cref="LzmaDecoder"/> handles. Dolphin's liblzma-based writer continues the
+/// dictionary across chunks, so this output is larger but equally decodable.
 /// </summary>
 public sealed class LzmaEncoder : ICompressionEncoder
 {
@@ -15,7 +17,7 @@ public sealed class LzmaEncoder : ICompressionEncoder
 
     /// <summary>
     /// Creates an LZMA1 or LZMA2 encoder. The level selects the dictionary size exactly like
-    /// liblzma's lzma_lzma_preset used by Dolphin: 0→64 KiB, 1→1 MiB, 2→2 MiB, 3→4 MiB,
+    /// liblzma's lzma_lzma_preset used by Dolphin: 0→256 KiB, 1→1 MiB, 2→2 MiB, 3→4 MiB,
     /// 4→4 MiB, 5→8 MiB, 6→8 MiB, 7→16 MiB, 8→32 MiB, 9→64 MiB.
     /// </summary>
     /// <param name="lzma2">True for LZMA2, false for LZMA1.</param>
@@ -24,7 +26,7 @@ public sealed class LzmaEncoder : ICompressionEncoder
     {
         _lzma2 = lzma2;
         // Level → dictionary size, exactly like liblzma's lzma_lzma_preset used by Dolphin
-        // (WIACompression.cpp:618): 0→64 KiB, 1→1 MiB, 2→2 MiB, 3→4 MiB, 4→4 MiB, 5→8 MiB,
+        // (WIACompression.cpp:618): 0→256 KiB, 1→1 MiB, 2→2 MiB, 3→4 MiB, 4→4 MiB, 5→8 MiB,
         // 6→8 MiB, 7→16 MiB, 8→32 MiB, 9→64 MiB.
         _dictionarySize = DictionarySizeForLevel(level);
     }
@@ -33,7 +35,7 @@ public sealed class LzmaEncoder : ICompressionEncoder
     {
         return level switch
         {
-            <= 0 => 1 << 16,
+            <= 0 => 1 << 18,
             1 => 1 << 20,
             2 => 1 << 21,
             3 or 4 => 1 << 22,
@@ -51,16 +53,17 @@ public sealed class LzmaEncoder : ICompressionEncoder
         {
             if (_lzma2)
             {
-                // 7-Zip LZMA2 dict-size byte: 2^(prop/2 + 12) for even props, 2^(prop/2 + 11)
-                // for odd ones (matches the reader's table).
+                // 7-Zip LZMA2 dict-size byte: LZMA2DictionarySize(p) = (2 | (p & 1)) << (p / 2 + 11),
+                // i.e. 2^(p/2 + 12) for even props and 3·2^(p/2 + 11) for odd ones. A power-of-two
+                // dictionary of 2^k is described exactly by the even prop 2·(k − 12) (Dolphin:
+                // WIACompression.cpp picks the smallest prop whose size is >= the dictionary).
                 var dictLog2 = 0;
                 while ((1 << dictLog2) < _dictionarySize)
                 {
                     dictLog2++;
                 }
 
-                var prop = 2 * (dictLog2 - 12) + (dictLog2 % 2 == 0 ? 1 : 0);
-                return [(byte)Math.Max(0, prop)];
+                return [(byte)Math.Max(0, 2 * (dictLog2 - 12))];
             }
 
             var encoder = new SevenZip.Compression.LZMA.Encoder();
@@ -142,6 +145,17 @@ public sealed class LzmaEncoder : ICompressionEncoder
         {
             var part = data.Slice(offset, Math.Min(maxChunk, data.Length - offset)).ToArray();
             var lzma1 = EncodeLzma1Core(part, withEndMarker: false);
+            if (lzma1.Length > 0x10000)
+            {
+                // Incompressible chunk expanded past the LZMA2 packed-size field (16 bits):
+                // store it raw (control 0x01 = uncompressed chunk with a dictionary reset).
+                output.WriteByte(0x01);
+                output.WriteByte((byte)((part.Length - 1) >> 8));
+                output.WriteByte((byte)((part.Length - 1) & 0xFF));
+                output.Write(part);
+                continue;
+            }
+
             var control = (byte)(0xE0 | ((part.Length - 1) >> 16));
             var header = new[]
             {

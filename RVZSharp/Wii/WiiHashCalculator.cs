@@ -95,13 +95,13 @@ public static class WiiHashCalculator
     }
 
     /// <summary>
-    /// Applies hash exceptions to a 0x400-byte hash area. <paramref name="chunkBaseOffset"/> is
-    /// the exception offset of the first byte of this hash area within the chunk's data
-    /// (usually 0; used when a chunk covers multiple 2 MiB exception regions).
+    /// Applies hash exceptions to one 0x400-byte hash area. <paramref name="chunkBaseOffset"/>
+    /// is added to every exception offset; the shifted offsets must still fall inside this
+    /// single hash area (the method patches one area, it does not select a block).
     /// </summary>
     /// <param name="exceptions">The hash exceptions to apply.</param>
     /// <param name="hashArea">The hash area to patch in place.</param>
-    /// <param name="chunkBaseOffset">Chunk-relative offset of this hash area's first byte.</param>
+    /// <param name="chunkBaseOffset">Offset added to each exception offset before patching.</param>
     public static void ApplyHashExceptions(ReadOnlySpan<HashExceptionEntry> exceptions,
         Span<byte> hashArea, int chunkBaseOffset = 0)
     {

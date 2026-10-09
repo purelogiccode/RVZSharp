@@ -88,7 +88,7 @@ public static class ChunkDecoder
         var effectiveCompression = group.UsesDiscCompression
             ? disc.Compression
             : CompressionType.None;
-        var exceptionLists = ParseExceptionLists(input, exceptionListCount,
+        var exceptionLists = ExceptionListParser.Parse(input, exceptionListCount,
             alignTo4: effectiveCompression is CompressionType.None or CompressionType.Purge,
             out var listBytes);
 
@@ -137,56 +137,6 @@ public static class ChunkDecoder
         }
     }
 
-    private static HashExceptionEntry[][] ParseExceptionLists(Stream input, int listCount, bool alignTo4,
-        out byte[] consumedBytes)
-    {
-        if (listCount == 0)
-        {
-            consumedBytes = [];
-            return [];
-        }
-
-        using var consumed = new MemoryStream();
-        var lists = new HashExceptionEntry[listCount][];
-        var totalBytes = 0;
-        for (var listIndex = 0; listIndex < listCount; listIndex++)
-        {
-            var countBytes = ReadExactly(input, 2, "exception list count");
-            consumed.Write(countBytes);
-            var count = (ushort)((countBytes[0] << 8) | countBytes[1]);
-
-            var entries = new HashExceptionEntry[count];
-            for (var i = 0; i < count; i++)
-            {
-                var entryBytes = ReadExactly(input, HashExceptionEntry.Size, "hash exception");
-                consumed.Write(entryBytes);
-                entries[i] = HashExceptionEntry.Parse(entryBytes);
-            }
-
-            lists[listIndex] = entries;
-            totalBytes += 2 + count * HashExceptionEntry.Size;
-
-            if (alignTo4 && listIndex == listCount - 1)
-            {
-                var padding = (4 - totalBytes % 4) % 4;
-                if (padding > 0)
-                {
-                    var pad = ReadExactly(input, padding, "exception list padding");
-                    consumed.Write(pad);
-                    totalBytes += padding;
-                }
-            }
-
-            if (totalBytes > listCount * ExceptionListParser.MaxBytesPerList)
-            {
-                throw new RvzFormatException("More hash exceptions than expected.");
-            }
-        }
-
-        consumedBytes = consumed.ToArray();
-        return lists;
-    }
-
     /// <summary>
     /// Reads exactly <paramref name="packedSize"/> bytes from <paramref name="input"/> into a
     /// growing buffer (never trusting the declared size for an upfront allocation), then
@@ -213,7 +163,17 @@ public static class ChunkDecoder
 
         packed.Position = 0;
         using var decoder = new RvzPackingDecoder(packed, dataOffset, leaveOpen: true);
-        return ReadExactly(decoder, expectedSize, "RVZ packing output");
+        var payload = ReadExactly(decoder, expectedSize, "RVZ packing output");
+        // Dolphin requires the packed stream to end exactly at the expected output
+        // (RVZPackDecompressor::Done); a trailing segment that still produces output is
+        // corruption, not padding.
+        if (decoder.ReadByte() != -1)
+        {
+            throw new RvzFormatException(
+                $"RVZ packing produced more than the expected {expectedSize} bytes.");
+        }
+
+        return payload;
     }
 
     private static byte[] ReadAll(Stream stream)

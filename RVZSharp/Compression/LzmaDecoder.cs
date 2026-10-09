@@ -17,7 +17,7 @@ public sealed class LzmaDecoder : ICompressionDecoder
     /// Creates a decoder for LZMA1 or LZMA2.
     /// </summary>
     /// <param name="useLzma2">True for LZMA2, false for LZMA1.</param>
-    internal LzmaDecoder(bool useLzma2)
+    public LzmaDecoder(bool useLzma2)
     {
         _useLzma2 = useLzma2;
     }
@@ -44,13 +44,22 @@ public sealed class LzmaDecoder : ICompressionDecoder
                 throw new RvzFormatException($"LZMA2 requires 1 byte of compressor data, got {properties.Length}.");
             }
 
-            switch (properties[0])
+            var property = properties[0];
+            if (property > 40)
             {
-                case > 40:
-                    throw new RvzFormatException($"Invalid LZMA2 dictionary size property {properties[0]}.");
-                case 40:
-                    throw new RvzUnsupportedException(
-                        "LZMA2 dictionary sizes of 4 GiB (property 40) are not supported.");
+                throw new RvzFormatException($"Invalid LZMA2 dictionary size property {property}.");
+            }
+
+            // LZMA2DictionarySize(p) = (2 | (p & 1)) << (p / 2 + 11); apply the same 1 GiB
+            // safety cap as LZMA1 so a hostile property cannot rent a multi-gigabyte window.
+            var dictSize = (property & 1) == 0
+                ? 2L << (property / 2 + 11)
+                : 3L << (property / 2 + 11);
+            if (dictSize >= 0x40000000)
+            {
+                throw new RvzUnsupportedException(
+                    $"LZMA2 dictionary size {dictSize} (property {property}) is not supported "
+                    + "(1 GiB cap).");
             }
         }
         else

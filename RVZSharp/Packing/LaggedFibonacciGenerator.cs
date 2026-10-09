@@ -206,7 +206,9 @@ public sealed class LaggedFibonacciGenerator
         var divK = u32DataOffset / BufferWords;
 
         var generator = new LaggedFibonacciGenerator();
-        Span<uint> words = stackalloc uint[u32Size];
+        // Heap-allocated: this is a public API and a caller-sized stackalloc would overflow
+        // the stack for large inputs (uncatchable StackOverflowException).
+        var words = new uint[u32Size];
         for (var i = 0; i < u32Size; i++)
         {
             words[i] = (uint)(data[bytesToSkip + i * 4] | (data[bytesToSkip + i * 4 + 1] << 8) |

@@ -55,13 +55,16 @@ public class CompressionCodecTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
-    /// <summary>Verifies that none with properties throws.</summary>
+    /// <summary>Verifies that NONE ignores compressor data (Dolphin only passes it to LZMA).</summary>
     [Fact]
-    public void None_WithProperties_Throws()
+    public void None_WithProperties_IgnoresThem()
     {
+        var payload = MakePayload(100_000);
+        using var input = new MemoryStream(payload);
         var decoder = CompressionCodecFactory.Create(CompressionType.None);
-        Assert.Throws<RvzFormatException>(() =>
-            decoder.CreateDecompressor(new MemoryStream(), [1], -1, -1));
+        using var stream = decoder.CreateDecompressor(input, [1, 2], payload.Length, payload.Length);
+
+        Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
     /// <summary>Verifies that Zstd round trip.</summary>
@@ -104,13 +107,19 @@ public class CompressionCodecTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
-    /// <summary>Verifies that Zstd with properties throws.</summary>
+    /// <summary>Verifies that Zstd ignores compressor data (Dolphin only passes it to LZMA).</summary>
     [Fact]
-    public void Zstd_WithProperties_Throws()
+    public void Zstd_WithProperties_IgnoresThem()
     {
+        var payload = MakePayload(200_000);
+        var (encoder, _) = CompressionEncoderFactory.Create(CompressionType.Zstd, 3);
+        var compressed = encoder.Compress(payload);
+
+        using var input = new MemoryStream(compressed);
         var decoder = CompressionCodecFactory.Create(CompressionType.Zstd);
-        Assert.Throws<RvzFormatException>(() =>
-            decoder.CreateDecompressor(new MemoryStream(), [1], -1, -1));
+        using var stream = decoder.CreateDecompressor(input, [1, 2], compressed.Length, payload.Length);
+
+        Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
     /// <summary>Verifies that bzip 2 round trip.</summary>
@@ -136,13 +145,19 @@ public class CompressionCodecTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
-    /// <summary>Verifies that bzip 2 with properties throws.</summary>
+    /// <summary>Verifies that bzip 2 ignores compressor data (Dolphin only passes it to LZMA).</summary>
     [Fact]
-    public void Bzip2_WithProperties_Throws()
+    public void Bzip2_WithProperties_IgnoresThem()
     {
+        var payload = MakePayload(200_000);
+        var (encoder, _) = CompressionEncoderFactory.Create(CompressionType.Bzip2, 5);
+        var compressed = encoder.Compress(payload);
+
+        using var input = new MemoryStream(compressed);
         var decoder = CompressionCodecFactory.Create(CompressionType.Bzip2);
-        Assert.Throws<RvzFormatException>(() =>
-            decoder.CreateDecompressor(new MemoryStream(), [1], -1, -1));
+        using var stream = decoder.CreateDecompressor(input, [1, 2], compressed.Length, payload.Length);
+
+        Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
     /// <summary>Verifies that bzip 2 corrupt stream throws format exception.</summary>

@@ -118,18 +118,19 @@ public class GczBlobTests
         Assert.Throws<RvzFormatException>(() => GczBlob.Open(new MemoryStream(bytes)));
     }
 
-    /// <summary>Verifies that read past block table throws format exception.</summary>
+    /// <summary>Verifies that a disc size exceeding the block table is rejected at open.</summary>
     [Fact]
-    public void ReadPastBlockTable_ThrowsFormatException()
+    public void DiscSizePastBlockTable_ThrowsFormatException()
     {
-        // A disc_size exceeding the block table must fail the read, not crash with an
+        // A disc_size exceeding the block table must fail cleanly, not crash with an
         // IndexOutOfRangeException (Dolphin fails the read, CompressedBlob.cpp:137-138).
         var gcz = TestLegacyBuilders.BuildGcz(MakeIso());
         var numBlocks = BitConverter.ToUInt32(gcz, 28);
         var blockSize = BitConverter.ToUInt32(gcz, 24);
         BitConverter.GetBytes((ulong)numBlocks * blockSize + 0x8000).CopyTo(gcz, 16); // disc_size
 
-        using var reader = GczBlob.Open(new MemoryStream(gcz));
-        Assert.Throws<RvzFormatException>(() => reader.ReadAt(0, new byte[reader.Length]));
+        var exception = Assert.Throws<RvzFormatException>(
+            () => GczBlob.Open(new MemoryStream(gcz)));
+        Assert.Contains("disc size", exception.Message);
     }
 }

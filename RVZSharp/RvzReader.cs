@@ -138,6 +138,9 @@ public sealed class RvzReader : IBlobReader
     public long Length { get; }
 
     /// <summary>Parses and validates an RVZ file. The stream must be seekable.</summary>
+    /// <remarks>On success the returned reader owns the stream unless <paramref name="leaveOpen"/>
+    /// is set. When the call throws, ownership stays with the caller (the stream is not
+    /// disposed).</remarks>
     public static RvzReader Open(Stream stream, bool leaveOpen = false)
     {
         return Open(stream, leaveOpen, WiaRvzFormat.Rvz);
@@ -644,6 +647,13 @@ public sealed class RvzReader : IBlobReader
     private byte[] DecodeRawChunk(int rawIndex, long chunkIndex, long areaSize)
     {
         var entry = RawDataEntries[rawIndex];
+        if (chunkIndex >= entry.NumGroups)
+        {
+            throw new RvzFormatException(
+                $"Raw-data entry {rawIndex} covers {entry.NumGroups} groups, but chunk "
+                + $"{chunkIndex} was requested.");
+        }
+
         var groupIndex = entry.GroupIndex + chunkIndex;
         if (groupIndex >= GroupEntries.Length)
         {
@@ -678,6 +688,13 @@ public sealed class RvzReader : IBlobReader
         DataArea area, long chunkIndex)
     {
         var pd = Partitions[area.Index].Data[area.Segment];
+        if (chunkIndex >= pd.NumGroups)
+        {
+            throw new RvzFormatException(
+                $"Partition data entry covers {pd.NumGroups} groups, but chunk {chunkIndex} "
+                + "was requested.");
+        }
+
         var sectorsPerChunk = Disc.ChunkSize / WiaDisc.SectorSize;
         var remainingSectors = pd.NumSectors - chunkIndex * sectorsPerChunk;
         var expectedSize =
@@ -855,7 +872,9 @@ public sealed class RvzReader : IBlobReader
         var listIndex = (int)(regionIndex - chunkRegionBase);
         if (listIndex < 0 || listIndex >= lists.Length)
         {
-            return [];
+            throw new RvzFormatException(
+                $"Partition chunk {chunkIndex} has {lists.Length} exception lists, but region "
+                + $"{regionIndex} was requested.");
         }
 
         // The writer stores exception offsets relative to the chunk; the chunk's position

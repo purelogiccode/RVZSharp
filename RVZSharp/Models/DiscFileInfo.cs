@@ -1,4 +1,4 @@
-namespace RVZSharp.Files;
+namespace RVZSharp.Models;
 
 /// <summary>
 /// One file or directory in a disc's file system table (Dolphin: FileInfoGCWii). Offsets are

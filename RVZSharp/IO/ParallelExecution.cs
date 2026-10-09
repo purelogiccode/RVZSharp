@@ -51,7 +51,11 @@ internal static class ParallelExecution
 
     private static void Rethrow(AggregateException e)
     {
-        var inner = e.Flatten().InnerExceptions.FirstOrDefault();
+        var inners = e.Flatten().InnerExceptions;
+        // Prefer the real loop-body failure over a concurrent cancellation so the documented
+        // exception type survives when both are present.
+        var inner = inners.FirstOrDefault(ex => ex is not OperationCanceledException)
+                    ?? inners.FirstOrDefault();
         if (inner is null)
         {
             throw e;

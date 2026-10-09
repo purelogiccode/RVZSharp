@@ -95,7 +95,9 @@ public sealed class TgcBlob : IBlobReader
         // gigabytes, and use the clamped size for every subsequent bound.
         var fstSizeClamped = (int)Math.Min(fstSize, Math.Max(0, stream.Length - fstRealOffset));
         var rawFst = new byte[fstSizeClamped];
-        var haveFst = ReadExactlyAt(stream, fstRealOffset, rawFst);
+        // An out-of-range FST offset clamps the size to 0; that is a failed read, not an
+        // empty-but-valid FST (Dolphin clears m_fst in that case).
+        var haveFst = fstSizeClamped > 0 && ReadExactlyAt(stream, fstRealOffset, rawFst);
 
         // Relocate every file entry's offset from file-relative to ISO-relative. The shift can
         // overflow u32; Dolphin relies on the wrap cancelling out, so use unchecked arithmetic.

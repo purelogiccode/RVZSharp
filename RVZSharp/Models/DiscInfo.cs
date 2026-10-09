@@ -1,9 +1,8 @@
 using System.Text;
 using RVZSharp.Interfaces;
-using RVZSharp.Models;
 using RVZSharp.Wii;
 
-namespace RVZSharp;
+namespace RVZSharp.Models;
 
 /// <summary>
 /// Disc volume metadata read from the decoded disc header (Dolphin: <c>VolumeDisc</c>):

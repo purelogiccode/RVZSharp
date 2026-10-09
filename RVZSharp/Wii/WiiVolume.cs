@@ -54,8 +54,7 @@ public static class WiiVolume
     public static bool HasWiiHashes(IBlobReader disc)
     {
         Span<byte> header = stackalloc byte[0x80];
-        disc.ReadAt(0, header);
-        return header[0x60] == 0;
+        return disc.ReadAt(0, header) == header.Length && header[0x60] == 0;
     }
 
     /// <summary>True for a Wii disc whose partition data is encrypted (disc header 0x61).</summary>
@@ -64,8 +63,7 @@ public static class WiiVolume
     public static bool HasWiiEncryption(IBlobReader disc)
     {
         Span<byte> header = stackalloc byte[0x80];
-        disc.ReadAt(0, header);
-        return header[0x61] == 0;
+        return disc.ReadAt(0, header) == header.Length && header[0x61] == 0;
     }
 
     /// <summary>Reads the disc type from the DVD/Wii magic in the disc header.</summary>
@@ -74,8 +72,7 @@ public static class WiiVolume
     public static bool IsWiiDisc(IBlobReader disc)
     {
         Span<byte> header = stackalloc byte[0x80];
-        disc.ReadAt(0, header);
-        return ReadBe32(header, 0x18) == WII_MAGIC;
+        return disc.ReadAt(0, header) == header.Length && ReadBe32(header, 0x18) == WII_MAGIC;
     }
 
     /// <summary>
@@ -116,8 +113,6 @@ public static class WiiVolume
     public static IReadOnlyList<Partition> GetPartitions(IBlobReader disc)
     {
         var partitions = new List<Partition>();
-        var header = new byte[0x80];
-        disc.ReadAt(0, header);
         var containerKeys = GetContainerPartitionKeys(disc);
 
         Span<byte> tableInfo = stackalloc byte[8];
@@ -162,18 +157,6 @@ public static class WiiVolume
                     continue;
                 }
 
-                // The partition header starts with the ticket; require a valid RSA2048
-                // ticket so we can decrypt the partition data (Dolphin: TicketReader::IsValid).
-                if (!TryReadAt(disc, partitionOffset, ticket))
-                {
-                    continue;
-                }
-
-                if (ReadBe32(ticket, 0) != 0x10001)
-                {
-                    continue;
-                }
-
                 var dataOffset = ReadSwappedAndShifted(disc, partitionOffset + 0x2B8);
                 var dataSize = ReadSwappedAndShifted(disc, partitionOffset + 0x2BC);
                 if (dataOffset == null || dataSize == null)
@@ -183,12 +166,31 @@ public static class WiiVolume
 
                 // The container (RVZ/WIA) stores the authoritative partition key; the ticket on
                 // the decoded disc can carry a re-signed (different) title key, so container
-                // keys win (Dolphin: WIABlob partition keys). Plain ISOs fall back to the
-                // ticket title key, which is common-key encrypted on retail discs.
-                var key = containerKeys.TryGetValue(
-                    partitionOffset + dataOffset.Value, out var containerKey)
-                    ? containerKey
-                    : GetTitleKey(ticket);
+                // keys win (Dolphin: WIABlob partition keys). Only plain ISOs need the ticket,
+                // and only then is a valid RSA2048 ticket required to decrypt its title key
+                // (Dolphin: TicketReader::IsValid) — a container with a damaged decoded ticket
+                // still decodes from its stored key.
+                byte[] key;
+                if (containerKeys.TryGetValue(
+                        partitionOffset + dataOffset.Value, out var containerKey))
+                {
+                    key = containerKey;
+                }
+                else
+                {
+                    if (!TryReadAt(disc, partitionOffset, ticket))
+                    {
+                        continue;
+                    }
+
+                    if (ReadBe32(ticket, 0) != 0x10001)
+                    {
+                        continue;
+                    }
+
+                    key = GetTitleKey(ticket);
+                }
+
                 partitions.Add(new Partition
                 {
                     Offset = partitionOffset,
@@ -227,10 +229,10 @@ public static class WiiVolume
     /// <exception cref="ArgumentException"><paramref name="ticket"/> is shorter than a ticket.</exception>
     public static byte[] GetTitleKey(ReadOnlySpan<byte> ticket)
     {
-        if (ticket.Length < 0x1F2)
+        if (ticket.Length < 0x2A4)
         {
             throw new ArgumentException(
-                "The ticket is too short to contain a title key.", nameof(ticket));
+                "The ticket is too short to be a complete RSA2048 ticket.", nameof(ticket));
         }
 
         Span<byte> iv = stackalloc byte[16];
@@ -375,7 +377,7 @@ public static class WiiVolume
     /// <returns>The DOL size, or null when the header cannot be read.</returns>
     public static uint? GetBootDolSize(IBlobReader view, ulong dolOffset)
     {
-        uint size = 0;
+        ulong size = 0;
         for (var i = 0; i < 7; i++)
         {
             if (!TryReadSwapped(view, dolOffset + (ulong)(0x00 + i * 4), out var offset) ||
@@ -384,7 +386,7 @@ public static class WiiVolume
                 return null;
             }
 
-            size = Math.Max(size, offset + segmentSize);
+            size = Math.Max(size, (ulong)offset + segmentSize);
         }
 
         for (var i = 0; i < 11; i++)
@@ -395,18 +397,42 @@ public static class WiiVolume
                 return null;
             }
 
-            size = Math.Max(size, offset + segmentSize);
+            size = Math.Max(size, (ulong)offset + segmentSize);
         }
 
-        return size;
+        return (uint)Math.Min(size, uint.MaxValue);
     }
 
-    /// <summary>Maps a partition-data-relative offset to a disc-relative offset.</summary>
+    /// <summary>
+    /// Maps a partition-data-relative offset to a disc-relative offset for a hashless
+    /// partition (no hash-tree gaps). Use the three-argument overload for hashed discs.
+    /// </summary>
     /// <param name="offset">The offset inside the partition data area.</param>
     /// <param name="partition">The partition holding the offset.</param>
     /// <returns>The corresponding raw disc offset.</returns>
     public static ulong PartitionOffsetToRawOffset(ulong offset, Partition partition)
     {
+        return PartitionOffsetToRawOffset(offset, partition, hasHashes: false);
+    }
+
+    /// <summary>
+    /// Maps a partition-data-relative offset to a disc-relative offset. Hashed partitions
+    /// interleave a 0x400-byte hash area per 0x7C00 data bytes, so the virtual offset is
+    /// expanded (Dolphin: VolumeWii::PartitionOffsetToRawOffset).
+    /// </summary>
+    /// <param name="offset">The offset inside the partition's decrypted data area.</param>
+    /// <param name="partition">The partition holding the offset.</param>
+    /// <param name="hasHashes">True when the disc stores hash trees (hash-gap mapping).</param>
+    /// <returns>The corresponding raw disc offset.</returns>
+    public static ulong PartitionOffsetToRawOffset(ulong offset, Partition partition,
+        bool hasHashes)
+    {
+        if (hasHashes)
+        {
+            offset = offset / WiiHashCalculator.SectorDataSize * PartitionRegionBuilder.SectorSize
+                     + offset % WiiHashCalculator.SectorDataSize;
+        }
+
         return partition.Offset + partition.DataOffset + offset;
     }
 

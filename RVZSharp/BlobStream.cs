@@ -63,7 +63,8 @@ public sealed class BlobStream : Stream
         {
             SeekOrigin.Begin => offset,
             SeekOrigin.Current => Position + offset,
-            _ => Length + offset
+            SeekOrigin.End => Length + offset,
+            _ => throw new ArgumentOutOfRangeException(nameof(origin))
         };
         return Position;
     }

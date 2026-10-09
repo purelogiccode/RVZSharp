@@ -30,6 +30,7 @@ public sealed class PartitionReader : IBlobReader
     private readonly object _lock = new();
 #endif
     private long _lastBlockIndex = -1;
+    private bool _disposed;
 
     /// <summary>Wraps <paramref name="disc"/> with a decrypted view of <paramref name="partition"/>.</summary>
     /// <param name="disc">The disc image (the partition is read from its original location).</param>
@@ -45,7 +46,11 @@ public sealed class PartitionReader : IBlobReader
         _hasEncryption = WiiVolume.HasWiiEncryption(disc);
 
         var available = Math.Max(0, disc.Length - _dataOffset);
-        Length = (long)Math.Min(partition.DataSize, (ulong)available);
+        var rawLength = (long)Math.Min(partition.DataSize, (ulong)available);
+        // Hashed partitions interleave 0x400-byte hash areas between 0x7C00-byte data blocks,
+        // so the decrypted view is shorter than the raw data size (hashless discs store the
+        // partition data as-is, where both lengths are equal).
+        Length = _hasHashes ? rawLength / BlockTotalSize * BlockDataSize : rawLength;
 
         if (_hasEncryption)
         {
@@ -98,6 +103,7 @@ public sealed class PartitionReader : IBlobReader
 
             lock (_lock)
             {
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 if (_lastBlockIndex != blockIndex)
                 {
                     ReadAndDecryptBlock(blockIndex);
@@ -143,6 +149,15 @@ public sealed class PartitionReader : IBlobReader
     /// </summary>
     public void Dispose()
     {
-        _aes?.Dispose();
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _aes?.Dispose();
+        }
     }
 }

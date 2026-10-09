@@ -76,29 +76,6 @@ internal sealed class LzmaStream : Stream
     }
 
     /// <summary>
-    /// Creates a decoder for a raw LZMA1 stream (when <paramref name="properties"/> has 5 bytes)
-    /// or a raw LZMA2 stream (when it has 1 byte), matching the property formats used by RVZ.
-    /// </summary>
-    /// <param name="properties">The compressor properties from the RVZ disc header.</param>
-    /// <param name="inputStream">Stream of the compressed data.</param>
-    /// <param name="inputSize">Exact compressed size, or -1 if unknown.</param>
-    /// <param name="outputSize">Expected decompressed size, or -1 if unknown.</param>
-    /// <param name="presetDictionary">Optional preset dictionary (not used by RVZ).</param>
-    /// <param name="leaveOpen">Whether to leave <paramref name="inputStream"/> open on dispose.</param>
-    public static LzmaStream Create(
-        byte[] properties,
-        Stream inputStream,
-        long inputSize,
-        long outputSize,
-        Stream? presetDictionary,
-        bool leaveOpen
-    )
-    {
-        return Create(properties, inputStream, inputSize, outputSize, presetDictionary, properties.Length < 5,
-            leaveOpen);
-    }
-
-    /// <summary>
     /// Creates a decoder for an LZMA1 or LZMA2 stream, selecting the format explicitly.
     /// </summary>
     /// <param name="properties">The compressor properties: 5 bytes for LZMA1, 1 byte for LZMA2.</param>
@@ -158,7 +135,8 @@ internal sealed class LzmaStream : Stream
     {
     }
 
-    /// <summary>Releases the underlying input stream (unless left open) and the output window.</summary>
+    /// <summary>Releases the underlying input stream (unless left open), the output window and the
+    /// range decoder's pooled read-ahead buffer.</summary>
     /// <param name="disposing">Whether managed resources should be released.</param>
     protected override void Dispose(bool disposing)
     {
@@ -176,6 +154,9 @@ internal sealed class LzmaStream : Stream
             }
 
             _outWindow.Dispose();
+            // The pooled buffer is otherwise returned only on successful completion, so an
+            // aborted/failed decode would leak it.
+            _rangeDecoder.ReleaseStream();
         }
 
         base.Dispose(disposing);
@@ -492,5 +473,5 @@ internal sealed class LzmaStream : Stream
     public byte[] Properties { get; }
 
     /// <summary>Number of compressed bytes consumed from the input stream so far (including LZMA2 chunk headers).</summary>
-    internal long CompressedBytesRead { get; private set; }
+    private long CompressedBytesRead { get; set; }
 }

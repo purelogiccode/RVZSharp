@@ -65,20 +65,28 @@ public static class PurgeDecoder
                     $"PURGE segment [{offset}, {offset + size}) exceeds the expected size {outputSize}.");
             }
 
-            if (outputPos < offset)
-            {
-                outputPos = (int)offset; // zero-fill
-            }
-
             if (streamEnd - inputPos < size)
             {
                 throw new RvzFormatException(
                     $"PURGE stream is truncated inside a segment at byte {inputPos}.");
             }
 
-            stream.Slice(inputPos, (int)size).CopyTo(output.AsSpan(outputPos));
+            if (outputPos < offset)
+            {
+                outputPos = (int)offset; // zero-fill
+            }
+
+            // Segments may overlap already-written output (Dolphin: WIACompression.cpp only
+            // copies the bytes that were not written yet, and skips fully covered segments).
+            if (outputPos < (long)offset + size)
+            {
+                var skip = outputPos - (int)offset;
+                var count = (int)size - skip;
+                stream.Slice(inputPos + skip, count).CopyTo(output.AsSpan(outputPos, count));
+                outputPos += count;
+            }
+
             inputPos += (int)size;
-            outputPos += (int)size;
         }
 
         return output;

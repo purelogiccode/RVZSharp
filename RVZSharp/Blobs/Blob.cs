@@ -37,6 +37,9 @@ public static class Blob
     /// <exception cref="RvzUnsupportedException">
     /// The file is an RVZ/WIA container with a version newer than this library supports.
     /// </exception>
+    /// <remarks>On success the returned reader owns <paramref name="stream"/> unless
+    /// <paramref name="leaveOpen"/> is set. When the call throws, ownership stays with the
+    /// caller (the stream is not disposed).</remarks>
     public static IBlobReader Open(Stream stream, string? filePath = null, bool leaveOpen = false)
     {
         if (!stream.CanSeek)
@@ -189,7 +192,16 @@ public static class Blob
     /// <param name="nfsKey">The 16-byte AES key used to decrypt NFS images.</param>
     public static IBlobReader Open(string path, ReadOnlySpan<byte> nfsKey)
     {
-        return Open(File.OpenRead(path), nfsKey, leaveOpen: false);
+        var stream = File.OpenRead(path);
+        try
+        {
+            return Open(stream, nfsKey, leaveOpen: false);
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
     }
 
     /// <summary>

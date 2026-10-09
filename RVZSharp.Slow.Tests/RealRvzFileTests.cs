@@ -30,6 +30,7 @@ public static class RealRvzCatalog
     public static readonly string WiiDir =
         Environment.GetEnvironmentVariable("RVZ_REAL_WII_DIR") ?? @"F:\Nintendo Wii";
 
+    /// <summary>The GameCube catalog (45 games with their No-Intro SHA-1 and ISO size).</summary>
     public static readonly RealRvz[] GameCube =
     [
         new("Advance Game Port (Unl)", "Advance Game Port (USA) (Unl).rvz",
@@ -94,6 +95,7 @@ public static class RealRvzCatalog
         new("Baten Kaitos - Eternal Wings and the Lost Ocean", "Baten Kaitos - Eternal Wings and the Lost Ocean (USA) (Disc 2).rvz", "a2a4b75e7866d9272407da95ec93986bef4c7dfc", 1459978240)
     ];
 
+    /// <summary>The Wii catalog (45 games with their No-Intro SHA-1 and ISO size).</summary>
     public static readonly RealRvz[] Wii =
     [
         new("Big Brain Academy - Wii Degree", "Big Brain Academy - Wii Degree (USA) (En,Fr,Es).rvz",
@@ -195,6 +197,8 @@ public static class RealRvzOnly
 /// </summary>
 public class RealRvzDecodeTests
 {
+    /// <summary>The decode theory data: every catalog file with its directory and No-Intro SHA-1.</summary>
+    /// <returns>One row (directory, file, expected SHA-1) per catalog entry.</returns>
     public static TheoryData<string, string, string> Files()
     {
         var data = new TheoryData<string, string, string>();
@@ -246,6 +250,10 @@ public class RealRvzDecodeTests
         }
     }
 
+    /// <summary>Verifies that a real file decodes byte-for-byte to its official No-Intro SHA-1.</summary>
+    /// <param name="dir">The catalog directory (GameCube or Wii).</param>
+    /// <param name="file">The RVZ file name.</param>
+    /// <param name="expectedSha1">The expected SHA-1 of the decoded ISO.</param>
     [Theory]
     [MemberData(nameof(Files))]
     public void DecodesToExpectedNoIntroSha1(string dir, string file, string expectedSha1)
@@ -258,6 +266,10 @@ public class RealRvzDecodeTests
         Assert.Equal(expectedSha1, RealRvzOnly.Sha1(reader));
     }
 
+    /// <summary>Verifies that the reader reports the official ISO size of a real file.</summary>
+    /// <param name="dir">The catalog directory (GameCube or Wii).</param>
+    /// <param name="file">The RVZ file name.</param>
+    /// <param name="_">Unused; kept so both theories share one member-data shape.</param>
     [Theory]
     [MemberData(nameof(Files))]
     public void ReportsExpectedIsoSize(string dir, string file, string _)
@@ -294,6 +306,8 @@ public class RealRvzDecodeTests
 /// </summary>
 public class RealRvzStructureTests
 {
+    /// <summary>The GameCube structure theory data (directory, file).</summary>
+    /// <returns>One row per GameCube catalog entry.</returns>
     public static TheoryData<string, string> GcFiles()
     {
         var data = new TheoryData<string, string>();
@@ -301,6 +315,8 @@ public class RealRvzStructureTests
         return data;
     }
 
+    /// <summary>The Wii structure theory data (directory, file).</summary>
+    /// <returns>One row per Wii catalog entry.</returns>
     public static TheoryData<string, string> WiiFiles()
     {
         var data = new TheoryData<string, string>();
@@ -308,6 +324,9 @@ public class RealRvzStructureTests
         return data;
     }
 
+    /// <summary>Verifies that the parsed file head and disc struct of a real RVZ are self-consistent.</summary>
+    /// <param name="dir">The catalog directory (GameCube or Wii).</param>
+    /// <param name="file">The RVZ file name.</param>
     [Theory]
     [MemberData(nameof(GcFiles))]
     [MemberData(nameof(WiiFiles))]
@@ -346,6 +365,7 @@ public class RealRvzStructureTests
 /// </summary>
 public class RealRvzRegionTests
 {
+    /// <summary>Verifies that a full read of a real GameCube file matches its No-Intro SHA-1.</summary>
     [Fact]
     public void ReadFully_GameCube_MatchesCatalogSha1()
     {
@@ -359,6 +379,7 @@ public class RealRvzRegionTests
         Assert.Equal(e.Sha1, Convert.ToHexString(SHA1.HashData(full)).ToLowerInvariant());
     }
 
+    /// <summary>Verifies that ReadAt across chunk boundaries matches the full read of a real GameCube file.</summary>
     [Fact]
     public void ReadAtAroundChunkBoundaries_GameCube_MatchesFullRead()
     {
@@ -384,6 +405,7 @@ public class RealRvzRegionTests
         }
     }
 
+    /// <summary>Verifies that out-of-range ReadAt on a real Wii file returns zero bytes.</summary>
     [Fact]
     public void ReadAt_OutOfRange_ReturnsZero_Wii()
     {
@@ -407,6 +429,7 @@ public class RealRvzRegionTests
 /// </summary>
 public class RealRvzWriteRoundTripTests
 {
+    /// <summary>Verifies that a real GameCube file re-encodes to RVZ and decodes back to the same SHA-1.</summary>
     [Fact]
     public void RealGameCube_ReencodedToRvz_DecodesBackToSameSha1()
     {
@@ -417,6 +440,7 @@ public class RealRvzWriteRoundTripTests
         ReencodeAndVerifySha1(path, e.Sha1);
     }
 
+    /// <summary>Verifies that a real Wii file re-encodes to RVZ and decodes back to the same SHA-1.</summary>
     [Fact]
     public void RealWii_ReencodedToRvz_DecodesBackToSameSha1()
     {

@@ -63,6 +63,19 @@ internal sealed class MultiPartStream : Stream
                 partIndex = ~partIndex - 1;
             }
 
+            // Skip parts that end at or before the position (zero-length continuations share
+            // their start with the next part, and a zero-length read would look like EOF).
+            while (partIndex < _parts.Length &&
+                   _starts[partIndex] + _parts[partIndex].Length <= Position)
+            {
+                partIndex++;
+            }
+
+            if (partIndex >= _parts.Length)
+            {
+                break;
+            }
+
             var part = _parts[partIndex];
             var local = Position - _starts[partIndex];
             if (part.Position != local)

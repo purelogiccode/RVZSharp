@@ -16,8 +16,9 @@ public readonly struct ChunkDecodeRequest
     public required int ExpectedSize { get; init; }
 
     /// <summary>
-    /// Offset of this chunk's data: disc-relative for raw data, partition-data-relative for
-    /// partitions. Used for the PRNG skip in RVZ packing.
+    /// Offset of this chunk's data within its area (raw-data areas and partitions both pass
+    /// an area-relative value). Only the value modulo 0x8000 is used, for the PRNG skip in
+    /// RVZ packing.
     /// </summary>
     public required long DataOffset { get; init; }
 }

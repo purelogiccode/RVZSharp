@@ -20,11 +20,14 @@ public sealed record RvzWriteOptions
     /// <summary>
     /// Compression level (Bzip2/LZMA/LZMA2: 1-9; Zstandard: -131072..22, where negative
     /// levels are fast modes). The default is 5, matching Dolphin's converter
-    /// (DolphinQt ConvertDialog: level 5 when available).
+    /// (DolphinQt ConvertDialog: level 5 when available). Out-of-range values are clamped
+    /// by the codec instead of rejected.
     /// </summary>
     public int CompressionLevel { get; init; } = 5;
 
-    /// <summary>Chunk size: a power of two between 32 KiB and 2 MiB (Dolphin's default: 2 MiB).</summary>
+    /// <summary>Chunk size: at least 32 KiB, a power of two below 2 MiB, and a multiple of
+    /// 2 MiB above 2 MiB (Dolphin's rule; default: 2 MiB). WIA additionally requires a
+    /// multiple of 2 MiB.</summary>
     public int ChunkSize { get; init; } = (int)WiaDisc.GroupSize;
 
     /// <summary>Whether to apply the RVZ packing (junk detection) stage.</summary>

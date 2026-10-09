@@ -14,17 +14,13 @@ public sealed class ZstdDecoder : ICompressionDecoder
     /// data is present.
     /// </summary>
     /// <param name="input">Stream of the Zstandard data.</param>
-    /// <param name="properties">The compressor properties; must be empty.</param>
+    /// <param name="properties">The compressor properties; ignored (Dolphin only passes
+    /// compressor data to the LZMA decoders).</param>
     /// <param name="inputSize">Ignored.</param>
     /// <param name="outputSize">Ignored.</param>
     /// <returns>A read-only decompressing stream.</returns>
     public Stream CreateDecompressor(Stream input, ReadOnlySpan<byte> properties, long inputSize, long outputSize)
     {
-        if (properties.Length != 0)
-        {
-            throw new RvzFormatException("Zstandard compression must not have compressor data.");
-        }
-
         return CodecErrorStream.Create(
             () => new ZstdSharp.DecompressionStream(input, leaveOpen: true), "Zstandard");
     }

@@ -1,9 +1,12 @@
 # Testing
 
-The test suite is split into **two projects**, so the default run is always the fast one:
+The test suite is split into **three projects**, so the default run is always the fast one:
 
-- **`RVZSharp.Tests`** — **468 synthetic tests** (unit + end-to-end round trips), ~1
+- **`RVZSharp.Tests`** — **602 synthetic tests** (unit + end-to-end round trips), ~1
   minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
+- **`RVZSharp.Cli.Tests`** — **40 tests** (net10.0) for the CLI: option parsing, shell-completion scripts and
+  the update checker's release-tag parsing / `RVZSHARP_NO_UPDATE_CHECK` switch. Part of the
+  solution.
 - **`RVZSharp.Slow.Tests`** — **276 real-file tests** (full decode, structural checks,
   writer round trips against 90 real game images), ~30 minutes when the games are mounted.
   It is deliberately kept **out of the solution**, so a plain `dotnet test` / solution run
@@ -95,10 +98,15 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `ConcurrentReadTests` | thread-safe `ReadAt`: parallel random reads on GC/Wii match the reference ISO; concurrent `ReadFully` + `ReadAt` |
 | `LruCacheTests` | decoded-unit LRU: hits, eviction, recency refresh, oversized values, concurrent misses |
 | `ParserRobustnessTests` | mutation/fuzz: corrupt containers and magic-prefixed garbage fail only with `RvzException`; hostile table counts are capped |
-| `DiscInfoTests` | disc metadata: game/maker ID, revision, name, region, country, title ID, fallbacks |
+| `DiscInfoTests`, `DiscInfoEdgeCaseTests` | disc metadata: game/maker ID, revision, name, region, country, title ID, fallbacks, the full country-code table, region words, CP1252/Shift-JIS names |
 | `ScrubOptionTests` | `RvzWriteOptions.Scrub` zeroes non-game partitions while keeping the game partition byte-exact |
 | `AsyncApiTests` | `ReadFullyAsync`/`CopyToAsync`/`WriteAsync` equal their synchronous forms, cancellation |
-| `DiscFileSystemTests` | FST parsing (GC + decrypted Wii partitions), case-insensitive lookup, file reads, `PartitionReader` decryption, invalid FST rejection |
+| `DiscFileSystemTests` | FST parsing (GC + decrypted Wii partitions), case-insensitive lookup, file reads, `PartitionReader` decryption, every invalid-FST rejection path |
+| `WiiVolumeEdgeCaseTests` | offset-shift detection, boot DOL/FST header reads, disc-header flags, hostile partition tables, retail/Korean/RVT title keys, partition offset math |
+| `BlobFactoryTests` | magic sniffing, split plain ISOs, stream ownership, the NFS key overload, blob-type names |
+| `IoUtilityTests` | `SpanReader` bounds, CRC-32 check values, `ParallelExecution` exception preservation, `CodecErrorStream` mapping, `MultiPartStream` concatenation |
+| `NfsBlobEdgeCaseTests` | NFS header validation, continuation-file lookup, out-of-range/block-boundary reads, disposal ownership |
+| `RVZSharp.Cli.Tests` | shell completions (bash/zsh/fish/PowerShell) and update-check tag parsing |
 | `RVZSharp.Slow.Tests/RealRvzFileTests.cs` | 276 real-file tests (see below) |
 | `RVZSharp.Slow.Tests/RealFileDecodeTests.cs` | env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`) |
 | `RVZSharp.Slow.Tests/RealLegacyFileTests.cs` | real GCZ/CISO/WBFS/TGC/WIA/NFS decode to their expected SHA-1 (`RVZ_REAL_GCZ` … `RVZ_REAL_NFS`/`RVZ_REAL_NFS_KEY`) |

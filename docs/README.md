@@ -13,7 +13,7 @@ implementations in
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 468 fast (every framework, ~1 min) + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 602 fast library tests (every framework, ~1 min) + 40 CLI tests + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing), WIA (None, PURGE, Bzip2, LZMA1, LZMA2) and GCZ (zlib deflate) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |

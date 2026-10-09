@@ -15,11 +15,14 @@ public class DifferentialToolTests
 {
     private readonly ITestOutputHelper _testOutputHelper;
 
+    /// <summary>Creates the test class with xUnit's output helper.</summary>
+    /// <param name="testOutputHelper">The xUnit output helper for diagnostic messages.</param>
     public DifferentialToolTests(ITestOutputHelper testOutputHelper)
     {
         _testOutputHelper = testOutputHelper;
     }
 
+    /// <summary>Verifies that dolphin-tool decodes an RVZ written by <c>RvzWriter</c> to the input ISO.</summary>
     [Fact]
     public void DolphinTool_DecodesOurRvzOutput()
     {
@@ -40,6 +43,7 @@ public class DifferentialToolTests
         });
     }
 
+    /// <summary>Verifies that <c>RvzReader</c> decodes an RVZ written by dolphin-tool to the input ISO.</summary>
     [Fact]
     public void OurReader_DecodesDolphinToolRvzOutput()
     {
@@ -61,6 +65,7 @@ public class DifferentialToolTests
         });
     }
 
+    /// <summary>Verifies that wit decodes a CISO written by <c>CisoWriter</c> (the input prefix matches).</summary>
     [Fact]
     public void Wit_DecodesOurCisoOutput()
     {
@@ -86,6 +91,7 @@ public class DifferentialToolTests
         });
     }
 
+    /// <summary>Verifies that wwt decodes a TGC written by <c>TgcWriter</c> to the input ISO.</summary>
     [Fact]
     public void Wwt_DecodesOurTgcOutput()
     {

@@ -21,12 +21,12 @@
 | Module | Files | Responsibility |
 |---|---|---|
 | `Blobs/` | `Blob`, `BlobType`, `IBlobReader`, `PlainBlob`, `GczBlob`, `CisoBlob`, `WbfsBlob`, `TgcBlob`, `NfsBlob` | Format detection and per-format random-access decoding to ISO bytes |
-| `Models/` | `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `WiaRawDataEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`, `WiaRvzFormat`, `CompressionType` | Container structs (RVZ/WIA) |
+| `Models/` | `DiscInfo`, `DiscFileInfo`, `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `WiaRawDataEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`, `WiaRvzFormat`, `CompressionType` | Data models, container structs (RVZ/WIA), option records and enums |
 | `Chunks/` | `ChunkDecoder`, `TableParser` | Group decompression, exception-list parsing, table loading |
 | `Compression/` | `CompressionCodecFactory`, `CompressionEncoderFactory`, `ICompressionDecoder`, `ICompressionEncoder`, codecs, `Lzma/` (vendored 7-Zip decoder) | Read-side decompression and write-side compression |
 | `Packing/` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator`, `LaggedFibonacciPrng` | RVZ junk packing: segment streams and PRNG seed recovery |
 | `Wii/` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor`, `PartitionReader` | Wii partition encryption, hash tree, exceptions, ticket title-key decryption, decrypted partition views |
-| `Files/` | `DiscFileSystem`, `DiscFileInfo` | GameCube/Wii FST parsing, case-insensitive lookup, file data streaming |
+| `Files/` | `DiscFileSystem` | GameCube/Wii FST parsing, case-insensitive lookup, file data streaming |
 | `Verification/` | `DiscVerifier` | Dolphin VolumeVerifier equivalent: partition headers, TMD/H3 tables and the h0/h1/h2/h3 hash tree walk |
 | `IO/` | `LruCache`, `MultiPartStream`, `BlobCopy`, `Crc32`, `SectionStream`, `ParallelExecution` | Decoded-unit caching, split-file streams, copy/hash helpers and exception-preserving parallel loops |
 

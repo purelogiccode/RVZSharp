@@ -15,14 +15,14 @@ All public types live in the `RVZSharp` assembly; the main namespaces are:
 | Namespace | Contents |
 |---|---|
 | `RVZSharp.Blobs` | `IBlobReader`, `Blob` (factory), `BlobType`, per-format readers |
-| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `CisoWriter`, `WbfsWriter`, `TgcWriter`, `DiscHasher`, `DiscInfo`, `BlobStream`, `RvzWriteOptions`, `GczWriteOptions` |
-| `RVZSharp.Models` | container structs: `WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`, `CompressionType` |
+| `RVZSharp` | `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `CisoWriter`, `WbfsWriter`, `TgcWriter`, `DiscHasher`, `BlobStream`, `RvzWriteOptions`, `GczWriteOptions` |
+| `RVZSharp.Models` | models: `DiscInfo`, `DiscFileInfo`, container structs (`WiaFileHead`, `WiaDisc`, `WiaPartEntry`, `GroupEntry`, `HashExceptionEntry`, `DiscHashes`), options records and enums (`CompressionType`, `BlobType`, `DiscType`, `WiaRvzFormat`) |
 | `RVZSharp.Chunks` | `ChunkDecoder`, `ExceptionListParser` |
 | `RVZSharp.Compression` | codec factories: `CompressionCodecFactory`, `CompressionEncoderFactory` (the vendored 7-Zip LZMA port is internal) |
 | `RVZSharp.IO` | `Adler32`, `SpanReader`, `SectionStream`, `NonDisposingStream` |
 | `RVZSharp.Packing` | `RvzPackingDecoder`, `RvzPackingEncoder`, `LaggedFibonacciGenerator` |
 | `RVZSharp.Wii` | `PartitionRegionBuilder`, `WiiHashCalculator`, `WiiVolume`, `WiiPartitionExtractor`, `PartitionReader` |
-| `RVZSharp.Files` | `DiscFileSystem`, `DiscFileInfo` (FST parsing and file extraction) |
+| `RVZSharp.Files` | `DiscFileSystem` (FST parsing and file extraction; the `DiscFileInfo` tree nodes live in `RVZSharp.Models`) |
 | `RVZSharp.Verification` | `DiscVerifier` and the `VerificationReport`/`VerificationIssue`/`PartitionVerification`/`VerificationSeverity` models |
 
 ---

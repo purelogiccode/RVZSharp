@@ -92,6 +92,14 @@ public sealed class GczBlob : IBlobReader
                 throw new RvzFormatException($"The GCZ block size {blockSize} is too large.");
         }
 
+        // The decoded size must fit the declared blocks, otherwise the block index computed
+        // in ReadAt can wrap for a hostile header.
+        if (discSize > (ulong)numBlocks * blockSize)
+        {
+            throw new RvzFormatException(
+                $"The GCZ disc size {discSize} exceeds {numBlocks} blocks of {blockSize} bytes.");
+        }
+
         // Compare in ulong so a header with the top bit set cannot wrap past the bounds check.
         var headerSize = HeaderSize + (ulong)numBlocks * 12;
         if (headerSize > (ulong)stream.Length ||
@@ -179,7 +187,7 @@ public sealed class GczBlob : IBlobReader
         var total = 0;
         while (!buffer.IsEmpty && position < Length)
         {
-            var blockIndex = (int)(position / BlockSize);
+            var blockIndex = position / BlockSize;
             if (blockIndex >= _blockOffsets.Length)
             {
                 // The header's disc_size exceeds the block table: reading past the last
@@ -191,7 +199,7 @@ public sealed class GczBlob : IBlobReader
             var offsetInBlock = (int)(position % BlockSize);
             var take = (int)Math.Min(Math.Min(buffer.Length, BlockSize - offsetInBlock), Length - position);
 
-            var block = DecodeBlock(blockIndex);
+            var block = DecodeBlock((int)blockIndex);
             block.AsSpan(offsetInBlock, take).CopyTo(buffer);
 
             position += take;

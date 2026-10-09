@@ -266,12 +266,15 @@ published as the GitHub Pages site, with a side menu in both) covering
 - `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
   surface, plus the legacy `info`/`decode` commands, `--json` output, `-` stdin/stdout and
   shell completions).
-- `RVZSharp.Tests` — 468 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
-  tables, codecs, PRNG, packing, exceptions, region rebuild) and end-to-end round-trips of
-  synthetic RVZ files built by `TestRvzBuilder`, plus writer round trips (every codec ×
-  packing, GC + Wii, legacy → RVZ, split WBFS, scrubbing), GCZ writer tests, parallel
-  write/decode determinism tests, FST/file-system tests, async API tests, package-facing
-  API tests (path open, ReadFully, progress, cancellation).
+- `RVZSharp.Tests` — 602 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+  tables, codecs, PRNG, packing, exceptions, region rebuild, metadata/offset edge cases,
+  low-level IO helpers) and end-to-end round-trips of synthetic RVZ files built by
+  `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii, legacy → RVZ,
+  split WBFS, scrubbing), GCZ writer tests, parallel write/decode determinism tests,
+  FST/file-system validation tests, async API tests, package-facing API tests (path open,
+  ReadFully, progress, cancellation).
+- `RVZSharp.Cli.Tests` — 40 tests (net10.0) for the CLI's option parser, shell-completion scripts and the
+  update checker's release-tag parsing and `RVZSHARP_NO_UPDATE_CHECK` switch.
 - `RVZSharp.Slow.Tests` — 276 real-file tests (`RealRvzFileTests`) that decode 90 real
   GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
   Kept out of the solution, so a plain `dotnet test` never runs them (~30 min); run

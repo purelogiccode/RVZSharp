@@ -3,7 +3,8 @@ using RVZSharp.IO;
 namespace RVZSharp.Models;
 
 /// <summary>
-/// <c>wia_exception_t</c>: one 20-byte difference between the recalculated hash data and the
+/// <c>wia_exception_t</c>: one 22-byte entry (2-byte offset + 20-byte hash) describing a
+/// difference between the recalculated hash data and the
 /// original hash data of a Wii partition group.
 /// </summary>
 public readonly struct HashExceptionEntry

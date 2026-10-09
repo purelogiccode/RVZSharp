@@ -74,6 +74,12 @@ public sealed class WbfsBlob : IBlobReader
         }
 
         var hdSectorCount = (long)ReadBe32(header, 4);
+        if (header[8] > 62 || header[9] > 62)
+        {
+            throw new RvzFormatException(
+                $"Invalid WBFS sector shifts ({header[8]}, {header[9]}): must be at most 62.");
+        }
+
         var hdSectorSize = 1L << header[8];
         var clusterSize = 1L << header[9];
 
@@ -102,53 +108,67 @@ public sealed class WbfsBlob : IBlobReader
             totalLength += part.Length;
         }
 
-        if (hdSectorCount * hdSectorSize != totalLength)
+        // Compare with division so the multiplication cannot overflow a hostile header.
+        if (hdSectorCount != totalLength / hdSectorSize || totalLength % hdSectorSize != 0)
         {
-            foreach (var part in parts.Skip(1))
-            {
-                part.Dispose();
-            }
-
+            DisposeContinuations(parts);
             throw new RvzFormatException(
-                $"WBFS size mismatch: header declares {hdSectorCount * hdSectorSize} bytes, "
+                $"WBFS size mismatch: header declares {hdSectorCount} × {hdSectorSize} bytes, "
                 + $"actual {totalLength} ({parts.Count} part(s)).");
         }
 
         var file = parts.Count == 1 ? stream : new MultiPartStream(parts, leaveOpen);
-
-        if (clusterSize < WiiSectorSize)
+        try
         {
-            throw new RvzFormatException($"Invalid WBFS cluster size {clusterSize} (must be ≥ 32 KiB).");
-        }
+            if (clusterSize < WiiSectorSize)
+            {
+                throw new RvzFormatException($"Invalid WBFS cluster size {clusterSize} (must be ≥ 32 KiB).");
+            }
 
-        // The header is magic(0-3), hd_sector_count(4-7), hd_sector_shift(8),
-        // wbfs_sector_shift(9), padding(10-11), disc_table[500](12-511) (Dolphin:
-        // WbfsBlob.h WbfsHeader). Dolphin requires disc_table[0] != 0 (WbfsBlob.cpp:119).
-        if (header[12] == 0) // disc_table[0]
-        {
-            throw new RvzFormatException("The WBFS file does not contain a disc in slot 0.");
-        }
+            // The header is magic(0-3), hd_sector_count(4-7), hd_sector_shift(8),
+            // wbfs_sector_shift(9), padding(10-11), disc_table[500](12-511) (Dolphin:
+            // WbfsBlob.h WbfsHeader). Dolphin requires disc_table[0] != 0 (WbfsBlob.cpp:119).
+            if (header[12] == 0) // disc_table[0]
+            {
+                throw new RvzFormatException("The WBFS file does not contain a disc in slot 0.");
+            }
 
-        var blocksPerDisc = (WiiDataSize + clusterSize - 1) / clusterSize;
-        var tableOffset = hdSectorSize + DiscHeaderSize;
-        if (tableOffset + blocksPerDisc * 2 > file.Length)
-        {
-            throw new RvzFormatException("The WBFS disc table is truncated.");
-        }
-
-        var table = new ushort[blocksPerDisc];
-        Span<byte> entry = stackalloc byte[2];
-        for (var i = 0; i < blocksPerDisc; i++)
-        {
-            if (!ReadExactlyAt(file, tableOffset + i * 2L, entry))
+            var blocksPerDisc = (WiiDataSize + clusterSize - 1) / clusterSize;
+            var tableOffset = hdSectorSize + DiscHeaderSize;
+            if (tableOffset + blocksPerDisc * 2 > file.Length)
             {
                 throw new RvzFormatException("The WBFS disc table is truncated.");
             }
 
-            table[i] = (ushort)((entry[0] << 8) | entry[1]);
-        }
+            var table = new ushort[blocksPerDisc];
+            Span<byte> entry = stackalloc byte[2];
+            for (var i = 0; i < blocksPerDisc; i++)
+            {
+                if (!ReadExactlyAt(file, tableOffset + i * 2L, entry))
+                {
+                    throw new RvzFormatException("The WBFS disc table is truncated.");
+                }
 
-        return new WbfsBlob(file, leaveOpen, hdSectorSize, clusterSize, table, blocksPerDisc);
+                table[i] = (ushort)((entry[0] << 8) | entry[1]);
+            }
+
+            return new WbfsBlob(file, leaveOpen, hdSectorSize, clusterSize, table, blocksPerDisc);
+        }
+        catch
+        {
+            // The caller owns the first part on failure; the internally opened continuation
+            // parts must always be released.
+            DisposeContinuations(parts);
+            throw;
+        }
+    }
+
+    private static void DisposeContinuations(List<Stream> parts)
+    {
+        foreach (var part in parts.Skip(1))
+        {
+            part.Dispose();
+        }
     }
 
     /// <summary>

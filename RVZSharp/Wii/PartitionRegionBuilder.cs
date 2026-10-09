@@ -49,8 +49,9 @@ public sealed class PartitionRegionBuilder
 
     /// <summary>
     /// Adds one sector of decoded partition data (0x7C00 bytes) together with any hash
-    /// exceptions that apply to it. Exception offsets must be relative to the start of this
-    /// 2 MiB region.
+    /// exceptions that apply to it. Exception offsets must be relative to this sector's
+    /// 0x400-byte hash area (block_index × 0x400 + position within the block is resolved by
+    /// the caller).
     /// </summary>
     /// <param name="data">The decrypted partition data (0x7C00 bytes).</param>
     /// <param name="exceptions">The hash exceptions applicable to this sector.</param>

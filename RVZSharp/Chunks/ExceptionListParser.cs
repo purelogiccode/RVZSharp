@@ -28,55 +28,94 @@ public static class ExceptionListParser
     public static (HashExceptionEntry[][] Lists, int BytesUsed) Parse(
         ReadOnlySpan<byte> data, int listCount, bool alignTo4)
     {
+        using var stream = new MemoryStream(data.ToArray(), writable: false);
+        var lists = Parse(stream, listCount, alignTo4, out var consumedBytes);
+        return (lists, consumedBytes.Length);
+    }
+
+    /// <summary>
+    /// Parses <paramref name="listCount"/> exception lists from a stream (the production path
+    /// used by <see cref="ChunkDecoder"/>). Enforces Dolphin's per-list size budget before
+    /// allocating or reading entries.
+    /// </summary>
+    /// <param name="input">The chunk stream, positioned at the first list.</param>
+    /// <param name="listCount">Number of lists expected.</param>
+    /// <param name="alignTo4">True for the NONE method: pad the last list to 4 bytes.</param>
+    /// <param name="consumedBytes">The raw bytes the lists (including padding) occupied.</param>
+    /// <returns>The parsed lists.</returns>
+    internal static HashExceptionEntry[][] Parse(Stream input, int listCount, bool alignTo4,
+        out byte[] consumedBytes)
+    {
         if (listCount == 0)
         {
-            return ([], 0);
+            consumedBytes = [];
+            return [];
         }
 
+        using var consumed = new MemoryStream();
         var lists = new HashExceptionEntry[listCount][];
-        var position = 0;
-
+        var totalBytes = 0;
         for (var listIndex = 0; listIndex < listCount; listIndex++)
         {
-            if (position + 2 > data.Length)
-            {
-                throw new RvzFormatException(
-                    $"Truncated exception list {listIndex}: need 2 bytes for the count, "
-                    + $"only {data.Length - position} available.");
-            }
+            var countBytes = ReadExactly(input, 2, "exception list count");
+            consumed.Write(countBytes);
+            var count = (ushort)((countBytes[0] << 8) | countBytes[1]);
 
-            var count = (ushort)((data[position] << 8) | data[position + 1]);
-            position += 2;
-
-            var listSize = checked(count * HashExceptionEntry.Size);
-            if (alignTo4 && listIndex == listCount - 1)
+            // Enforce the size budget before allocating/reading the entries so a hostile
+            // count cannot request a large array (Dolphin: MAX_SIZE_PER_EXCEPTION_LIST).
+            if (totalBytes + 2L + (long)count * HashExceptionEntry.Size >
+                (long)listCount * MaxBytesPerList)
             {
-                listSize = (listSize + position + 3) & ~3;
-                listSize -= position;
-            }
-
-            if (position + listSize > data.Length)
-            {
-                throw new RvzFormatException(
-                    $"Truncated exception list {listIndex}: declares {count} exceptions "
-                    + $"({listSize} bytes), only {data.Length - position} available.");
+                throw new RvzFormatException("More hash exceptions than expected.");
             }
 
             var entries = new HashExceptionEntry[count];
             for (var i = 0; i < count; i++)
             {
-                entries[i] = HashExceptionEntry.Parse(data.Slice(position, HashExceptionEntry.Size));
-                position += HashExceptionEntry.Size;
-            }
-
-            if (alignTo4 && listIndex == listCount - 1)
-            {
-                position = (position + 3) & ~3;
+                var entryBytes = ReadExactly(input, HashExceptionEntry.Size, "hash exception");
+                consumed.Write(entryBytes);
+                entries[i] = HashExceptionEntry.Parse(entryBytes);
             }
 
             lists[listIndex] = entries;
+            totalBytes += 2 + count * HashExceptionEntry.Size;
+
+            if (alignTo4 && listIndex == listCount - 1)
+            {
+                var padding = (4 - totalBytes % 4) % 4;
+                if (padding > 0)
+                {
+                    var pad = ReadExactly(input, padding, "exception list padding");
+                    consumed.Write(pad);
+                    totalBytes += padding;
+                }
+            }
+
+            if (totalBytes > listCount * MaxBytesPerList)
+            {
+                throw new RvzFormatException("More hash exceptions than expected.");
+            }
         }
 
-        return (lists, position);
+        consumedBytes = consumed.ToArray();
+        return lists;
+    }
+
+    private static byte[] ReadExactly(Stream stream, int count, string what)
+    {
+        var output = new byte[count];
+        var total = 0;
+        while (total < count)
+        {
+            var read = stream.Read(output, total, count - total);
+            if (read <= 0)
+            {
+                throw new RvzFormatException($"Truncated {what}.");
+            }
+
+            total += read;
+        }
+
+        return output;
     }
 }

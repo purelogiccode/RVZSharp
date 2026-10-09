@@ -12,21 +12,17 @@ public sealed class Bzip2Decoder : ICompressionDecoder
     public CompressionType Type => CompressionType.Bzip2;
 
     /// <summary>
-    /// Creates a bzip2 decompressor over <c>input</c> after checking that no compressor data
-    /// is present. The input stream is wrapped so its ownership stays with the caller.
+    /// Creates a bzip2 decompressor over <c>input</c>. The input stream is wrapped so its
+    /// ownership stays with the caller.
     /// </summary>
     /// <param name="input">Stream of the bzip2 data.</param>
-    /// <param name="properties">The compressor properties; must be empty.</param>
+    /// <param name="properties">The compressor properties; ignored (Dolphin only passes
+    /// compressor data to the LZMA decoders).</param>
     /// <param name="inputSize">Ignored by bzip2 framing.</param>
     /// <param name="outputSize">Ignored by bzip2 framing.</param>
     /// <returns>A read-only decompressing stream.</returns>
     public Stream CreateDecompressor(Stream input, ReadOnlySpan<byte> properties, long inputSize, long outputSize)
     {
-        if (properties.Length != 0)
-        {
-            throw new RvzFormatException("BZip2 compression must not have compressor data.");
-        }
-
         // BZip2InputStream disposes its underlying stream; wrap to keep ownership with the
         // caller, and guard construction (it parses the first block eagerly).
         return CodecErrorStream.Create(

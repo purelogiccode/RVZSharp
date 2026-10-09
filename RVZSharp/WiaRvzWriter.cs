@@ -134,6 +134,14 @@ internal static class WiaRvzWriter
                 nameof(options));
         }
 
+        if (!output.CanSeek || output.Position != 0)
+        {
+            throw new ArgumentException(
+                "The WIA/RVZ output stream must be seekable and positioned at 0: the file head "
+                + "is written last and describes the whole file.",
+                nameof(output));
+        }
+
         if (isWia && options.Compression == CompressionType.Zstd)
         {
             throw new RvzUnsupportedException(
@@ -255,7 +263,10 @@ internal static class WiaRvzWriter
 
                 var fstOffset = WiiVolume.GetFstOffset(input, partition) ?? 0;
                 var fstSize = WiiVolume.GetFstSize(input, partition) ?? 0;
-                var fstEnd = partition.Offset + partition.DataOffset + fstOffset + fstSize;
+                // Hash-aware mapping (Dolphin: PartitionOffsetToRawOffset) so the split point
+                // lands where Dolphin puts it on retail (hashed) discs.
+                var fstEnd = WiiVolume.PartitionOffsetToRawOffset(
+                    fstOffset + fstSize, partition, WiiVolume.HasWiiHashes(input));
                 var splitPoint = Math.Min(dataStart + AlignUp(fstEnd - dataStart, GroupTotalSize), dataEnd);
 
                 var size0 = AlignDown(splitPoint - dataStart, SectorSize);
@@ -492,7 +503,7 @@ internal static class WiaRvzWriter
     {
         var blocksPerChunk = (int)((ulong)options.ChunkSize / SectorSize);
         var chunkPayload = blocksPerChunk * WiiHashCalculator.SectorDataSize;
-        var extractor = new WiiPartitionExtractor(input, area.Partition.Key);
+        using var extractor = new WiiPartitionExtractor(input, area.Partition.Key);
         var totalBlocks = (int)(area.Size / SectorSize);
         var dataOffsetInPartition = 0L;
 
@@ -527,8 +538,12 @@ internal static class WiaRvzWriter
                             e.Hash))
                         .ToList();
 
+                    // An all-zero chunk with no exceptions becomes a zero group: the format's
+                    // stored-size-0 special case carries no exception lists at all.
                     sink.Add(chunkData, dataOffsetInPartition,
-                        BuildExceptionListBytes([chunkExceptions]));
+                        chunkExceptions.Count == 0 && IsAllZero(chunkData)
+                            ? []
+                            : BuildExceptionListBytes([chunkExceptions]));
                     dataOffsetInPartition += chunkData.Length;
                 }
             }
@@ -556,7 +571,10 @@ internal static class WiaRvzWriter
                     lists[(regionStart - chunkStart) / 64].AddRange(regionExceptions);
                 }
 
-                sink.Add(chunkData, dataOffsetInPartition, BuildExceptionListBytes(lists));
+                sink.Add(chunkData, dataOffsetInPartition,
+                    lists.All(l => l.Count == 0) && IsAllZero(chunkData)
+                        ? []
+                        : BuildExceptionListBytes(lists));
                 dataOffsetInPartition += chunkData.Length;
             }
         }

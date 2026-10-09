@@ -43,7 +43,7 @@ jobs:
           --results-directory artifacts/coverage
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage
           path: artifacts/coverage
@@ -64,7 +64,7 @@ jobs:
       - name: Pack
         run: dotnet pack RVZSharp/RVZSharp.csproj -c Release -o artifacts/packages
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: packages
           path: artifacts/packages
@@ -91,7 +91,7 @@ jobs:
       - name: Smoke test
         run: artifacts/rvzsharp-win-x64/RVZSharp.exe --help
       - name: Upload CLI
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: rvzsharp-win-x64
           path: artifacts/rvzsharp-win-x64

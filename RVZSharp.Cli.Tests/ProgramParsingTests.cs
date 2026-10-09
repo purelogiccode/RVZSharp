@@ -1,5 +1,3 @@
-using RVZSharp.Cli;
-
 namespace RVZSharp.Cli.Tests;
 
 /// <summary>
@@ -42,8 +40,7 @@ public class ProgramParsingTests
     [Fact]
     public void ParseArgs_FlagWithInlineValue_Throws()
     {
-        var exception = Assert.Throws<Program.CliErrorException>(
-            () => Program.ParseArgs(["--scrub=no"], Spec));
+        var exception = Assert.Throws<Program.CliErrorException>(() => Program.ParseArgs(["--scrub=no"], Spec));
         Assert.Contains("does not take an argument", exception.Message);
     }
 
@@ -59,8 +56,7 @@ public class ProgramParsingTests
     [Fact]
     public void ParseArgs_MissingValue_Throws()
     {
-        var exception = Assert.Throws<Program.CliErrorException>(
-            () => Program.ParseArgs(["--input"], Spec));
+        var exception = Assert.Throws<Program.CliErrorException>(() => Program.ParseArgs(["--input"], Spec));
         Assert.Contains("requires an argument", exception.Message);
     }
 
@@ -68,8 +64,7 @@ public class ProgramParsingTests
     [Fact]
     public void ParseArgs_InvalidChoice_Throws()
     {
-        var exception = Assert.Throws<Program.CliErrorException>(
-            () => Program.ParseArgs(["-f", "gcz"], Spec));
+        var exception = Assert.Throws<Program.CliErrorException>(() => Program.ParseArgs(["-f", "gcz"], Spec));
         Assert.Contains("invalid choice", exception.Message);
     }
 

@@ -271,7 +271,9 @@ public static class DiscVerifier
             return false;
         }
 
-        if ((long)TmdContentsOffset + (long)contentCount * TmdContentSize > tmd.Length)
+        // ReSharper disable once ArrangeRedundantParentheses
+        // ReSharper disable once UselessBinaryOperation
+        if ((long)TmdContentsOffset + ((long)contentCount * TmdContentSize) > tmd.Length)
         {
             issues.Add(new VerificationIssue(VerificationSeverity.Medium,
                 "The partition TMD content table is truncated.", partition.Offset, partition.Type));

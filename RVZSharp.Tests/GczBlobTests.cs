@@ -129,8 +129,7 @@ public class GczBlobTests
         var blockSize = BitConverter.ToUInt32(gcz, 24);
         BitConverter.GetBytes((ulong)numBlocks * blockSize + 0x8000).CopyTo(gcz, 16); // disc_size
 
-        var exception = Assert.Throws<RvzFormatException>(
-            () => GczBlob.Open(new MemoryStream(gcz)));
+        var exception = Assert.Throws<RvzFormatException>(() => GczBlob.Open(new MemoryStream(gcz)));
         Assert.Contains("disc size", exception.Message);
     }
 }

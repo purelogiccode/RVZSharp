@@ -1,5 +1,3 @@
-using RVZSharp.Cli;
-
 namespace RVZSharp.Cli.Tests;
 
 /// <summary>

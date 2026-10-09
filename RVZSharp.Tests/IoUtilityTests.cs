@@ -185,8 +185,7 @@ public class IoUtilityTests
     {
         using var read = CodecErrorStream.Create(
             () => new FaultyStream { ReadException = new IndexOutOfRangeException("corrupt") }, "LZMA");
-        Assert.Contains("LZMA", Assert.Throws<RvzFormatException>(
-            () => read.Read(new byte[4], 0, 4)).Message);
+        Assert.Contains("LZMA", Assert.Throws<RvzFormatException>(() => read.Read(new byte[4], 0, 4)).Message);
 
         using var span = CodecErrorStream.Create(
             () => new FaultyStream { ReadException = new InvalidDataException("corrupt") }, "LZMA");
@@ -285,6 +284,7 @@ public class IoUtilityTests
     {
         var first = new TrackingStream();
         var second = new TrackingStream();
+        // ReSharper disable once UnusedVariable
         using (var stream = new MultiPartStream([first, second], leaveOpen: true))
         {
         }
@@ -294,6 +294,7 @@ public class IoUtilityTests
 
         var owned = new TrackingStream();
         var other = new TrackingStream();
+        // ReSharper disable once UnusedVariable
         using (var stream = new MultiPartStream([owned, other], leaveOpen: false))
         {
         }

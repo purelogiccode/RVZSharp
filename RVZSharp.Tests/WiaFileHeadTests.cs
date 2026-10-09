@@ -134,8 +134,7 @@ public class WiaFileHeadTests
         var bytes = builder.Build();
         var head = WiaFileHead.Parse(bytes);
 
-        var exception = Assert.Throws<RvzFormatException>(
-            () => head.Validate(bytes, bytes.Length + 0xDC));
+        var exception = Assert.Throws<RvzFormatException>(() => head.Validate(bytes, bytes.Length + 0xDC));
         Assert.Contains("disc struct", exception.Message);
 
         var tooSmall = new TestHeaderBuilder

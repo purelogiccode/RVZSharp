@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using RVZSharp.Blobs;
-using RVZSharp.Interfaces;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 using RVZSharp.Wii;

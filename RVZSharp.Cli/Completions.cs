@@ -159,56 +159,56 @@ internal static class Completions
                                  """;
 
     private const string Fish = $"""
-                                  # rvzsharp fish completion. Install:
-                                  #   rvzsharp completions fish > ~/.config/fish/completions/rvzsharp.fish
-                                  complete -c rvzsharp -f
-                                  complete -c rvzsharp -n '__fish_use_subcommand' -a convert -d 'Convert a disc image'
-                                  complete -c rvzsharp -n '__fish_use_subcommand' -a header -d 'Print disc header information'
-                                  complete -c rvzsharp -n '__fish_use_subcommand' -a verify -d 'Hash and verify a disc image'
-                                  complete -c rvzsharp -n '__fish_use_subcommand' -a extract -d 'List or extract disc files'
-                                  complete -c rvzsharp -n '__fish_use_subcommand' -a info -d 'Legacy alias of header'
-                                  complete -c rvzsharp -n '__fish_use_subcommand' -a decode -d 'Decode any blob to a plain ISO'
-                                  complete -c rvzsharp -n '__fish_use_subcommand' -a completions -d 'Print a shell completion script'
+                                 # rvzsharp fish completion. Install:
+                                 #   rvzsharp completions fish > ~/.config/fish/completions/rvzsharp.fish
+                                 complete -c rvzsharp -f
+                                 complete -c rvzsharp -n '__fish_use_subcommand' -a convert -d 'Convert a disc image'
+                                 complete -c rvzsharp -n '__fish_use_subcommand' -a header -d 'Print disc header information'
+                                 complete -c rvzsharp -n '__fish_use_subcommand' -a verify -d 'Hash and verify a disc image'
+                                 complete -c rvzsharp -n '__fish_use_subcommand' -a extract -d 'List or extract disc files'
+                                 complete -c rvzsharp -n '__fish_use_subcommand' -a info -d 'Legacy alias of header'
+                                 complete -c rvzsharp -n '__fish_use_subcommand' -a decode -d 'Decode any blob to a plain ISO'
+                                 complete -c rvzsharp -n '__fish_use_subcommand' -a completions -d 'Print a shell completion script'
 
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s i -l input -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s o -l output -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s u -l user -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s f -l format -x -a '{Formats}'
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s s -l scrub
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s b -l block_size -x
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s c -l compression -x -a '{CompressionMethods}'
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s l -l compression_level -x
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l chunk-size -x
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l no-packing
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l threads -x
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l verify
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l json
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s i -l input -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s o -l output -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s u -l user -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s f -l format -x -a '{Formats}'
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s s -l scrub
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s b -l block_size -x
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s c -l compression -x -a '{CompressionMethods}'
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -s l -l compression_level -x
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l chunk-size -x
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l no-packing
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l threads -x
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l verify
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from convert' -l json
 
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s i -l input -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s j -l json
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s b -l block_size
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s c -l compression
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s l -l compression_level
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s i -l input -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s j -l json
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s b -l block_size
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s c -l compression
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from header' -s l -l compression_level
 
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -s i -l input -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -s u -l user -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -s a -l algorithm -x -a '{Algorithms}'
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -l partitions
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -l json
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -s i -l input -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -s u -l user -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -s a -l algorithm -x -a '{Algorithms}'
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -l partitions
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from verify' -l json
 
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s i -l input -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s o -l output -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s p -l partition -x
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s s -l single -r
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s l -l list
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s q -l quiet
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s g -l gameonly
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s i -l input -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s o -l output -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s p -l partition -x
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s s -l single -r
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s l -l list
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s q -l quiet
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from extract' -s g -l gameonly
 
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from decode' -l sha1 -x
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from decode' -l threads -x
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from decode' -l sha1 -x
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from decode' -l threads -x
 
-                                  complete -c rvzsharp -n '__fish_seen_subcommand_from completions' -x -a 'bash zsh fish powershell'
-                                  """;
+                                 complete -c rvzsharp -n '__fish_seen_subcommand_from completions' -x -a 'bash zsh fish powershell'
+                                 """;
 
     private const string PowerShell = """
                                       # rvzsharp PowerShell completion. Install (add to $PROFILE):

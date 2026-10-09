@@ -16,7 +16,7 @@
 | 10 — API ergonomics | Dolphin-default compression level 5, `DiscInfo` metadata API, split plain ISO (`.part0.iso`), path overloads (`RvzWriter.Write`/`RvzReader.Open`), seekable `BlobStream`, `Scrub` writer option | ✅ done |
 | 11 — Robustness & performance | thread-safe `ReadAt` with a 16 MiB LRU decoded-unit cache, binary-search area lookup, ArrayPool group reads; parser caps + mutation/fuzz robustness suite; Native AOT/trimming validated (library annotated, CLI trimmed + AOT publish smoke-tested) | ✅ done |
 | 12 — Formats & verification | `CisoWriter`/`WbfsWriter`/`TgcWriter` (+ `convert -f ciso\|wbfs\|tgc`); `DiscVerifier` Wii h0/h1/h2/h3 + TMD/H3 verification (`verify --partitions`); env-var real legacy-file tests + optional `dolphin-tool`/`wit`/`wwt` differential tests | ✅ done |
-| 13 — Tooling & packaging | GitHub Actions CI (build + fast tests on net8.0/9.0/10.0, coverage artifact, pack + API validation, ReadyToRun CLI publish) and Dependabot; `PackageValidationBaselineVersion` (1.0.0) diffing the public API; SPDX SBOM embedded in the nupkg; CLI `--json`, `-` stdin/stdout and shell completions; per-tag GitHub Releases with CLI bundles + NuGet push; `docs/` mirrored to the wiki and deployed to Pages | ✅ done (not published yet) |
+| 13 — Tooling & packaging | GitHub Actions CI (build + fast tests on net8.0/9.0/10.0, coverage artifact, pack + API validation, CLI publish) and Dependabot; `PackageValidationBaselineVersion` (1.0.0) diffing the public API; SPDX SBOM embedded in the nupkg; CLI `--json`, `-` stdin/stdout and shell completions; per-tag GitHub Releases with CLI bundles + NuGet push; `docs/` mirrored to the wiki and deployed to Pages | ✅ done (1.1.0 published 2026-10-09) |
 | 14 — Correctness review | commit-by-commit audit before 1.1.0: retail ticket-key decryption with the Wii common key (`WiiVolume.GetTitleKey`), extract TMD/cert/H3 partition-relative offsets + H3 guard, WBFS header size/copy fixes, `convert --json` stdout hygiene, Ctrl+C exit 130, monotonic writer progress, original-exception propagation from parallel loops — each pinned by a regression test | ✅ done |
 | 15 — Audit follow-up | second commit-by-commit audit: zero-group decode of all-zero partition chunks, extract path-traversal guards (`-s`/image names cannot escape `-o`), FST validation hardening, `decode -h`, help-run telemetry/update-prompt skips, stdin-spool cancellation in every command, release/wiki workflow fixes — each pinned by a regression test | ✅ done |
 
@@ -72,5 +72,5 @@
 
 - Run the legacy/differential slow tests against a real collection of GCZ/CISO/WBFS/TGC/NFS
   files and `dolphin-tool`/`wit`/`wwt` on a machine that has them.
-- Publish the 1.1.0 package (API-compat validated against 1.0.0, SBOM embedded) and the
-  ReadyToRun/Native AOT CLI binaries.
+- Keep the 1.1.x line current: dependency bumps via Dependabot and patch releases from
+  `master` when a regression is reported.

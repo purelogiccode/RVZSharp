@@ -65,8 +65,8 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
    -p:PublishTrimmed=true` (and `-p:PublishAot=true`) must produce warning-free binaries
    that round-trip a disc image byte-exactly.
 6. **CI** — `.github/workflows/ci.yml` builds and runs the fast suite on all three
-   frameworks (coverage artifact), packs with API validation + SBOM, and publishes a
-   ReadyToRun single-file CLI (win-x64) that is smoke-tested before upload.
+   frameworks (coverage artifact), packs with API validation + SBOM, and publishes the
+   framework-dependent single-file CLI (win-x64) that is smoke-tested before upload.
    `.github/workflows/release.yml` builds the release bundles (below),
    `.github/workflows/wiki.yml` mirrors `docs/` to the wiki and
    `.github/workflows/pages.yml` deploys `docs/` to GitHub Pages. Dependabot
@@ -77,19 +77,27 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
 Releases are built by `.github/workflows/release.yml`. Push a tag `v<version>`
 (`v1.1.0`, `v1.2.0-beta.1`, … — valid SemVer after the leading `v`):
 
-1. **CLI bundles** — the self-contained single-file CLI is published, smoke-tested
-   (`--help` must exit 0) and zipped per runtime, each zip holding the executable
-   plus `LICENSE`, `THIRD-PARTY-NOTICES.md` and `README.md`:
+1. **CLI bundles** — the framework-dependent single-file CLI is published for six
+   runtimes, smoke-tested on a native runner (`--help` must exit 0) and zipped, each
+   zip holding the executable plus `LICENSE`, `README.md`, `WhatsNew.md` and
+   `THIRD-PARTY-NOTICES.md`:
 
-   | Asset | Runner | Notes |
-   |---|---|---|
-   | `rvzsharp-<version>-win-x64.zip` | Windows | ReadyToRun |
-   | `rvzsharp-<version>-linux-x64.zip` | Linux | ReadyToRun |
-   | `rvzsharp-<version>-osx-x64.zip` | macOS | Intel |
-   | `rvzsharp-<version>-osx-arm64.zip` | macOS | Apple Silicon |
+   | Asset | Runner |
+   |---|---|
+   | `rvzsharp_v<version>_win-x64.zip` | Windows Server 2025 (x64) |
+   | `rvzsharp_v<version>_win-arm64.zip` | Windows 11 (arm64) |
+   | `rvzsharp_v<version>_linux-x64.zip` | Ubuntu 24.04 (x64) |
+   | `rvzsharp_v<version>_linux-arm64.zip` | Ubuntu 24.04 (arm64) |
+   | `rvzsharp_v<version>_osx-x64.zip` | macOS 15 (Intel) |
+   | `rvzsharp_v<version>_osx-arm64.zip` | macOS 26 (Apple Silicon) |
+
+   The bundles are framework-dependent: the .NET 10 runtime is **not** embedded, so
+   target machines install it (see
+   [Getting started](getting-started.md#install-the-cli)). On Linux and macOS the zip
+   is built with `zip(1)` so the executable bit survives extraction.
 2. **NuGet package** — `dotnet pack` with API-compat validation and the embedded
    SBOM (`RVZSharp.<version>.nupkg` + `.snupkg` symbols).
-3. **GitHub Release** — created with the four zips, `SHA256SUMS.txt` and both
+3. **GitHub Release** — created with the six zips, `SHA256SUMS.txt` and both
    packages. The notes come from `docs/release-notes-<version>.md` when that file
    exists (`release-notes-1.0.0.md` shows the format); otherwise a fallback body
    is used. Tags containing `-` are marked as pre-releases.
@@ -176,21 +184,22 @@ dotnet add package RVZSharp --version 1.1.0
 ## The CLI
 
 The command-line tool (`RVZSharp.Cli`) is **not** packaged as a NuGet tool — it is a
-reference implementation and smoke-test surface for the library. It targets `net10.0` and
-ships as single-file, self-contained binaries (no runtime required on the target):
+reference implementation and smoke-test surface for the library. It targets `net10.0`
+and ships as framework-dependent single-file binaries (one executable per runtime; the
+.NET 10 runtime is a prerequisite on the target machine, it is not embedded):
 
 ```bash
 dotnet build CSharp_RVZSharp.sln -c Release
 dotnet run --project RVZSharp.Cli -c Release -- header -i game.rvz
 
-# Native AOT (the release path) or the ReadyToRun fallback published by CI:
-dotnet publish RVZSharp.Cli -c Release -f net10.0 -r win-x64 -p:PublishAot=true
-dotnet publish RVZSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained true \
-    -p:PublishSingleFile=true -p:PublishReadyToRun=true
+# Release bundles (all six RIDs), framework-dependent single-file:
+dotnet publish RVZSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained false \
+    -p:PublishSingleFile=true
 ```
 
 End users do not need the SDK: each GitHub Release (see [Release
-process](#release-process)) ships `rvzsharp-<version>-<rid>.zip` bundles
-(`win-x64`, `linux-x64`, `osx-x64`, `osx-arm64`) — unzip and run `RVZSharp.Cli`
-(`RVZSharp.Cli.exe` on Windows); see [Getting
+process](#release-process)) ships `rvzsharp_v<version>_<rid>.zip` bundles
+(`win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`) — unzip,
+install the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) and run
+`RVZSharp.Cli` (`RVZSharp.Cli.exe` on Windows); see [Getting
 started](getting-started.md#install-the-cli).

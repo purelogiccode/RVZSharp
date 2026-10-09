@@ -332,10 +332,10 @@ partition-table key and falls back to the ticket key for plain ISO inputs.
 **Packaging & CI**: the NuGet package is API-compat validated against the last published
 release (`PackageValidationBaselineVersion` 1.0.0) and carries an embedded SPDX 2.2 SBOM;
 GitHub Actions (`.github/workflows/ci.yml`) builds and tests on `net8.0`/`net9.0`/`net10.0`
-with coverage, packs, and publishes a smoke-tested ReadyToRun CLI artifact. Dependabot
-keeps NuGet and Actions dependencies current.
+with coverage, packs, and publishes a smoke-tested framework-dependent single-file CLI
+artifact. Dependabot keeps NuGet and Actions dependencies current.
 
-**1.1.0 (unreleased)** adds the legacy writers (CISO/WBFS/TGC), `DiscVerifier`, the CI and
+**1.1.0 (2026-10-09)** adds the legacy writers (CISO/WBFS/TGC), `DiscVerifier`, the CI and
 packaging gates above, and the CLI conveniences (`--json`, `-` stdin/stdout, completions).
 A post-release review also fixed a set of correctness bugs: retail ticket title keys are
 now common-key decrypted (so `verify --partitions`, `extract` and RVZ writing work on real

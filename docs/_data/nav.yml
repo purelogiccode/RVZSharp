@@ -22,6 +22,8 @@
   url: "/format/legacy.html"
 - title: Testing
   url: "/testing.html"
+- title: Release notes 1.1.0
+  url: "/release-notes-1.1.0.html"
 - title: Release notes 1.0.0
   url: "/release-notes-1.0.0.html"
 - title: Roadmap & status

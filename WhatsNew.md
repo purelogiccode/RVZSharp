@@ -1,9 +1,10 @@
 # What's new in RVZSharp
 
-Release highlights, newest first. The full 1.0.0 announcement is in
+Release highlights, newest first. The full announcements are in
+[`docs/release-notes-1.1.0.md`](docs/release-notes-1.1.0.md) and
 [`docs/release-notes-1.0.0.md`](docs/release-notes-1.0.0.md).
 
-## 1.1.0 (unreleased)
+## 1.1.0 (2026-10-09)
 
 A feature and correctness release. The public API stays compatible with 1.0.0 (checked at
 pack time against the published package via `PackageValidationBaselineVersion`).
@@ -56,12 +57,16 @@ pack time against the published package via `PackageValidationBaselineVersion`).
 ### Tooling & packaging
 
 - GitHub Actions CI (fast tests on `net8.0`/`net9.0`/`net10.0` with coverage, pack with API
-  validation + embedded SPDX 2.2 SBOM, smoke-tested ReadyToRun CLI artifact) and Dependabot.
+  validation + embedded SPDX 2.2 SBOM, smoke-tested CLI artifact) and Dependabot.
 - **Release automation** — pushing a `v<version>` tag builds per-platform CLI bundles
-  (`win-x64`, `linux-x64`, `osx-x64`, `osx-arm64`), packs the NuGet package, creates the
-  GitHub Release (notes from `docs/release-notes-<version>.md`) and pushes stable
-  versions to nuget.org; `docs/` is mirrored to the repository wiki and deployed to
-  GitHub Pages (side menu in both).
+  for six runtimes (`win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`,
+  `osx-arm64`), packs the NuGet package, creates the GitHub Release (notes from
+  `docs/release-notes-<version>.md`) and pushes stable versions to nuget.org; `docs/` is
+  mirrored to the repository wiki and deployed to GitHub Pages (side menu in both).
+- **Lean CLI bundles** — `rvzsharp_v<version>_<rid>.zip` ships a framework-dependent
+  single-file executable (the .NET 10 runtime is not embedded and is installed once on
+  the target machine) plus `LICENSE`, `README.md`, `WhatsNew.md` and
+  `THIRD-PARTY-NOTICES.md`.
 - **609 library tests** on each target framework plus **57 CLI tests** and 276 real-file slow tests (90 RVZ games).
 
 ## 1.0.0 (2026-08-15)

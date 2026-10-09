@@ -22,7 +22,7 @@ implementations in
 
 | Page | What it covers |
 |---|---|
-| [What's new](whats-new.md) | Release highlights (1.1.0 unreleased, 1.0.0) |
+| [What's new](whats-new.md) | Release highlights (1.1.0, 1.0.0) |
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
 | [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
 | [CLI reference](usage-cli.md) | `convert`, `header`, `verify`, `extract` (+ legacy `info`/`decode`) — options and examples |
@@ -33,7 +33,7 @@ implementations in
 | [Wii partitions](format/wii-partitions.md) | Encryption, hash tree, hash exceptions, tickets |
 | [Legacy formats](format/legacy.md) | GCZ, CISO/WBI, WBFS, TGC, NFS byte layouts |
 | [Testing](testing.md) | Test strategy and synthetic image builders |
-| [Release notes](release-notes-1.0.0.md) | 1.0.0 announcement content (GitHub release post) |
+| [Release notes](release-notes-1.1.0.md) | 1.1.0 and [1.0.0](release-notes-1.0.0.md) announcement content (GitHub release posts) |
 | [Roadmap & status](roadmap.md) | Milestones, limitations, open questions |
 | [FAQ](faq.md) | Common questions |
 

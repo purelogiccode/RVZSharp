@@ -58,7 +58,8 @@ byte-for-byte against their official No-Intro SHA-1s:
 7. **Continuous integration** (`.github/workflows/ci.yml`): builds the solution and runs the
    fast suite on `net8.0`/`net9.0`/`net10.0` with coverage uploaded as an artifact, packs
    the library (API-compat against 1.0.0 + embedded SBOM) and publishes a smoke-tested
-   ReadyToRun CLI. The slow suite and differential tests stay opt-in on developer machines.
+   framework-dependent single-file CLI. The slow suite and differential tests stay opt-in
+   on developer machines.
 8. **1.1.0 correctness review**: a commit-by-commit audit pinned the fixes below with
    regression tests — retail ticket title keys are common-key decrypted
    (`WiiVolumeTests`; the synthetic Wii builders now store encrypted keys like real discs),

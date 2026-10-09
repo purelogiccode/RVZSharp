@@ -43,7 +43,7 @@ Expected result: `Passed: 468, Failed: 0` on **each** of `net8.0`, `net9.0` and 
 and runs only when requested:
 
 ```bash
-dotnet test RVZSharp.Slow.Tests -c Release   # 97 real-game tests, ~12 min when mounted
+dotnet test RVZSharp.Slow.Tests -c Release   # 276 real-game tests, ~30 min when mounted
 ```
 
 To run a single test class:

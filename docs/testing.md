@@ -4,8 +4,8 @@ The test suite is split into **two projects**, so the default run is always the 
 
 - **`RVZSharp.Tests`** — **468 synthetic tests** (unit + end-to-end round trips), ~1
   minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
-- **`RVZSharp.Slow.Tests`** — **97 real-file tests** (full decode, structural checks,
-  writer round trips against real game images), ~12 minutes when the games are mounted.
+- **`RVZSharp.Slow.Tests`** — **276 real-file tests** (full decode, structural checks,
+  writer round trips against 90 real game images), ~30 minutes when the games are mounted.
   It is deliberately kept **out of the solution**, so a plain `dotnet test` / solution run
   never executes it.
 
@@ -99,7 +99,7 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `ScrubOptionTests` | `RvzWriteOptions.Scrub` zeroes non-game partitions while keeping the game partition byte-exact |
 | `AsyncApiTests` | `ReadFullyAsync`/`CopyToAsync`/`WriteAsync` equal their synchronous forms, cancellation |
 | `DiscFileSystemTests` | FST parsing (GC + decrypted Wii partitions), case-insensitive lookup, file reads, `PartitionReader` decryption, invalid FST rejection |
-| `RVZSharp.Slow.Tests/RealRvzFileTests.cs` | 97 real-file tests (see below) |
+| `RVZSharp.Slow.Tests/RealRvzFileTests.cs` | 276 real-file tests (see below) |
 | `RVZSharp.Slow.Tests/RealFileDecodeTests.cs` | env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`) |
 | `RVZSharp.Slow.Tests/RealLegacyFileTests.cs` | real GCZ/CISO/WBFS/TGC/WIA/NFS decode to their expected SHA-1 (`RVZ_REAL_GCZ` … `RVZ_REAL_NFS`/`RVZ_REAL_NFS_KEY`) |
 | `RVZSharp.Slow.Tests/DifferentialToolTests.cs` | optional cross-checks against `dolphin-tool`/`wit`/`wwt` (`RVZ_DOLPHIN_TOOL`/`RVZ_WIT`/`RVZ_WWT` + `RVZ_DIFF_ISO`) |
@@ -112,9 +112,9 @@ images on a local drive
 No-Intro DAT files in `References/rvz-1.0.3/testdata/`, so a passing test proves the decoder
 reproduces the original disc image byte-for-byte:
 
-- **30 full-decode SHA-1 tests** — 15 GameCube + 15 Wii RVZ files, decoded entirely and
+- **90 full-decode SHA-1 tests** — 45 GameCube + 45 Wii RVZ files, decoded entirely and
   compared to their No-Intro DAT SHA-1, plus an expected-ISO-size check per file;
-- **30 structural tests** — RVZ magic, version, legal chunk size, compression method,
+- **90 structural tests** — RVZ magic, version, legal chunk size, compression method,
   group-table sanity on every file;
 - **3 region/random-access tests** — full-read hashing, `ReadAt` vs `ReadFully` across chunk
   boundaries, out-of-range clamping;

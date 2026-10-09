@@ -13,7 +13,7 @@ implementations in
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 468 fast (every framework, ~1 min) + 97 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 468 fast (every framework, ~1 min) + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing), WIA (None, PURGE, Bzip2, LZMA1, LZMA2) and GCZ (zlib deflate) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
@@ -73,7 +73,7 @@ These pages are published twice from the same files:
   worker pools (`--threads`; output byte-identical for any thread count), and the async API
   (`CopyToAsync`/`ReadFullyAsync`/`WriteAsync`) wraps the CPU-bound work for UI consumers.
 - **Verifiable** — every conversion is byte-exact: the test suite round-trips synthetic
-  discs through every codec, packing setting and chunk size, decodes **30 real GameCube/Wii
+  discs through every codec, packing setting and chunk size, decodes **90 real GameCube/Wii
   RVZ files** byte-for-byte against their official No-Intro SHA-1s, re-encodes real GC/Wii
   images back to RVZ, and `DiscHasher`/the CLI can verify decoded output (`--sha1`,
   `verify`).

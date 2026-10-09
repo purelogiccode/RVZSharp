@@ -12,9 +12,10 @@ namespace RVZSharp.Slow.Tests;
 /// <c>Nintendo - Wii - Datfile…dat</c>). A test that decodes a real file to its No-Intro
 /// SHA-1 proves the reader reproduces the original disc image byte-for-byte.
 ///
-/// The files live on a local drive (<c>F:\Nintendo GameCube</c> / <c>F:\Nintendo Wii</c>)
-/// and are NOT part of the repository, so every test early-returns (no-op) when its file
-/// is absent. Run the suite on a machine that has the games mounted to execute them.
+/// The files live on a local drive (<c>F:\Nintendo GameCube</c> / <c>F:\Nintendo Wii</c> by
+/// default; override with <c>RVZ_REAL_GC_DIR</c> / <c>RVZ_REAL_WII_DIR</c>) and are NOT part
+/// of the repository, so every test early-returns (no-op) when its file is absent. Run the
+/// suite on a machine that has the games mounted to execute them.
 /// </summary>
 public static class RealRvzCatalog
 {
@@ -60,7 +61,37 @@ public static class RealRvzCatalog
         new("Sum of All Fears, The", "Sum of All Fears, The (USA).rvz",
             "c7214e84362f41983703328a187f4e056177da37", 1459978240),
         new("Tak and the Power of Juju", "Tak and the Power of Juju (USA).rvz",
-            "ac9b16004e7a8eb87e5acebb5c095541ace72e18", 1459978240)
+            "ac9b16004e7a8eb87e5acebb5c095541ace72e18", 1459978240),
+        new("007 - Agent Under Fire", "007 - Agent Under Fire (USA) (Rev 1).rvz", "7c8a0148f0e5d5b1f40bdfb098eba1935df1932e", 1459978240),
+        new("007 - Everything or Nothing", "007 - Everything or Nothing (USA).rvz", "850fc473afcca94171864e754a098a81d9276e98", 1459978240),
+        new("007 - From Russia with Love", "007 - From Russia with Love (USA).rvz", "0f002bca477a6631cc90e909b39f53fc27e60855", 1459978240),
+        new("007 - Nightfire", "007 - Nightfire (USA).rvz", "7275e43f04caa3c9ec6f3675a54d043d4c544bf3", 1459978240),
+        new("1080 Avalanche", "1080 Avalanche (USA).rvz", "09b059208054434df2dadf20b96292b8e11fa908", 1459978240),
+        new("18 Wheeler - American Pro Trucker", "18 Wheeler - American Pro Trucker (USA).rvz", "5fea37dc1e9b4e7112f14e81bfda67e38410bd11", 1459978240),
+        new("2002 FIFA World Cup", "2002 FIFA World Cup (USA).rvz", "0e4e9ad320de2502a2405548c1cc691720b591aa", 1459978240),
+        new("4x4 Evo 2", "4x4 Evo 2 (USA).rvz", "7a384b777c3bc06ca67f0707e4b610831024f307", 1459978240),
+        new("Aggressive Inline", "Aggressive Inline (USA).rvz", "5df120bab0042b81b8bbd01774ed9318cecec62f", 1459978240),
+        new("Alien Hominid", "Alien Hominid (USA).rvz", "227ba514263da3d51e2288672414ad496507a77d", 1459978240),
+        new("All-Star Baseball 2002", "All-Star Baseball 2002 (USA).rvz", "074f624da00da21216c14b9086efac9b22168254", 1459978240),
+        new("All-Star Baseball 2003 featuring Derek Jeter", "All-Star Baseball 2003 featuring Derek Jeter (USA).rvz", "c16946c178cbf38add8cebd3a31e9b9cc8815c25", 1459978240),
+        new("All-Star Baseball 2004 featuring Derek Jeter", "All-Star Baseball 2004 featuring Derek Jeter (USA).rvz", "72130d8dfba37ef562ea758bab5a55420e3858f8", 1459978240),
+        new("Amazing Island", "Amazing Island (USA).rvz", "b82cb04d83b9448e63b594409b378302772c5e38", 1459978240),
+        new("American Chopper 2 - Full Throttle", "American Chopper 2 - Full Throttle (USA).rvz", "a56283207bf046faf262afee1278605834329390", 1459978240),
+        new("Animaniacs - The Great Edgar Hunt", "Animaniacs - The Great Edgar Hunt (USA).rvz", "b21bf13c0d297ab350edbdc80d682e054328a743", 1459978240),
+        new("Ant Bully, The", "Ant Bully, The (USA) (En,Fr).rvz", "2f55464b07983a4e89ce5d360339a73ef106320b", 1459978240),
+        new("Aquaman - Battle for Atlantis", "Aquaman - Battle for Atlantis (USA).rvz", "547231c50378665ac2e4a6b3045b1381a96898be", 1459978240),
+        new("Army Men - Air Combat - The Elite Missions", "Army Men - Air Combat - The Elite Missions (USA).rvz", "1fadea0db0547efe014d4dd8030afd32b7230b1c", 1459978240),
+        new("Army Men - RTS", "Army Men - RTS (USA).rvz", "6a17e1535a4a40d84f7737bcad4fa5599a1f3a14", 1459978240),
+        new("Army Men - Sarge's War", "Army Men - Sarge's War (USA).rvz", "21ab1185a4dec9c40e1999500ed9bca7d99eddb3", 1459978240),
+        new("ATV - Quad Power Racing 2", "ATV - Quad Power Racing 2 (USA).rvz", "f9c6a0bdd336d0e3a3d48b8d25874f514635f37f", 1459978240),
+        new("Auto Modellista", "Auto Modellista (USA).rvz", "800b74412f60939c2d93d7f1ce679cd3da068e55", 1459978240),
+        new("Backyard Baseball", "Backyard Baseball (USA).rvz", "25477c45eef85de8058635353c74f829512e2826", 1459978240),
+        new("Backyard Football", "Backyard Football (USA).rvz", "0aecb7fd86ec9994bc1a440796536fbac733c1b4", 1459978240),
+        new("Backyard Sports - Baseball 2007", "Backyard Sports - Baseball 2007 (USA).rvz", "4e2a0c9458984d01cbbd41540296236f231ba33b", 1459978240),
+        new("Bad Boys - Miami Takedown", "Bad Boys - Miami Takedown (USA).rvz", "6960d88596dfe89e5da516c70ac2700b8089d38f", 1459978240),
+        new("Baldur's Gate - Dark Alliance", "Baldur's Gate - Dark Alliance (USA).rvz", "c2d49e31143dbb4818b9f9198446618e6265190e", 1459978240),
+        new("Baten Kaitos - Eternal Wings and the Lost Ocean", "Baten Kaitos - Eternal Wings and the Lost Ocean (USA) (Disc 1).rvz", "0ce23b9b41bee99e475812b46e236c89a0987956", 1459978240),
+        new("Baten Kaitos - Eternal Wings and the Lost Ocean", "Baten Kaitos - Eternal Wings and the Lost Ocean (USA) (Disc 2).rvz", "a2a4b75e7866d9272407da95ec93986bef4c7dfc", 1459978240)
     ];
 
     public static readonly RealRvz[] Wii =
@@ -94,7 +125,37 @@ public static class RealRvzCatalog
         new("Smurfs 2, The", "Smurfs 2, The (USA) (En,Fr,Es).rvz",
             "ac13785a09a4ad45d5b7a741061cdc1a501caff6", 4699979776),
         new("Wii Fit Plus", "Wii Fit Plus (USA) (En,Fr,Es).rvz",
-            "5b9c83266681293f16dafba0cfe5ac5775df0330", 4699979776)
+            "5b9c83266681293f16dafba0cfe5ac5775df0330", 4699979776),
+        new("$1,000,000 Pyramid, The", "$1,000,000 Pyramid, The (USA).rvz", "43724fdd3f0dbdbf23dcad2b3036749b53de173b", 4699979776),
+        new("007 - Quantum of Solace", "007 - Quantum of Solace (USA) (En,Fr).rvz", "dc4e3fb3c06f5a652076efb36c0bbb9dd3b7c447", 4699979776),
+        new("10 Minute Solution", "10 Minute Solution (USA) (En,Fr).rvz", "fdfc0a9dff00c829f61becab9097c3d143db9bd7", 4699979776),
+        new("101-in-1 Party Megamix", "101-in-1 Party Megamix (USA) (En,Fr,Es).rvz", "69c8eb01482c5e58a0e0a07fa202b19aa3cd87c3", 4699979776),
+        new("101-in-1 Sports Party Megamix", "101-in-1 Sports Party Megamix (USA) (En,Fr,Es).rvz", "4db8fa273b0584e5052f18b02f7e44c1762350ff", 4699979776),
+        new("2010 FIFA World Cup South Africa", "2010 FIFA World Cup South Africa (USA) (En,Es).rvz", "92c5a9312f2ca95a49588a7571d28d8c1e71e711", 4699979776),
+        new("ABBA - You Can Dance", "ABBA - You Can Dance (USA) (En,Fr,Es).rvz", "1fb886a3afffd0fb1690be80e5d62bc98ddce02d", 4699979776),
+        new("ABC Wipeout - Create & Crash", "ABC Wipeout - Create & Crash (USA).rvz", "4b349dab473e2aa0ac1d07b82136bd53bd807b3d", 4699979776),
+        new("ABC Wipeout - The Game", "ABC Wipeout - The Game (USA).rvz", "3f67f62dce08af87d137abafbdf156a1fd3cd3c1", 4699979776),
+        new("ABC Wipeout 2", "ABC Wipeout 2 (USA).rvz", "12d9b729d73a95ef37df6a4b6072daec0b7325bf", 4699979776),
+        new("ABC Wipeout 3", "ABC Wipeout 3 (USA).rvz", "6034997894f8fbdef6f0ac084295b9310e2244af", 4699979776),
+        new("AC-DC Live - Rock Band Track Pack", "AC-DC Live - Rock Band Track Pack (USA).rvz", "e346f267b1f0646f66559ab6caf95a108a8811b1", 4699979776),
+        new("Academy of Champions - Soccer", "Academy of Champions - Soccer (USA) (En,Fr,Es).rvz", "ee63539b810aab46df1a3a26f4b92d67a8919b47", 4699979776),
+        new("Action Girlz Racing", "Action Girlz Racing (USA).rvz", "5ca9617754e8b2e071d5ba39ce7f764be8ed95eb", 4699979776),
+        new("Active Life - Explorer", "Active Life - Explorer (USA) (En,Fr,Es).rvz", "023d5b239468db827eac6532f58c220848b1e99f", 4699979776),
+        new("Active Life - Extreme Challenge", "Active Life - Extreme Challenge (USA).rvz", "119be7c51f21a6a1c34f6c9322e6b7b36529e64a", 4699979776),
+        new("Active Life - Magical Carnival", "Active Life - Magical Carnival (USA) (En,Fr,Es).rvz", "75f17c82e6b5a7a92bf046122dc9f844067a9f6d", 4699979776),
+        new("Active Life - Outdoor Challenge", "Active Life - Outdoor Challenge (USA) (En,Fr).rvz", "639f6ab44f3d7e569845766e14044d4312de091d", 4699979776),
+        new("Activision Demo Action Pack", "Activision Demo Action Pack (USA).rvz", "b5d07f79214ccf1f556bef0bb978850423e9e45d", 4699979776),
+        new("Adventures of Tintin, The - The Game", "Adventures of Tintin, The - The Game (USA) (En,Fr,Es,Pt).rvz", "52503172fd6d719f5bd68f6e88cb7a2fab190213", 4699979776),
+        new("Agatha Christie - And Then There Were None", "Agatha Christie - And Then There Were None (USA).rvz", "34902d2c79a35fa553ad376dcf8e531a7a1d7a59", 4699979776),
+        new("Agatha Christie - Evil Under the Sun", "Agatha Christie - Evil Under the Sun (USA) (En,Fr,Es).rvz", "5dc5235275352915cde561e2d70187496c9d5f8c", 4699979776),
+        new("Aladdin Magic Racer", "Aladdin Magic Racer (USA).rvz", "38f585d51940f232d82defc232cc9172edbfc94a", 4699979776),
+        new("Alien Monster Bowling League", "Alien Monster Bowling League (USA).rvz", "44fb244c9757dc7698325fffd9ab68e3c6ae376d", 4699979776),
+        new("Alien Syndrome", "Alien Syndrome (USA).rvz", "b527073e130d64a81654221559c80e8dafae4e95", 4699979776),
+        new("Aliens in the Attic", "Aliens in the Attic (USA) (En,Es).rvz", "67377e1dc50200df932aa04d4fe7b01438f7084f", 4699979776),
+        new("All Star Cheer Squad", "All Star Cheer Squad (USA).rvz", "38d7454e413dbf7847a24bb082e826c9a124cf0e", 4699979776),
+        new("All Star Cheer Squad 2", "All Star Cheer Squad 2 (USA).rvz", "456af520a62d13246512ca79aef926b9d2ad83dc", 4699979776),
+        new("All Star Karate", "All Star Karate (USA) (En,Fr,Es).rvz", "e9411f5a3b93a9db40e0cc0f81f230c6c53a8c89", 4699979776),
+        new("Alone in the Dark", "Alone in the Dark (USA) (En,Fr,Es) (Rev 1).rvz", "97314fd611475cb6530e6d386fc3124efc426e23", 4699979776)
     ];
 }
 
@@ -150,8 +211,8 @@ public class RealRvzDecodeTests
     [Fact]
     public void CatalogIsFullyPresent_WhenDriveIsMounted()
     {
-        Assert.Equal(15, RealRvzCatalog.GameCube.Length);
-        Assert.Equal(15, RealRvzCatalog.Wii.Length);
+        Assert.Equal(45, RealRvzCatalog.GameCube.Length);
+        Assert.Equal(45, RealRvzCatalog.Wii.Length);
 
         var missing = new List<string>();
         foreach (var e in RealRvzCatalog.GameCube)

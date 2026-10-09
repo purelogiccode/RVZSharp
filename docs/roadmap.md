@@ -9,7 +9,7 @@
 | 3 — RVZ writer | `RvzWriter`, encoders, junk packing, CLI `convert` | ✅ done |
 | 4 — Distribution | NuGet package (net8.0/9.0/10.0), multi-target tests, progress/cancellation API | ✅ done |
 | 5 — Reference alignment | audit against dolphin-master + rvz-1.0.3; every finding fixed or documented | ✅ done |
-| 6 — Real-world validation | 97 real-file tests (`RVZSharp.Slow.Tests`) against 30 GameCube/Wii RVZ games (No-Intro SHA-1) incl. writer round-trips — found & fixed the 2 MiB ticket-key writer bug | ✅ done |
+| 6 — Real-world validation | 276 real-file tests (`RVZSharp.Slow.Tests`) against 90 GameCube/Wii RVZ games (No-Intro SHA-1) incl. writer round-trips — found & fixed the 2 MiB ticket-key writer bug | ✅ done |
 | 7 — Writer performance | parallel group compression (`MaxThreads` / `--threads`, Dolphin's worker-pool model), `convert --verify` hash comparison | ✅ done |
 | 8 — GCZ writer | `GczWriter` / `convert -f gcz`: 16 KiB zlib blocks, raw-block fallback, per-block Adler-32, parallel block deflate | ✅ done |
 | 9 — Filesystem & concurrency | `DiscFileSystem` FST parser + `PartitionReader`, CLI `extract` (list/extract/single/partition/gameonly, system data), parallel full-image decode (`--threads`), async API (`CopyToAsync`/`ReadFullyAsync`/`WriteAsync`), `-c purge` for WIA | ✅ done |
@@ -42,7 +42,7 @@
 - File system access: `DiscFileSystem` parses the GameCube/Wii FST (case-insensitive lookup,
   file streaming) and the CLI `extract` command lists/extracts the tree plus the standard
   system data per partition (DolphinTool-compatible layout).
-- Real-world validation: 30 real GC/Wii RVZ images decode byte-for-byte to their official
+- Real-world validation: 90 real GC/Wii RVZ images decode byte-for-byte to their official
   No-Intro SHA-1s; real images re-encode to RVZ (default 2 MiB chunks) and decode back to
   the same hash. See [testing.md](testing.md#real-file-suite) for the suite details.
 
@@ -57,7 +57,7 @@
 
 ## Open questions
 
-1. **Real-file validation** — ✅ resolved for RVZ: 30 real GameCube/Wii games decode
+1. **Real-file validation** — ✅ resolved for RVZ: 90 real GameCube/Wii games decode
    byte-for-byte to their official No-Intro SHA-1s, and real images re-encode to RVZ and
    decode back. Legacy-format real files (GCZ/CISO/WBFS/TGC/NFS/WIA) are covered by
    env-var-driven tests in the slow suite (`RVZ_REAL_GCZ` etc.) plus optional

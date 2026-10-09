@@ -2,9 +2,10 @@
 
 The test suite is split into **three projects**, so the default run is always the fast one:
 
-- **`RVZSharp.Tests`** — **602 synthetic tests** (unit + end-to-end round trips), ~1
+- **`RVZSharp.Tests`** — **609 synthetic tests** (unit + end-to-end round trips), ~1
   minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
-- **`RVZSharp.Cli.Tests`** — **40 tests** (net10.0) for the CLI: option parsing, shell-completion scripts and
+- **`RVZSharp.Cli.Tests`** — **57 tests** (net10.0) for the CLI: option parsing, extract path
+  guards, shell-completion scripts and
   the update checker's release-tag parsing / `RVZSHARP_NO_UPDATE_CHECK` switch. Part of the
   solution.
 - **`RVZSharp.Slow.Tests`** — **276 real-file tests** (full decode, structural checks,
@@ -86,7 +87,7 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `Adler32Tests`, `SpanReader`/`SectionStreamTests`, `NonDisposingStreamTests` | checksums, big-endian reads, section bounds, stream ownership |
 | `GczBlobTests`, `CisoBlobTests`, `WbfsBlobTests`, `TgcBlobTests`, `NfsBlobTests` | legacy decoders |
 | `WiaReaderTests`, `RvzReaderTests`, `RvzReaderMatrixTests` | full-container decoding across codecs/chunk sizes |
-| `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, junk-only image, >2 MiB chunks, overlapping/odd partitions, scrubbing, raw-table group counts, `MaxThreads` determinism |
+| `RvzWriterTests` | writer round trips: GC + Wii (FST split, corrupted hashes, small chunks), legacy → RVZ → ISO, zero-image, all-zero Wii partition (zero groups), junk-only image, >2 MiB chunks, overlapping/odd partitions, scrubbing, raw-table group counts, `MaxThreads` determinism |
 | `WiaWriterTests` | WIA round trips across all five codecs (GC + Wii with hash exceptions), 4/6 MiB chunks, magic/version, PURGE, option validation, `MaxThreads` determinism |
 | `GczWriterTests` | GCZ round trips (GC + Wii), last-block zero padding, header fields, raw/compressed block storage, `MaxThreads` determinism, option validation |
 | `CisoWriterTests` | CISO round trips (GC + Wii), presence map, absent all-zero blocks, scrub shrinking, header fields, option validation |
@@ -106,7 +107,7 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `BlobFactoryTests` | magic sniffing, split plain ISOs, stream ownership, the NFS key overload, blob-type names |
 | `IoUtilityTests` | `SpanReader` bounds, CRC-32 check values, `ParallelExecution` exception preservation, `CodecErrorStream` mapping, `MultiPartStream` concatenation |
 | `NfsBlobEdgeCaseTests` | NFS header validation, continuation-file lookup, out-of-range/block-boundary reads, disposal ownership |
-| `RVZSharp.Cli.Tests` | shell completions (bash/zsh/fish/PowerShell) and update-check tag parsing |
+| `RVZSharp.Cli.Tests` | option parsing, extract path guards, shell completions (bash/zsh/fish/PowerShell) and update-check tag parsing |
 | `RVZSharp.Slow.Tests/RealRvzFileTests.cs` | 276 real-file tests (see below) |
 | `RVZSharp.Slow.Tests/RealFileDecodeTests.cs` | env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`) |
 | `RVZSharp.Slow.Tests/RealLegacyFileTests.cs` | real GCZ/CISO/WBFS/TGC/WIA/NFS decode to their expected SHA-1 (`RVZ_REAL_GCZ` … `RVZ_REAL_NFS`/`RVZ_REAL_NFS_KEY`) |
@@ -169,7 +170,8 @@ and `RVZ_DIFF_ISO` points at a real ISO. All of them no-op when unset.
 - **Packing**: on and off.
 - **Discs**: GameCube (random + zero + junk regions), Wii with corrupted hash areas
   (forcing exceptions), Wii with an FST split, Wii with junk inside partition data,
-  Wii with small chunk sizes (exception splitting), all-zero ISO.
+  Wii with small chunk sizes (exception splitting), Wii with an all-zero partition
+  (zero groups, no exception lists), all-zero ISO.
 - **Chunk sizes**: 2 MiB default, 32 KiB / 64 KiB small chunks, 6 MiB (multiple of 2 MiB).
 
 ## Gotchas encoded in tests

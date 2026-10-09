@@ -53,7 +53,7 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
    `dotnet pack`; intentional breaks must be suppressed in a `CompatibilitySuppressions.xml`
    with a justification.
 3. **Tests on every framework** — `dotnet test CSharp_RVZSharp.sln -c Release` runs the
-   fast suite (602 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
+   fast suite (609 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
    (`dotnet test RVZSharp.Slow.Tests -c Release`) runs on machines with the games mounted.
 4. **Consumer smoke test** — before publishing, a fresh project consuming only the nupkg
    (from a local feed) must compile and run on .NET 8 and .NET 10, converting and decoding

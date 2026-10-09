@@ -24,6 +24,11 @@ pack time against the published package via `PackageValidationBaselineVersion`).
   and partition headers are printed by `extract --list`.
 - **WBFS fixes** — `hd_sector_count` is relative to the stream position, and the disc
   header copy is written at offset `0x200` for tools that identify discs without decoding.
+- **Zero-group decode** — RVZ/WIA partition chunks that are entirely zeroes (padding,
+  emptied areas) are stored as zero-size groups with no exception lists; the reader
+  decodes them back to zeroes instead of rejecting the missing lists.
+- **FST hardening** — corrupt file-system tables fail with a format error instead of an
+  internal exception.
 
 ### CLI
 
@@ -32,6 +37,10 @@ pack time against the published package via `PackageValidationBaselineVersion`).
   stdout stays machine-readable (including `convert -f iso --json`).
 - `convert --verify` honors Ctrl+C (exit code 130) during hashing and verification, and
   writer progress is monotonic, reaching exactly 1.0 when the last byte is read.
+- **Extract path safety** — `-s` paths and image file names can no longer escape the
+  output folder (absolute paths stay under `-o`, `..` is rejected, hostile names fail
+  with a format error); `decode -h` prints usage (exit 0), help runs skip the telemetry
+  wait/update prompt, and Ctrl+C is observed while spooling stdin in every command.
 
 ### Performance & robustness
 
@@ -48,7 +57,12 @@ pack time against the published package via `PackageValidationBaselineVersion`).
 
 - GitHub Actions CI (fast tests on `net8.0`/`net9.0`/`net10.0` with coverage, pack with API
   validation + embedded SPDX 2.2 SBOM, smoke-tested ReadyToRun CLI artifact) and Dependabot.
-- **602 library tests** on each target framework plus **40 CLI tests** and 276 real-file slow tests (90 RVZ games).
+- **Release automation** — pushing a `v<version>` tag builds per-platform CLI bundles
+  (`win-x64`, `linux-x64`, `osx-x64`, `osx-arm64`), packs the NuGet package, creates the
+  GitHub Release (notes from `release-notes-<version>.md`) and pushes stable
+  versions to nuget.org; `docs/` is mirrored to the repository wiki and deployed to
+  GitHub Pages (side menu in both).
+- **609 library tests** on each target framework plus **57 CLI tests** and 276 real-file slow tests (90 RVZ games).
 
 ## 1.0.0 (2026-08-15)
 

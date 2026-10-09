@@ -230,7 +230,7 @@ extract -i <FILE> [-o <dir>] [-p <name>] [-s <path>] [-l] [-q] [-g]
 | `-i`, `--input` | path to the input disc image (any supported format). Required. |
 | `-o`, `--output` | output directory (without `--list`) or output **file** for the listing (with `--list`). Required unless `--list` prints to stdout only. |
 | `-p`, `--partition` | only this partition, by Dolphin name: `DATA`, `UPDATE`, `CHANNEL`, `P-XXXX` (case-insensitive). |
-| `-s`, `--single` | only this file/directory (FST path, e.g. `files/maps/foo.dat`); with `--list`, list this path instead of `/`. |
+| `-s`, `--single` | only this file/directory (FST path, e.g. `files/maps/foo.dat` — `/` separators, relative, without `..`); with `--list`, list this path instead of `/`. Paths can never escape `-o`: absolute paths stay inside, `..` is rejected, and hostile image file names fail with a format error. |
 | `-l`, `--list` | list the files (recursively) instead of extracting them; printed to stdout and to `-o` when given. |
 | `-q`, `--quiet` | suppress per-file progress messages (extraction) — with `--list` and no `-o`, this is an error (nothing would be printed). |
 | `-g`, `--gameonly` | shorthand for `-p DATA` (the game partition). |
@@ -275,7 +275,8 @@ rvzsharp extract -i game.rvz -s files/maps/foo.dat -o extracted
   disc type, partitions, raw areas, groups).
 - `decode <FILE> <OUT> [--sha1 <hex>] [--threads <n>]` — decode any blob to a plain ISO;
   `--sha1` verifies the output hash while writing (the `convert -f iso` equivalent with
-  verification); `--threads` enables parallel RVZ/WIA decoding (0 = processor count).
+  verification); `--threads` enables parallel RVZ/WIA decoding (0 = processor count);
+  `decode -h` prints usage (exit 0).
 
 ## Exit codes
 

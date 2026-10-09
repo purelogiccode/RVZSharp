@@ -236,9 +236,12 @@ extensions: `--threads <n>` sets the compression/decode worker count (output is
 byte-identical for any value), `--verify` re-decodes the written file and compares
 CRC-32/MD5/SHA-1 with the input, `--json` prints machine-readable results on stdout, `-`
 reads stdin / writes stdout, `completions <shell>` prints bash/zsh/fish/PowerShell
-completion scripts, and `-c purge` exposes PURGE for WIA. `extract` reads the disc's file
-system: list or extract the FST tree and the system data (boot/BI2/apploader/DOL/FST, Wii
-disc header/region, ticket/TMD/cert/H3) per partition.
+ completion scripts, and `-c purge` exposes PURGE for WIA. `extract` reads the disc's file
+ system: list or extract the FST tree and the system data (boot/BI2/apploader/DOL/FST, Wii
+ disc header/region, ticket/TMD/cert/H3) per partition. `-s` takes a Dolphin-style FST
+ path (`/` separators, relative, without `..`) and extraction can never escape `-o`:
+ absolute paths stay inside, `..` is rejected, and hostile image file names fail with a
+ format error.
 
 ## Documentation
 
@@ -266,14 +269,14 @@ The full documentation lives in [`docs/`](https://github.com/purelogiccode/RVZSh
 - `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
   surface, plus the legacy `info`/`decode` commands, `--json` output, `-` stdin/stdout and
   shell completions).
-- `RVZSharp.Tests` — 602 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 609 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild, metadata/offset edge cases,
   low-level IO helpers) and end-to-end round-trips of synthetic RVZ files built by
   `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii, legacy → RVZ,
   split WBFS, scrubbing), GCZ writer tests, parallel write/decode determinism tests,
   FST/file-system validation tests, async API tests, package-facing API tests (path open,
   ReadFully, progress, cancellation).
-- `RVZSharp.Cli.Tests` — 40 tests (net10.0) for the CLI's option parser, shell-completion scripts and the
+- `RVZSharp.Cli.Tests` — 57 tests (net10.0) for the CLI's option parser, extract path guards, shell-completion scripts and the
   update checker's release-tag parsing and `RVZSHARP_NO_UPDATE_CHECK` switch.
 - `RVZSharp.Slow.Tests` — 276 real-file tests (`RealRvzFileTests`) that decode 90 real
   GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
@@ -339,7 +342,10 @@ now common-key decrypted (so `verify --partitions`, `extract` and RVZ writing wo
 encrypted discs), extract's `tmd.bin`/`cert.bin`/`h3.bin` use partition-relative offsets,
 the WBFS header declares the file size correctly and carries the disc-header copy,
 `convert --verify` honors Ctrl+C (exit 130), writer progress is monotonic, and parallel
-decode/encode failures surface the original exception. See [WhatsNew.md](https://github.com/purelogiccode/RVZSharp/blob/master/WhatsNew.md).
+decode/encode failures surface the original exception. A follow-up audit fixed
+zero-group decoding (all-zero partition chunks no longer fail), extract path traversal
+(`-s` paths and image file names cannot escape `-o`), `decode -h`, help-run telemetry
+waits and stdin-spool cancellation. See [WhatsNew.md](https://github.com/purelogiccode/RVZSharp/blob/master/WhatsNew.md).
 
 ## License
 

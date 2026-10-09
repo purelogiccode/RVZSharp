@@ -79,22 +79,22 @@ jobs:
         include:
           - rid: win-x64
             os: windows-latest
-            exe: RVZSharp.Cli.exe
+            exe: RVZSharp.exe
           - rid: win-arm64
             os: windows-11-arm
-            exe: RVZSharp.Cli.exe
+            exe: RVZSharp.exe
           - rid: linux-x64
             os: ubuntu-latest
-            exe: RVZSharp.Cli
+            exe: RVZSharp
           - rid: linux-arm64
             os: ubuntu-24.04-arm
-            exe: RVZSharp.Cli
+            exe: RVZSharp
           - rid: osx-x64
             os: macos-15-intel
-            exe: RVZSharp.Cli
+            exe: RVZSharp
           - rid: osx-arm64
             os: macos-latest
-            exe: RVZSharp.Cli
+            exe: RVZSharp
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:

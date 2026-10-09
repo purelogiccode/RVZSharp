@@ -63,10 +63,10 @@ pack time against the published package via `PackageValidationBaselineVersion`).
   `osx-arm64`), packs the NuGet package, creates the GitHub Release (notes from
   `docs/release-notes-<version>.md`) and pushes stable versions to nuget.org; `docs/` is
   mirrored to the repository wiki and deployed to GitHub Pages (side menu in both).
-- **Lean CLI bundles** — `rvzsharp_v<version>_<rid>.zip` ships a framework-dependent
-  single-file executable (the .NET 10 runtime is not embedded and is installed once on
-  the target machine) plus `LICENSE`, `README.md`, `WhatsNew.md` and
-  `THIRD-PARTY-NOTICES.md`.
+- **Lean CLI bundles** — `rvzsharp_v<version>_<rid>.zip` ships the `RVZSharp` executable
+  (`RVZSharp.exe` on Windows) as a framework-dependent single-file binary (the .NET 10
+  runtime is not embedded and is installed once on the target machine) plus `LICENSE`,
+  `README.md`, `WhatsNew.md` and `THIRD-PARTY-NOTICES.md`.
 - **609 library tests** on each target framework plus **57 CLI tests** and 276 real-file slow tests (90 RVZ games).
 
 ## 1.0.0 (2026-08-15)

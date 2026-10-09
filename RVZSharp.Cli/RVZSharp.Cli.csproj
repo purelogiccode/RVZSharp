@@ -48,4 +48,19 @@
         <Delete Files="@(PublishXmlDocs)" />
     </Target>
 
+    <!-- Ship the CLI binary as RVZSharp[.exe] instead of RVZSharp.Cli[.exe]. The assembly
+       keeps its RVZSharp.Cli name: the project reference to the library is also
+       RVZSharp.dll, so renaming the assembly would collide in the output folder. The
+       single-file apphost can simply be renamed; it loads the embedded assembly. -->
+    <Target Name="RenamePublishedCliExecutable" AfterTargets="Publish">
+        <PropertyGroup>
+            <_CliPublishedExecutable>$(PublishDir)$(AssemblyName)$(_NativeExecutableExtension)</_CliPublishedExecutable>
+            <_CliRenamedExecutable>$(PublishDir)RVZSharp$(_NativeExecutableExtension)</_CliRenamedExecutable>
+        </PropertyGroup>
+        <Copy SourceFiles="$(_CliPublishedExecutable)" DestinationFiles="$(_CliRenamedExecutable)"
+              Condition="Exists('$(_CliPublishedExecutable)') and '$(_CliPublishedExecutable)' != '$(_CliRenamedExecutable)'" />
+        <Delete Files="$(_CliPublishedExecutable)"
+                Condition="Exists('$(_CliRenamedExecutable)') and '$(_CliPublishedExecutable)' != '$(_CliRenamedExecutable)'" />
+    </Target>
+
 </Project>

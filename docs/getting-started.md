@@ -13,7 +13,7 @@
 
 Download `rvzsharp_v<version>_<rid>.zip` from the
 [GitHub Releases](https://github.com/purelogiccode/RVZSharp/releases) page, unzip it
-and run `RVZSharp.Cli` (`RVZSharp.Cli.exe` on Windows):
+and run `RVZSharp` (`RVZSharp.exe` on Windows):
 
 | | |
 |---|---|
@@ -28,7 +28,7 @@ Each bundle holds the single-file executable plus `LICENSE`, `README.md`, `Whats
 and `THIRD-PARTY-NOTICES.md`. The executables are framework-dependent — the .NET runtime
 is not embedded — so install the
 [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) first (the SDK
-works too). Verify with `RVZSharp.Cli --help` (also prints the product version). Each
+works too). Verify with `RVZSharp --help` (also prints the product version). Each
 release page also carries `SHA256SUMS.txt` to verify a download. To build from source
 instead, see [Building](#building) below.
 

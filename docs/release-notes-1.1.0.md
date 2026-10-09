@@ -66,8 +66,9 @@ runtimes, including macOS:
 | `rvzsharp_v1.1.0_osx-x64.zip` | macOS, Intel |
 | `rvzsharp_v1.1.0_osx-arm64.zip` | macOS, Apple Silicon |
 
-Each zip holds the executable plus `LICENSE`, `README.md`, `WhatsNew.md` and
-`THIRD-PARTY-NOTICES.md`. Verify downloads against `SHA256SUMS.txt`.
+Each zip holds the `RVZSharp` executable (`RVZSharp.exe` on Windows) plus `LICENSE`,
+`README.md`, `WhatsNew.md` and `THIRD-PARTY-NOTICES.md`. Verify downloads against
+`SHA256SUMS.txt`.
 
 > Upgrading from 1.0.0? The 1.0.0 bundles were self-contained; 1.1.0 bundles require the
 > .NET 10 Runtime to be installed.

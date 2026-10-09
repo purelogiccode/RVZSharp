@@ -25,6 +25,9 @@ Run the CLI with:
 dotnet run --project RVZSharp.Cli -c Release -- <command> [args…]
 ```
 
+The release bundles ship the same tool as `RVZSharp` (`RVZSharp.exe` on Windows); the
+examples below use `rvzsharp` for brevity.
+
 ## Input auto-detection
 
 Every command opens its input through `Blob.Open`, which recognises formats by magic bytes:

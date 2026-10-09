@@ -201,5 +201,5 @@ End users do not need the SDK: each GitHub Release (see [Release
 process](#release-process)) ships `rvzsharp_v<version>_<rid>.zip` bundles
 (`win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`) — unzip,
 install the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) and run
-`RVZSharp.Cli` (`RVZSharp.Cli.exe` on Windows); see [Getting
+`RVZSharp` (`RVZSharp.exe` on Windows); see [Getting
 started](getting-started.md#install-the-cli).

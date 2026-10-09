@@ -1,8 +1,14 @@
 [![CI](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml)
+[![Docs](https://github.com/purelogiccode/RVZSharp/actions/workflows/pages.yml/badge.svg)](https://purelogiccode.github.io/RVZSharp/)
 [![.NET](https://img.shields.io/badge/.NET-8.0_%7C_9.0_%7C_10.0-blueviolet)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
+[![NuGet downloads](https://img.shields.io/nuget/dt/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
+[![Release](https://img.shields.io/github/v/release/purelogiccode/RVZSharp?color=blue&label=release)](https://github.com/purelogiccode/RVZSharp/releases)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green)](https://github.com/purelogiccode/RVZSharp/blob/master/LICENSE)
 [![Tests](https://img.shields.io/badge/tests-xUnit-brightgreen)](https://github.com/purelogiccode/RVZSharp/blob/master/docs/testing.md)
+[![Platforms](https://img.shields.io/badge/platform-Windows_%7C_Linux_%7C_macOS-lightgrey)](https://github.com/purelogiccode/RVZSharp/releases)
+[![Architectures](https://img.shields.io/badge/arch-x64_%7C_arm64-informational)](https://github.com/purelogiccode/RVZSharp/releases)
+[![GitHub stars](https://img.shields.io/github/stars/purelogiccode/RVZSharp?style=flat&color=yellow)](https://github.com/purelogiccode/RVZSharp/stargazers)
 
 # RVZSharp
 

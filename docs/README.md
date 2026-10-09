@@ -1,3 +1,11 @@
+[![CI](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml)
+[![Docs](https://github.com/purelogiccode/RVZSharp/actions/workflows/pages.yml/badge.svg)](https://purelogiccode.github.io/RVZSharp/)
+[![NuGet](https://img.shields.io/nuget/v/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
+[![NuGet downloads](https://img.shields.io/nuget/dt/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
+[![Release](https://img.shields.io/github/v/release/purelogiccode/RVZSharp?color=blue&label=release)](https://github.com/purelogiccode/RVZSharp/releases)
+[![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green)](https://github.com/purelogiccode/RVZSharp/blob/master/LICENSE)
+[![Platforms](https://img.shields.io/badge/platform-Windows_%7C_Linux_%7C_macOS-lightgrey)](https://github.com/purelogiccode/RVZSharp/releases)
+
 # RVZSharp Documentation
 
 RVZSharp is a .NET 8 / 9 / 10 library and command-line tool for **GameCube and Wii disc

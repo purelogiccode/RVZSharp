@@ -134,7 +134,7 @@ jobs:
           }
           Get-Item "$bundle.zip"
       - name: Upload bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: rvzsharp-${{ needs.version.outputs.version }}-${{ matrix.rid }}
           path: artifacts/bundle/rvzsharp_v${{ needs.version.outputs.version }}_${{ matrix.rid }}.zip
@@ -160,7 +160,7 @@ jobs:
           -p:ContinuousIntegrationBuild=true
           -o artifacts/packages
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: packages-${{ needs.version.outputs.version }}
           path: artifacts/packages/*

@@ -44,8 +44,11 @@
         <PackageProjectUrl>https://github.com/purelogiccode/RVZSharp</PackageProjectUrl>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <IncludeSymbols>true</IncludeSymbols>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <!-- No symbols package: Directory.Build.props embeds the PDBs in the assemblies
+         (important for single-file publishes), so an .snupkg would carry no .pdb files and
+         nuget.org rejects it ("does not contain any symbol files"). Debuggers read the
+         embedded PDBs directly. -->
+        <IncludeSymbols>false</IncludeSymbols>
         <!-- Validates that every target framework (net8.0/net9.0/net10.0) asset is compatible
          with the package's supported frameworks, and that the public API stays compatible
          with the last published release (1.0.0). Breaking changes must be suppressed with a

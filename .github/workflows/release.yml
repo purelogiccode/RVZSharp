@@ -10,7 +10,7 @@ name: Release
 #        binary on a native runner, and zip it with LICENSE, THIRD-PARTY-NOTICES.md,
 #        README.md and WhatsNew.md -> rvzsharp_v<version>_<rid>.zip (the naming the
 #        update-check clients expect)
-#     2. pack the RVZSharp NuGet package (+ .snupkg symbols)
+#     2. pack the RVZSharp NuGet package (embedded PDBs, so no symbols package)
 #     3. create the GitHub Release with the zips, SHA256SUMS.txt and the packages;
 #        the release notes come from docs/release-notes-<version>.md when present
 #     4. push the package to nuget.org for stable versions (needs the NUGET_API_KEY
@@ -222,7 +222,6 @@ jobs:
             artifacts/release/*.zip
             artifacts/release/SHA256SUMS.txt
             artifacts/release/*.nupkg
-            artifacts/release/*.snupkg
 
   nuget:
     name: Push to nuget.org
@@ -248,6 +247,6 @@ jobs:
             exit 0
           fi
           shopt -s nullglob
-          for pkg in artifacts/packages/*.nupkg artifacts/packages/*.snupkg; do
+          for pkg in artifacts/packages/*.nupkg; do
             dotnet nuget push "$pkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_API_KEY}" --skip-duplicate
           done

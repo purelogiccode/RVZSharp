@@ -133,6 +133,75 @@ internal static class Program
     }
 
     /// <summary>
+    /// Handles a command-level exception. Cancellation exits quietly with code 130,
+    /// expected failures (bad usage, unsupported input, file-system problems) are logged
+    /// as warnings so the bug-report sink ignores them, and unexpected failures are
+    /// logged as errors so the sink files them as bugs.
+    /// </summary>
+    private static int CommandFailed(Exception e, string context)
+    {
+        if (IsCancellation(e))
+        {
+            ConsoleProgress.Clear();
+            Console.Error.WriteLine("Canceled.");
+            return 130;
+        }
+
+        if (IsExpectedFailure(e))
+        {
+            Log.Warning(e, "{Context}", context);
+        }
+        else
+        {
+            Log.Error(e, "{Context}", context);
+        }
+
+        return Fail(e.Message);
+    }
+
+    /// <summary>True when the exception or one of its inner exceptions is a cancellation.</summary>
+    private static bool IsCancellation(Exception e)
+    {
+        for (var current = e; current is not null; current = current.InnerException)
+        {
+            if (current is OperationCanceledException)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True when the exception or one of its inner exceptions describes a user or
+    /// environment problem (usage errors, invalid or unsupported disc data, I/O failures)
+    /// rather than a defect in RVZSharp.
+    /// </summary>
+    private static bool IsExpectedFailure(Exception e)
+    {
+        for (var current = e; current is not null; current = current.InnerException)
+        {
+            switch (current)
+            {
+                case OperationCanceledException:
+                case CliErrorException:
+                case RvzException:
+                case IOException:
+                case UnauthorizedAccessException:
+                case InvalidDataException:
+                case ArgumentException:
+                case NotSupportedException:
+                case FormatException:
+                case OverflowException:
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Progress reporter that updates a single line on stderr. Nothing is written when
     /// stderr is redirected, so scripts and logs stay clean.
     /// </summary>
@@ -514,7 +583,7 @@ internal static class Program
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Error(e, "Failed to open input file '{InputPath}'", inputPath);
+                Log.Warning(e, "Failed to open input file '{InputPath}'", inputPath);
                 return Fail("The input file could not be opened.");
             }
 
@@ -728,8 +797,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Log.Error(e, "Convert command failed");
-            return Fail(e.Message);
+            return CommandFailed(e, "Convert command failed");
         }
     }
 
@@ -840,8 +908,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Log.Error(e, "ConvertLegacy command failed");
-            return Fail(e.Message);
+            return CommandFailed(e, "ConvertLegacy command failed");
         }
     }
 
@@ -860,7 +927,7 @@ internal static class Program
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
         {
-            Log.Error(e, "Failed to open output file '{OutputPath}' for verification", outputPath);
+            Log.Warning(e, "Failed to open output file '{OutputPath}' for verification", outputPath);
             return Fail("The output file could not be opened for verification.");
         }
 
@@ -1002,7 +1069,7 @@ internal static class Program
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Error(e, "Failed to open input file '{InputPath}'", path);
+                Log.Warning(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("Unable to open disc image");
             }
 
@@ -1105,8 +1172,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Log.Error(e, "Header command failed");
-            return Fail(e.Message);
+            return CommandFailed(e, "Header command failed");
         }
     }
 
@@ -1203,7 +1269,7 @@ internal static class Program
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Error(e, "Failed to open input file '{InputPath}'", path);
+                Log.Warning(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("Unable to open input file");
             }
 
@@ -1275,8 +1341,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Log.Error(e, "Verify command failed");
-            return Fail(e.Message);
+            return CommandFailed(e, "Verify command failed");
         }
     }
 
@@ -1440,7 +1505,7 @@ internal static class Program
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Error(e, "Failed to open input file '{InputPath}'", path);
+                Log.Warning(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("The input file could not be opened.");
             }
 
@@ -1460,8 +1525,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Log.Error(e, "Extract command failed");
-            return Fail(e.Message);
+            return CommandFailed(e, "Extract command failed");
         }
     }
 
@@ -1930,9 +1994,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Log.Error(e, "Info command failed for path '{Path}'", path);
-            Console.Error.WriteLine($"Error: {e.Message}");
-            return 1;
+            return CommandFailed(e, $"Info command failed for '{path}'");
         }
     }
 
@@ -1973,9 +2035,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Log.Error(e, "Decode command failed");
-            Console.Error.WriteLine($"Error: {e.Message}");
-            return 1;
+            return CommandFailed(e, "Decode command failed");
         }
     }
 
@@ -2025,10 +2085,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            ConsoleProgress.Clear();
-            Log.Error(e, "DecodeBlob failed");
-            Console.Error.WriteLine($"Error: {e.Message}");
-            return 1;
+            return CommandFailed(e, "DecodeBlob failed");
         }
     }
 }

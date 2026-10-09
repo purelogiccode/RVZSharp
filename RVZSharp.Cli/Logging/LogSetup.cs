@@ -4,8 +4,8 @@ namespace RVZSharp.Cli.Logging;
 
 /// <summary>
 /// Configures the process-wide Serilog logger for the CLI: console output, a rolling
-/// file under the temp directory, and a bug-report sink that forwards warnings and
-/// errors to the bug-report API. Console logs go to stderr so stdout only ever carries
+/// file under the temp directory, and a bug-report sink that forwards unexpected errors
+/// to the bug-report API. Console logs go to stderr so stdout only ever carries
 /// the command's result (JSON, hashes, disc images written with <c>-o -</c>).
 /// </summary>
 internal static class LogSetup

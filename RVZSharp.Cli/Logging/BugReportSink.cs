@@ -6,7 +6,10 @@ namespace RVZSharp.Cli.Logging;
 
 /// <summary>
 /// Serilog sink that forwards log events at or above a minimum level to the bug-report
-/// API as fire-and-forget HTTP requests, without blocking the caller.
+/// API as fire-and-forget HTTP requests, without blocking the caller. Expected failures
+/// (bad usage, unsupported input, I/O problems, cancellation) are logged as warnings and
+/// are deliberately below the default minimum level, so only genuine unexpected errors
+/// are filed as bugs.
 /// </summary>
 internal sealed class BugReportSink : ILogEventSink
 {
@@ -16,8 +19,8 @@ internal sealed class BugReportSink : ILogEventSink
 
     /// <summary>Creates a sink that reports events at or above <c>minLevel</c>.</summary>
     /// <param name="client">The API client used to send bug reports.</param>
-    /// <param name="minLevel">The minimum event level that triggers a report (default: Warning).</param>
-    public BugReportSink(BugReportApiClient client, LogEventLevel minLevel = LogEventLevel.Warning)
+    /// <param name="minLevel">The minimum event level that triggers a report (default: Error).</param>
+    public BugReportSink(BugReportApiClient client, LogEventLevel minLevel = LogEventLevel.Error)
     {
         _client = client;
         _minLevel = minLevel;

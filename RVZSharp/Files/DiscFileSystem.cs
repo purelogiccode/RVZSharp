@@ -148,10 +148,12 @@ public sealed class DiscFileSystem : IDisposable
 
     private static DiscFileSystem Parse(IBlobReader view, bool ownsReader)
     {
-        var offsetShift = DetectOffsetShift(view);
-        var fstOffset = ReadSwappedAndShifted(view, 0x424)
+        var offsetShift = WiiVolume.TryGetOffsetShift(view)
+                          ?? throw new RvzFormatException(
+                              "The image has no GameCube or Wii disc magic; it has no file system.");
+        var fstOffset = ReadSwappedAndShifted(view, 0x424, offsetShift)
                         ?? throw new RvzFormatException("The boot header has no FST offset.");
-        var fstSize = ReadSwappedAndShifted(view, 0x428)
+        var fstSize = ReadSwappedAndShifted(view, 0x428, offsetShift)
                       ?? throw new RvzFormatException("The boot header has no FST size.");
         if (fstSize < FstEntrySize)
         {
@@ -256,26 +258,7 @@ public sealed class DiscFileSystem : IDisposable
         return new DiscFileSystem(view, ownsReader, nodes[0], fstOffset, fstSize);
     }
 
-    private static int DetectOffsetShift(IBlobReader view)
-    {
-        Span<byte> magic = stackalloc byte[4];
-        if (view.ReadAt(0x18, magic) == 4 &&
-            BinaryPrimitives.ReadUInt32BigEndian(magic) == WiiVolume.WII_MAGIC)
-        {
-            return 2; // Wii file system: entry offsets are shifted by 2
-        }
-
-        if (view.ReadAt(0x1C, magic) == 4 &&
-            BinaryPrimitives.ReadUInt32BigEndian(magic) == WiiVolume.GC_MAGIC)
-        {
-            return 0; // GameCube file system: byte offsets
-        }
-
-        throw new RvzFormatException(
-            "The image has no GameCube or Wii disc magic; it has no file system.");
-    }
-
-    private static ulong? ReadSwappedAndShifted(IBlobReader view, ulong offset)
+    private static ulong? ReadSwappedAndShifted(IBlobReader view, ulong offset, int shift)
     {
         Span<byte> bytes = stackalloc byte[4];
         if ((ulong)view.Length < offset + 4 || view.ReadAt((long)offset, bytes) != 4)
@@ -283,7 +266,7 @@ public sealed class DiscFileSystem : IDisposable
             return null;
         }
 
-        return (ulong)BinaryPrimitives.ReadUInt32BigEndian(bytes) << 2;
+        return (ulong)BinaryPrimitives.ReadUInt32BigEndian(bytes) << shift;
     }
 
     private static string ReadName(byte[] fst, int offset)

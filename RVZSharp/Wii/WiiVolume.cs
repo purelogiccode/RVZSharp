@@ -286,6 +286,31 @@ public static class WiiVolume
         return keys;
     }
 
+    /// <summary>
+    /// Detects the boot-header offset shift of a disc view (Dolphin: Volume::GetOffsetShift):
+    /// Wii partitions store offsets in 4-byte units (shift 2), GameCube discs in bytes (shift 0).
+    /// </summary>
+    /// <param name="view">A decrypted Wii partition view or a GameCube disc.</param>
+    /// <returns>The shift (0 or 2), or null when the view has no GameCube/Wii magic.</returns>
+    public static int? TryGetOffsetShift(IBlobReader view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        Span<byte> magic = stackalloc byte[4];
+        if (view.ReadAt(0x18, magic) == 4 &&
+            ReadBe32(magic, 0) == WII_MAGIC)
+        {
+            return 2;
+        }
+
+        if (view.ReadAt(0x1C, magic) == 4 &&
+            ReadBe32(magic, 0) == GC_MAGIC)
+        {
+            return 0;
+        }
+
+        return null;
+    }
+
     /// <summary>The FST offset within the partition (partition header 0x424, shifted).</summary>
     /// <param name="disc">The disc image.</param>
     /// <param name="partition">The partition whose FST offset is requested.</param>
@@ -331,12 +356,13 @@ public static class WiiVolume
     /// <returns>The DOL offset, or null when it is absent or zero.</returns>
     public static ulong? GetBootDolOffset(IBlobReader view)
     {
-        if (!TryReadSwapped(view, 0x420, out var value))
+        if (!TryReadSwapped(view, 0x420, out var value) ||
+            TryGetOffsetShift(view) is not { } shift)
         {
             return null;
         }
 
-        var offset = (ulong)value << 2;
+        var offset = (ulong)value << shift;
         return offset == 0 ? null : offset;
     }
 

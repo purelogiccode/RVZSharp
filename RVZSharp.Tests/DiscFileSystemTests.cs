@@ -95,6 +95,33 @@ public class DiscFileSystemTests
         Assert.Equal(DataBytes, dataContents.ToArray());
     }
 
+    /// <summary>
+    /// Verifies that boot-header offsets are shifted per disc type: GameCube offsets are byte
+    /// offsets, while Wii partition offsets are stored in 4-byte units
+    /// (Dolphin: Volume::GetOffsetShift).
+    /// </summary>
+    [Fact]
+    public void BootDolOffset_UsesDiscTypeShift()
+    {
+        var gc = BuildGcIso();
+        WriteBe32(gc, 0x420, 0x800);
+        using (var gcBlob = PlainBlob.Open(new MemoryStream(gc)))
+        {
+            Assert.Equal(0x800UL, WiiVolume.GetBootDolOffset(gcBlob));
+        }
+
+        var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
+        const int sectorCount = 130;
+        var data = TestWiiIsoBuilder.RandomData(sectorCount, 7);
+        WriteBe32(data, 0x18, WiiVolume.WII_MAGIC);
+        WriteBe32(data, 0x420, 0x800 >> 2);
+        var iso = TestWiiIsoBuilder.Build(key, sectorCount, data);
+        using var blob = PlainBlob.Open(new MemoryStream(iso));
+        var partition = WiiVolume.GetPartitions(blob)[0];
+        using var view = new PartitionReader(blob, partition);
+        Assert.Equal(0x800UL, WiiVolume.GetBootDolOffset(view));
+    }
+
     /// <summary>Verifies that partition reader decrypts boot sector.</summary>
     [Fact]
     public void PartitionReader_DecryptsBootSector()
@@ -134,8 +161,9 @@ public class DiscFileSystemTests
     private static readonly byte[] DataBytes = [0x00, 0x01, 0x02, 0x03, 0xFE, 0xFF, 0x7F, 0x80];
 
     /// <summary>
-    /// A GameCube ISO with one directory and two files. The FST lives at 0x3000, the file
-    /// data at absolute disc offsets (GameCube entry offsets are not shifted).
+    /// A GameCube ISO with one directory and two files. The FST lives at 0x3000 and the file
+    /// data at absolute disc offsets: GameCube boot-header and entry offsets are not shifted
+    /// (Dolphin: Volume::GetOffsetShift returns 0 for GameCube).
     /// </summary>
     private static byte[] BuildGcIso()
     {
@@ -151,8 +179,8 @@ public class DiscFileSystemTests
         iso[0x1F] = 0x3D;
 
         var fst = BuildFst(offsetShift: 0, helloOffset, dataOffset);
-        WriteBe32(iso, 0x424, fstOffset >> 2);
-        WriteBe32(iso, 0x428, (uint)(fst.Length >> 2));
+        WriteBe32(iso, 0x424, fstOffset);
+        WriteBe32(iso, 0x428, (uint)fst.Length);
         fst.CopyTo(iso, fstOffset);
         HelloText.CopyTo(iso, helloOffset);
         DataBytes.CopyTo(iso, dataOffset);
@@ -173,7 +201,7 @@ public class DiscFileSystemTests
     {
         const int totalEntries = 4;
         var names = "\0files\0hello.txt\0data.bin\0"u8.ToArray();
-        // The FST size is stored shifted by 2, so it must be 4-byte aligned.
+        // Wii stores the FST size shifted by 2, so it must be 4-byte aligned.
         var size = (totalEntries * 12 + names.Length + 3) / 4 * 4;
         var fst = new byte[size];
         var nameTable = totalEntries * 12;

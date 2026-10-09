@@ -1784,10 +1784,12 @@ internal static class Program
     /// True when a single file/folder name cannot escape its parent directory: non-empty,
     /// not "." or "..", with no separators, no drive/root qualifier and no invalid chars.
     /// </summary>
-    internal static bool IsSafePathSegment(string segment) =>
-        segment.Length > 0 && segment is not "." and not ".." &&
-        segment.IndexOfAny(['/', '\\']) < 0 && !Path.IsPathRooted(segment) &&
-        segment.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+    internal static bool IsSafePathSegment(string segment)
+    {
+        return segment.Length > 0 && segment is not "." and not ".." &&
+               segment.IndexOfAny(['/', '\\']) < 0 && !Path.IsPathRooted(segment) &&
+               segment.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+    }
 
     /// <summary>
     /// Builds the output path for a user-supplied <c>-s</c> path (Dolphin-style, e.g.

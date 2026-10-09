@@ -14,28 +14,52 @@ public class EncodeBenchmarks
     private byte[] _iso = null!;
 
     [GlobalSetup]
-    public void Setup() => _iso = BenchmarkDisc.BuildGameCubeImage();
+    public void Setup()
+    {
+        _iso = BenchmarkDisc.BuildGameCubeImage();
+    }
 
     [Benchmark(Baseline = true)]
-    public long Rvz_Zstd() => EncodeRvz(CompressionType.Zstd, 3);
+    public long Rvz_Zstd()
+    {
+        return EncodeRvz(CompressionType.Zstd, 3);
+    }
 
     [Benchmark]
-    public long Rvz_Lzma2() => EncodeRvz(CompressionType.Lzma2, 3);
+    public long Rvz_Lzma2()
+    {
+        return EncodeRvz(CompressionType.Lzma2, 3);
+    }
 
     [Benchmark]
-    public long Rvz_Bzip2() => EncodeRvz(CompressionType.Bzip2, 3);
+    public long Rvz_Bzip2()
+    {
+        return EncodeRvz(CompressionType.Bzip2, 3);
+    }
 
     [Benchmark]
-    public long Rvz_None() => EncodeRvz(CompressionType.None, 0);
+    public long Rvz_None()
+    {
+        return EncodeRvz(CompressionType.None, 0);
+    }
 
     [Benchmark]
-    public long Rvz_Zstd_NoPacking() => EncodeRvz(CompressionType.Zstd, 3, packing: false);
+    public long Rvz_Zstd_NoPacking()
+    {
+        return EncodeRvz(CompressionType.Zstd, 3, packing: false);
+    }
 
     [Benchmark]
-    public long Wia_Lzma2() => EncodeWia();
+    public long Wia_Lzma2()
+    {
+        return EncodeWia();
+    }
 
     [Benchmark]
-    public long Gcz_Deflate() => EncodeGcz();
+    public long Gcz_Deflate()
+    {
+        return EncodeGcz();
+    }
 
     private long EncodeRvz(CompressionType compression, int level, bool packing = true)
     {

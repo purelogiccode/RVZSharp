@@ -50,16 +50,28 @@ public class DecodeBenchmarks
     }
 
     [Benchmark(Baseline = true)]
-    public uint Decode_Rvz_Zstd() => Hash(_rvzZstd);
+    public uint Decode_Rvz_Zstd()
+    {
+        return Hash(_rvzZstd);
+    }
 
     [Benchmark]
-    public uint Decode_Rvz_Lzma2() => Hash(_rvzLzma2);
+    public uint Decode_Rvz_Lzma2()
+    {
+        return Hash(_rvzLzma2);
+    }
 
     [Benchmark]
-    public uint Decode_Wia_Lzma2() => Hash(_wiaLzma2);
+    public uint Decode_Wia_Lzma2()
+    {
+        return Hash(_wiaLzma2);
+    }
 
     [Benchmark]
-    public uint Decode_Gcz() => Hash(_gcz);
+    public uint Decode_Gcz()
+    {
+        return Hash(_gcz);
+    }
 
     private static byte[] Encode(byte[] iso, Action<MemoryStream> write)
     {

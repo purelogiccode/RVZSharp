@@ -17,7 +17,10 @@ public class ThreadScalingBenchmarks
     [Params(1, 2, 4, 8, 0)] public int Threads { get; set; }
 
     [GlobalSetup]
-    public void Setup() => _iso = BenchmarkDisc.BuildGameCubeImage();
+    public void Setup()
+    {
+        _iso = BenchmarkDisc.BuildGameCubeImage();
+    }
 
     [Benchmark]
     public long Rvz_Zstd()

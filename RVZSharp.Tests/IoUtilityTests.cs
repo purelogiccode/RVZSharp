@@ -210,6 +210,7 @@ public class IoUtilityTests
     public void CodecErrorStream_PassThroughMembers()
     {
         using var inner = new MemoryStream(new byte[16]);
+        // ReSharper disable once AccessToDisposedClosure
         using var stream = CodecErrorStream.Create(() => inner, "None");
 
         Assert.True(stream.CanRead);
@@ -340,14 +341,23 @@ public class IoUtilityTests
             throw ReadException ?? new IOException("no exception configured");
         }
 
-        public override long Seek(long offset, SeekOrigin origin) => 0;
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            return 0;
+        }
 
         public override void Flush()
         {
         }
 
-        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
 
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

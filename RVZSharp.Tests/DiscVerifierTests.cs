@@ -362,6 +362,9 @@ public class DiscVerifierTests
     private sealed class InlineProgress(Action<double> report) : IProgress<double>
     {
         private readonly Action<double> Report1 = report;
-        public void Report(double value) => Report1(value);
+        public void Report(double value)
+        {
+            Report1(value);
+        }
     }
 }

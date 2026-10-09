@@ -174,6 +174,7 @@ public class ParallelDecodeTests
             {
                 if (value >= 0.5)
                 {
+                    // ReSharper disable once AccessToDisposedClosure
                     cts.Cancel();
                 }
             }), 4, cts.Token));

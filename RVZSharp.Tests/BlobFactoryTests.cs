@@ -226,16 +226,28 @@ public class BlobFactoryTests
             set => throw new NotSupportedException();
         }
 
-        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            return _inner.Read(buffer, offset, count);
+        }
 
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
 
         public override void Flush()
         {
         }
 
-        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
 
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

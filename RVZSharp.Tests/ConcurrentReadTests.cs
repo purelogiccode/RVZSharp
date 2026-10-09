@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using RVZSharp.Models;
 using RVZSharp.Tests.Helpers;
 
@@ -7,6 +8,7 @@ namespace RVZSharp.Tests;
 /// Tests that <see cref="RvzReader.ReadAt"/> is thread-safe: concurrent random reads (raw
 /// chunks and Wii partition regions with hash exceptions) must match the reference ISO.
 /// </summary>
+[SuppressMessage("ReSharper", "AccessToDisposedClosure")]
 public class ConcurrentReadTests
 {
     /// <summary>Verifies that concurrent read at game cube matches reference.</summary>

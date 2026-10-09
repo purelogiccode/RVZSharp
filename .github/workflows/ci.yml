@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             8.0.x
@@ -56,7 +56,7 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
       # Runs EnablePackageValidation (baseline 1.0.0) and generates the SPDX SBOM
@@ -76,7 +76,7 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
       # Validates the exact publish shape release.yml ships: framework-dependent

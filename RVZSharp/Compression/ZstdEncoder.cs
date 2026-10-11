@@ -26,13 +26,14 @@ public sealed class ZstdEncoder : ICompressionEncoder
     /// <returns>The Zstandard-compressed bytes.</returns>
     public byte[] Compress(ReadOnlySpan<byte> data)
     {
-        using var output = new MemoryStream();
-        using (var zstd = new CompressionStream(output, _level, leaveOpen: true))
-        {
-            zstd.Write(data);
-        }
-
-        return output.ToArray();
+        // One-shot ZSTD_compress2 with the source size known up front, like Dolphin's
+        // ZstdCompressor (ZSTD_compress). A streaming session without a pledged source size
+        // sizes its context from the level's window log, so level 22 reserves ~128 MiB of
+        // window per worker before it sees any input; compressing groups in parallel then
+        // runs out of memory on machines with modest RAM. One-shot sizing caps the window at
+        // the chunk size instead, which is all a single frame can reference anyway.
+        using var compressor = new Compressor(_level);
+        return compressor.Wrap(data).ToArray();
     }
 
     /// <summary>No-op: Zstandard compression has no preceding data to cover.</summary>

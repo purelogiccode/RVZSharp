@@ -107,6 +107,33 @@ public class CompressionCodecTests
         Assert.Equal(payload, DecompressAll(stream, payload.Length));
     }
 
+    /// <summary>
+    /// Verifies that the maximum Zstd level round trips when many groups are compressed in
+    /// parallel. The streaming encoder reserved the level's full window per worker (~128 MiB
+    /// at level 22), which exhausted memory on modest machines; the one-shot encoder sizes
+    /// the window to the chunk instead.
+    /// </summary>
+    [Fact]
+    public void Zstd_MaxLevel_ParallelRoundTrip()
+    {
+        var payloads = new byte[Math.Max(2, Environment.ProcessorCount)][];
+        for (var i = 0; i < payloads.Length; i++)
+        {
+            payloads[i] = MakePayload(131_072, i + 1);
+        }
+
+        var compressed = new byte[payloads.Length][];
+        Parallel.For(0, payloads.Length, i => compressed[i] = new ZstdEncoder(22).Compress(payloads[i]));
+
+        var decoder = CompressionCodecFactory.Create(CompressionType.Zstd);
+        for (var i = 0; i < payloads.Length; i++)
+        {
+            using var input = new MemoryStream(compressed[i]);
+            using var stream = decoder.CreateDecompressor(input, [], compressed[i].Length, payloads[i].Length);
+            Assert.Equal(payloads[i], DecompressAll(stream, payloads[i].Length));
+        }
+    }
+
     /// <summary>Verifies that Zstd ignores compressor data (Dolphin only passes it to LZMA).</summary>
     [Fact]
     public void Zstd_WithProperties_IgnoresThem()

@@ -9,6 +9,12 @@
 [![Platforms](https://img.shields.io/badge/platform-Windows_%7C_Linux_%7C_macOS-lightgrey)](https://github.com/purelogiccode/RVZSharp/releases)
 [![Architectures](https://img.shields.io/badge/arch-x64_%7C_arm64-informational)](https://github.com/purelogiccode/RVZSharp/releases)
 [![GitHub stars](https://img.shields.io/github/stars/purelogiccode/RVZSharp?style=flat&color=yellow)](https://github.com/purelogiccode/RVZSharp/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/purelogiccode/RVZSharp/total?color=blue&label=downloads)](https://github.com/purelogiccode/RVZSharp/releases)
+[![Last commit](https://img.shields.io/github/last-commit/purelogiccode/RVZSharp?color=blue)](https://github.com/purelogiccode/RVZSharp/commits)
+[![Issues](https://img.shields.io/github/issues/purelogiccode/RVZSharp?color=blue)](https://github.com/purelogiccode/RVZSharp/issues)
+[![Language](https://img.shields.io/github/languages/top/purelogiccode/RVZSharp?color=blue)](https://github.com/purelogiccode/RVZSharp)
+[![Repo size](https://img.shields.io/github/repo-size/purelogiccode/RVZSharp?color=blue)](https://github.com/purelogiccode/RVZSharp)
+[![Contributors](https://img.shields.io/github/contributors/purelogiccode/RVZSharp?color=blue)](https://github.com/purelogiccode/RVZSharp/graphs/contributors)
 
 # RVZSharp
 

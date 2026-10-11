@@ -4,7 +4,7 @@ namespace RVZSharp.Cli;
 
 /// <summary>
 /// The CLI's product version: the assembly's informational version with build metadata
-/// stripped (e.g. <c>1.1.0</c>), so telemetry, bug reports and the update check all agree.
+/// stripped (e.g. <c>1.1.1</c>), so telemetry, bug reports and the update check all agree.
 /// </summary>
 internal static class CliVersion
 {

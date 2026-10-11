@@ -21,7 +21,7 @@ implementations in
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 609 fast library tests (every framework, ~1 min) + 57 CLI tests + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 610 fast library tests (every framework, ~1 min) + 57 CLI tests + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing), WIA (None, PURGE, Bzip2, LZMA1, LZMA2) and GCZ (zlib deflate) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
@@ -30,7 +30,7 @@ implementations in
 
 | Page | What it covers |
 |---|---|
-| [What's new](whats-new.md) | Release highlights (1.1.0, 1.0.0) |
+| [What's new](whats-new.md) | Release highlights (1.1.1, 1.1.0, 1.0.0) |
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
 | [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
 | [CLI reference](usage-cli.md) | `convert`, `header`, `verify`, `extract` (+ legacy `info`/`decode`) — options and examples |
@@ -41,7 +41,7 @@ implementations in
 | [Wii partitions](format/wii-partitions.md) | Encryption, hash tree, hash exceptions, tickets |
 | [Legacy formats](format/legacy.md) | GCZ, CISO/WBI, WBFS, TGC, NFS byte layouts |
 | [Testing](testing.md) | Test strategy and synthetic image builders |
-| [Release notes](release-notes-1.1.0.md) | 1.1.0 and [1.0.0](release-notes-1.0.0.md) announcement content (GitHub release posts) |
+| [Release notes](release-notes-1.1.1.md) | 1.1.1, [1.1.0](release-notes-1.1.0.md) and [1.0.0](release-notes-1.0.0.md) announcement content (GitHub release posts) |
 | [Roadmap & status](roadmap.md) | Milestones, limitations, open questions |
 | [FAQ](faq.md) | Common questions |
 

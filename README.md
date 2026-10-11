@@ -353,6 +353,12 @@ zero-group decoding (all-zero partition chunks no longer fail), extract path tra
 (`-s` paths and image file names cannot escape `-o`), `decode -h`, help-run telemetry
 waits and stdin-spool cancellation. See [WhatsNew.md](https://github.com/purelogiccode/RVZSharp/blob/master/WhatsNew.md).
 
+**1.1.1 (2026-10-11)** is a correctness and packaging patch: the Zstd encoder compresses
+one-shot, so level 22 no longer reserves ~128 MiB per parallel worker (output verified
+byte-identical in Dolphin's `dolphin-tool`, including a full codec interop matrix in
+both directions), and the NuGet package ships without the empty symbols package
+(assemblies carry embedded PDBs). The public API stays compatible with 1.0.0.
+
 ## License
 
 RVZSharp is copyright (c) 2025-2026 by **Peterson Fernandes**

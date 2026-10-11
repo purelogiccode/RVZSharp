@@ -1,8 +1,23 @@
 # What's new in RVZSharp
 
 Release highlights, newest first. The full announcements are in
+[`docs/release-notes-1.1.1.md`](docs/release-notes-1.1.1.md),
 [`docs/release-notes-1.1.0.md`](docs/release-notes-1.1.0.md) and
 [`docs/release-notes-1.0.0.md`](docs/release-notes-1.0.0.md).
+
+## 1.1.1 (2026-10-11)
+
+A correctness and packaging patch. The public API stays compatible with 1.0.0 (checked at
+pack time against the published package via `PackageValidationBaselineVersion`).
+
+- **Zstd encoder memory** — chunks are compressed one-shot (Dolphin's `ZSTD_compress`),
+  so level 22 no longer reserves ~128 MiB per parallel worker; the output is unchanged
+  standard Zstandard (a level-22 file decodes byte-identically in `dolphin-tool`).
+- **NuGet packaging** — no empty `.snupkg` (the assemblies carry embedded PDBs); only
+  the `.nupkg` ships.
+- **Differential testing** — the slow suite cross-checks every RVZ codec against the
+  real `dolphin-tool` in both directions (the repo-root `DolphinTool.exe` is used by
+  default). **610 library tests** per framework, 57 CLI tests, 276 real-file tests.
 
 ## 1.1.0 (2026-10-09)
 

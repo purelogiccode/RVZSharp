@@ -8,7 +8,7 @@ how to build it, how to publish it, and the quality gates that protect the API.
 | | |
 |---|---|
 | Package ID | `RVZSharp` |
-| Version | `1.1.0` (SemVer; bumped per release) |
+| Version | `1.1.1` (SemVer; bumped per release) |
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | License | GPL-2.0-or-later (`PackageLicenseExpression`) |
 | Dependencies | `LZMA-SDK`, `SharpZipLib`, `ZstdSharp.Port` (all pure managed) |
@@ -144,7 +144,7 @@ equivalent is:
 dotnet pack RVZSharp/RVZSharp.csproj -c Release
 
 # 2. Push (the API key comes from nuget.org → API Keys).
-dotnet nuget push RVZSharp/bin/Release/RVZSharp.1.1.0.nupkg \
+dotnet nuget push RVZSharp/bin/Release/RVZSharp.1.1.1.nupkg \
     --source https://api.nuget.org/v3/index.json \
     --api-key <NUGET_API_KEY>
 ```
@@ -178,7 +178,7 @@ To test the package without publishing:
 ```
 
 ```bash
-dotnet add package RVZSharp --version 1.1.0
+dotnet add package RVZSharp --version 1.1.1
 ```
 
 ## The CLI

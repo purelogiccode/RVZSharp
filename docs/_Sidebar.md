@@ -23,6 +23,7 @@
 **Project**
 
 - [What's new](whats-new)
+- [Release notes 1.1.1](release-notes-1.1.1)
 - [Release notes 1.1.0](release-notes-1.1.0)
 - [Release notes 1.0.0](release-notes-1.0.0)
 - [Packaging & distribution](packaging)

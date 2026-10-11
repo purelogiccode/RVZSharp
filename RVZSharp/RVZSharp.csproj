@@ -5,8 +5,8 @@
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Company>PureLogicCode.com</Company>
-        <AssemblyVersion>1.1.0</AssemblyVersion>
-        <FileVersion>1.1.0</FileVersion>
+        <AssemblyVersion>1.1.1</AssemblyVersion>
+        <FileVersion>1.1.1</FileVersion>
         <NeutralLanguage>en</NeutralLanguage>
         <!-- Native AOT / trimming: the library is fully reflection-free, so the trim and AOT
          analyzers must stay clean for every target framework. -->
@@ -30,6 +30,10 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageReleaseNotes>
+            1.1.1: one-shot Zstd chunk compression (level 22 no longer reserves ~128 MiB
+            per parallel worker; output verified byte-identical in Dolphin's dolphin-tool,
+            including a full codec interop matrix) and no empty symbols package (assemblies
+            carry embedded PDBs). Public API stays compatible with 1.0.0.
             1.1.0: legacy writers (CisoWriter, WbfsWriter, TgcWriter), the DiscVerifier Wii
             hash-tree/TMD/H3 verifier, thread-safe ReadAt with an LRU cache, the async API,
             split plain ISO, DiscInfo, BlobStream and scrub options; CLI --json output, -

@@ -28,7 +28,7 @@
         <!-- Icon embedded in the built rvzsharp executable (Windows explorer). -->
         <ApplicationIcon>icon\icon.ico</ApplicationIcon>
         <Company>PureLogicCode.com</Company>
-        <!-- AssemblyVersion/FileVersion follow Directory.Build.props' Version (1.1.0), so
+        <!-- AssemblyVersion/FileVersion follow Directory.Build.props' Version (1.1.1), so
          the binary, telemetry and the update check all report the same product version. -->
         <NeutralLanguage>en</NeutralLanguage>
         <!-- No XML docs for the CLI: the publish output ships the single binary only. -->

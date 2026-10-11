@@ -72,7 +72,7 @@ public class ProgramParsingTests
     [Fact]
     public void CliVersion_MatchesProductVersion()
     {
-        Assert.StartsWith("1.1.0", CliVersion.Product);
-        Assert.Equal(new Version(1, 1, 0), CliVersion.Parsed);
+        Assert.StartsWith("1.1.1", CliVersion.Product);
+        Assert.Equal(new Version(1, 1, 1), CliVersion.Parsed);
     }
 }

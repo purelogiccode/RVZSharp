@@ -112,7 +112,7 @@ byte-for-byte against their official No-Intro SHA-1s:
 | `RVZSharp.Slow.Tests/RealRvzFileTests.cs` | 276 real-file tests (see below) |
 | `RVZSharp.Slow.Tests/RealFileDecodeTests.cs` | env-var-driven real-file decode (`RVZ_REAL_FILE`/`RVZ_REAL_SHA1`) |
 | `RVZSharp.Slow.Tests/RealLegacyFileTests.cs` | real GCZ/CISO/WBFS/TGC/WIA/NFS decode to their expected SHA-1 (`RVZ_REAL_GCZ` … `RVZ_REAL_NFS`/`RVZ_REAL_NFS_KEY`) |
-| `RVZSharp.Slow.Tests/DifferentialToolTests.cs` | optional cross-checks against `dolphin-tool`/`wit`/`wwt` (`RVZ_DOLPHIN_TOOL`/`RVZ_WIT`/`RVZ_WWT` + `RVZ_DIFF_ISO`) |
+| `RVZSharp.Slow.Tests/DifferentialToolTests.cs` | optional cross-checks against `dolphin-tool` (repo-root `DolphinTool.exe` by default, else `RVZ_DOLPHIN_TOOL`/PATH) and `wit`/`wwt` (`RVZ_WIT`/`RVZ_WWT`): RVZ both directions over a 7-row codec/level matrix plus our CISO/TGC output; needs `RVZ_DIFF_ISO` |
 
 ## Real-file suite
 
@@ -147,9 +147,12 @@ common-key-encrypted keys so the fast suite exercises the same path.
 Legacy-format real files are covered by `RealLegacyFileTests` through environment variables
 (`RVZ_REAL_GCZ`, `RVZ_REAL_CISO`, `RVZ_REAL_WBFS`, `RVZ_REAL_TGC`, `RVZ_REAL_WIA`, and
 `RVZ_REAL_NFS` + `RVZ_REAL_NFS_KEY`; each with an optional `<VAR>_SHA1` expectation), and
-`DifferentialToolTests` optionally cross-checks our writers/reader against `dolphin-tool`
-(RVZ, both directions) and `wit`/`wwt` (our CISO/TGC output) when those tools are installed
-and `RVZ_DIFF_ISO` points at a real ISO. All of them no-op when unset.
+`DifferentialToolTests` cross-checks our writers/reader against `dolphin-tool`
+(RVZ, both directions, over a codec/level matrix — zstd, lzma2, lzma, bzip2, none, plus a
+128 KiB-block zstd row) and `wit`/`wwt` (our CISO/TGC output). `dolphin-tool` defaults to
+the `DolphinTool.exe` shipped at the repository root (`RVZ_DOLPHIN_TOOL` overrides it);
+`RVZ_DIFF_ISO` must point at a real ISO, since `dolphin-tool` only accepts valid discs.
+All of them no-op when the tool or the ISO is unset.
 
 ## Synthetic builders (`RVZSharp.Tests/Helpers/`)
 

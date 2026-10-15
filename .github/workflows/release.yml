@@ -180,13 +180,13 @@ jobs:
         with:
           ref: ${{ needs.version.outputs.tag }}
       - name: Download bundles
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: rvzsharp-${{ needs.version.outputs.version }}-*
           path: artifacts/release
           merge-multiple: true
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages-${{ needs.version.outputs.version }}
           path: artifacts/release
@@ -234,7 +234,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages-${{ needs.version.outputs.version }}
           path: artifacts/packages

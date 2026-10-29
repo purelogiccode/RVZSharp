@@ -72,9 +72,9 @@
         </PackageReference>
         <PackageReference Include="SharpZipLib" Version="1.4.2" />
         <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.402" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.403" PrivateAssets="all" />
         <PackageReference Include="Microsoft.Sbom.Targets" Version="4.1.13" PrivateAssets="all" />
-        <PackageReference Include="Meziantou.Analyzer" Version="3.0.316">
+        <PackageReference Include="Meziantou.Analyzer" Version="3.0.317">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
         </PackageReference>

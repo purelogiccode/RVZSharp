@@ -1,8 +1,8 @@
 # CLI reference
 
 The command-line tool accepts the **same command surface as Dolphin's `dolphin-tool`**:
-`convert`, `verify`, `header`, `extract` — with the same flags, defaults and error messages.
-The legacy `info` and `decode` commands are kept as RVZSharp extensions.
+`convert`, `verify`, `header`, `extract` — with the same flags, Dolphin-compatible defaults
+and error messages. The legacy `info` and `decode` commands are kept as RVZSharp extensions.
 
 ```
 rvzsharp convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz|ciso|wbfs|tgc] [-s]
@@ -62,10 +62,10 @@ convert -i <FILE> -o <FILE> [-u <dir>] [-f iso|gcz|wia|rvz|ciso|wbfs|tgc] [-s]
 | `-i`, `--input` | path to the input disc image (any supported format). Required. |
 | `-o`, `--output` | path to the destination file. Required. |
 | `-u`, `--user` | user folder path; accepted for DolphinTool compatibility (RVZSharp needs no user directory). |
-| `-f`, `--format` | container format: `iso`, `gcz`, `wia`, `rvz`, `ciso`, `wbfs`, `tgc` (the last three are RVZSharp extensions). Required. |
-| `-b`, `--block_size` | block size in **bytes**. Required for GCZ/WIA/RVZ; optional for CISO/WBFS (defaults to 2 MiB). |
-| `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`, and `purge` (WIA only, RVZSharp extension). Required for WIA/RVZ; ignored for GCZ (always zlib deflate). |
-| `-l`, `--compression_level` | compression level. Required unless `-c none`. |
+| `-f`, `--format` | container format: `iso`, `gcz`, `wia`, `rvz`, `ciso`, `wbfs`, `tgc` (the last three are RVZSharp extensions). Default: `rvz`. |
+| `-b`, `--block_size` | block size in **bytes**. Defaults: 128 KiB for GCZ/RVZ, 2 MiB for WIA/CISO/WBFS. |
+| `-c`, `--compression` | compression method for WIA/RVZ: `none`, `zstd` (RVZ only), `bzip2`, `lzma`, `lzma2`, and `purge` (WIA only, RVZSharp extension). Defaults: `zstd` for RVZ, `lzma2` for WIA; ignored for GCZ (always zlib deflate). |
+| `-l`, `--compression_level` | compression level. Default: 5; ignored (set to 0) with `-c none` or `-c purge`. |
 | `-s`, `--scrub` | zero the data of non-game Wii partitions (update/channel) before converting; for `-f rvz` and `-f iso` a warning notes that scrubbing gains little (converting a Wii disc to `-f gcz` without `-s` warns separately). |
 | `--threads` | compression threads (RVZSharp extension). `0` (default) uses the processor count; the output is byte-identical for any value. |
 | `--verify` | after writing, decode the output and compare its CRC-32/MD5/SHA-1 with the input (RVZSharp extension); prints `Verification: OK (<sha1>)` or fails. With `-s` the scrubbed input is the reference. |
@@ -92,15 +92,15 @@ Notes:
 
 - **`-f iso`** writes a plain, fully decoded ISO (the same operation as the legacy `decode`).
 - **`-f rvz`** uses the RVZ writer: Wii partitions stored decrypted with hash exceptions,
-  PRNG junk packing, fully checksummed tables. `-b` becomes the chunk size; below 2 MiB it
-  must be a power of two, at/above 2 MiB a multiple of 2 MiB (Dolphin's rule).
+  PRNG junk packing, fully checksummed tables. `-b` becomes the chunk size (default 128 KiB);
+  below 2 MiB it must be a power of two, at/above 2 MiB a multiple of 2 MiB (Dolphin's rule).
 - **`-f wia`** uses the WIA writer: Wii partitions stored decrypted with hash exceptions,
-  fully checksummed tables. `-b` must be a multiple of 2 MiB; `zstd` is rejected (WIA
-  supports `none`, `bzip2`, `lzma` and `lzma2`). `-c purge` (RVZSharp extension) stores the
-  hash exceptions plus a raw stream instead of compressing; DolphinTool's CLI does not
-  expose it.
-- **`-f gcz`** uses the GCZ writer: blocks of `-b` bytes (any power of two; 16 KiB is the
-  classic size, Dolphin's GUI defaults to 128 KiB), each block deflated at level 9 and stored
+  fully checksummed tables. `-b` must be a multiple of 2 MiB (default 2 MiB); `zstd` is
+  rejected (WIA supports `none`, `bzip2`, `lzma` and `lzma2`, default `lzma2`). `-c purge`
+  (RVZSharp extension) stores the hash exceptions plus a raw stream instead of compressing;
+  DolphinTool's CLI does not expose it.
+- **`-f gcz`** uses the GCZ writer: blocks of `-b` bytes (any power of two; default 128 KiB,
+  16 KiB is the classic size), each block deflated at level 9 and stored
   raw when compression saves fewer than 10 bytes, with a per-block Adler-32 of the stored
   bytes. `-c`/`-l` are ignored (GCZ is always zlib). Converting a Wii disc without `-s`
   prints Dolphin's "may not offer space advantages over ISO" warning.

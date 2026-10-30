@@ -581,10 +581,13 @@ internal static class Program
                     + "  -i, --input <FILE>         path to disc image FILE\n"
                     + "  -o, --output <FILE>        path to the destination FILE\n"
                     + "  -f, --format <format>      container format: iso, gcz, wia, rvz, ciso, wbfs, tgc\n"
+                    + "                             (default: rvz)\n"
                     + "  -s, --scrub                scrub junk data as part of conversion\n"
-                    + "  -b, --block_size <int>     block size in bytes (required for GCZ/WIA/RVZ)\n"
-                    + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2\n"
-                    + "  -l, --compression_level    level of compression for the selected method\n"
+                    + "  -b, --block_size <int>     block size in bytes (default: 128 KiB for GCZ/RVZ,\n"
+                    + "                             2 MiB for WIA/CISO/WBFS)\n"
+                    + "  -c, --compression <method> none, zstd, bzip2, lzma, lzma2 (default: zstd for RVZ,\n"
+                    + "                             lzma2 for WIA)\n"
+                    + "  -l, --compression_level    level of compression for the selected method (default: 5)\n"
                     + "  --threads <int>            compression/decode threads (0 = processor count, default)\n"
                     + "  --verify                   verify the written file decodes to the input image\n"
                     + "  --json                     print the conversion result as JSON on stdout\n"
@@ -640,7 +643,8 @@ internal static class Program
                 return Fail("No output set");
             }
 
-            var format = options.Get("format");
+            // Dolphin's converter defaults to RVZ when -f is omitted.
+            var format = options.Get("format") ?? "rvz";
             if (format is not ("iso" or "gcz" or "wia" or "rvz" or "ciso" or "wbfs" or "tgc"))
             {
                 return Fail("No output format set");
@@ -669,24 +673,16 @@ internal static class Program
                 return Fail("Threads must be a non-negative integer (0 = processor count)");
             }
 
-            var blockSize = 0;
+            var blockSize = DefaultBlockSize(format);
             if (format is "gcz" or "wia" or "rvz" or "ciso" or "wbfs")
             {
                 var blockSizeArg = options.IsSet("block_size")
                     ? options.Get("block_size")
                     : options.Get("chunk-size");
 
-                // CISO and WBFS have a natural default (2 MiB blocks/clusters); the RVZSharp
-                // writers are the ones that benefit from an explicit -b for the others.
-                if (blockSizeArg == null && (format is "ciso" or "wbfs"))
-                {
-                    blockSize = 0x200000;
-                }
-                else if (blockSizeArg == null)
-                {
-                    return Fail("Block size must be set for GCZ/RVZ/WIA");
-                }
-                else if (!int.TryParse(blockSizeArg, out blockSize))
+                // -b is optional: use Dolphin's preferred block size for the format
+                // (128 KiB for GCZ/RVZ, 2 MiB for WIA/CISO/WBFS) when it is omitted.
+                if (blockSizeArg != null && !int.TryParse(blockSizeArg, out blockSize))
                 {
                     return Fail($"Block size '{blockSizeArg}' is not a number");
                 }
@@ -702,21 +698,22 @@ internal static class Program
                 }
             }
 
-            var compression = CompressionType.Zstd;
-            var level = 0;
+            var compression = DefaultCompression(format);
+            var level = RvzWriteOptions.Default.CompressionLevel;
             var packing = true;
             switch (format)
             {
                 case "rvz":
                 case "wia":
                 {
+                    // -c is optional: Zstandard for RVZ and LZMA2 for WIA (the library
+                    // defaults), so a plain convert -f rvz/wia works like the GUI defaults.
                     var compressionName = options.Get("compression");
-                    if (compressionName is null)
+                    if (compressionName is not null)
                     {
-                        return Fail("Compression method must be set for WIA or RVZ");
+                        compression = ParseCompression(compressionName);
                     }
 
-                    compression = ParseCompression(compressionName);
                     if ((format == "rvz" && compression == CompressionType.Purge) ||
                         (format == "wia" && compression == CompressionType.Zstd))
                     {
@@ -731,11 +728,10 @@ internal static class Program
                     }
                     else
                     {
-                        if (!options.IsSet("compression_level") ||
-                            !int.TryParse(options.Get("compression_level"), out level))
+                        var levelArg = options.Get("compression_level");
+                        if (levelArg is not null && !int.TryParse(levelArg, out level))
                         {
-                            return Fail(
-                                "Compression level must be set when compression type is not 'none' or 'purge'");
+                            return Fail($"Compression level '{levelArg}' is not a number");
                         }
 
                         var (min, max) = GetAllowedCompressionLevels(compression);
@@ -1064,6 +1060,31 @@ internal static class Program
 
             return 0;
         }
+    }
+
+    /// <summary>
+    /// The block size used when <c>-b</c> is omitted: Dolphin's preferred 128 KiB for
+    /// GCZ/RVZ and the 2 MiB minimum for WIA/CISO/WBFS.
+    /// </summary>
+    internal static int DefaultBlockSize(string format)
+    {
+        return format switch
+        {
+            "gcz" or "rvz" => 0x20000,
+            "wia" or "ciso" or "wbfs" => 0x200000,
+            _ => 0
+        };
+    }
+
+    /// <summary>
+    /// The compression method used when <c>-c</c> is omitted: Zstandard for RVZ and LZMA2
+    /// for WIA (the <see cref="RvzWriteOptions"/> defaults for each container).
+    /// </summary>
+    internal static CompressionType DefaultCompression(string format)
+    {
+        return format == "wia"
+            ? RvzWriteOptions.WiaDefault.Compression
+            : RvzWriteOptions.Default.Compression;
     }
 
     private static bool IsDiscImageBlockSizeValid(int blockSize, string format)

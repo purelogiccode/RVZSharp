@@ -28,6 +28,8 @@
   url: "/security.html"
 - title: API reference
   url: "/api/"
+- title: Release notes 1.2.0
+  url: "/release-notes-1.2.0.html"
 - title: Release notes 1.1.1
   url: "/release-notes-1.1.1.html"
 - title: Release notes 1.1.0

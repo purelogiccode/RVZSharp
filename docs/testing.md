@@ -4,7 +4,7 @@ The test suite is split into **three projects**, so the default run is always th
 
 - **`RVZSharp.Tests`** — **613 synthetic tests** (unit + end-to-end round trips), ~1
   minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
-- **`RVZSharp.Cli.Tests`** — **95 tests** (net10.0) for the CLI: option parsing, extract path
+- **`RVZSharp.Cli.Tests`** — **97 tests** (net10.0) for the CLI: option parsing, extract path
   guards, shell-completion scripts, the update checker (release tags, HTTP responses and
   `RVZSHARP_NO_UPDATE_CHECK`), ApplicationStats telemetry, the Serilog bug-report sink and
   the required bug-report environment/error/exception layout. Part of the solution.
@@ -56,9 +56,11 @@ byte-for-byte against their official No-Intro SHA-1s:
 6. **Concurrency** (`ConcurrentReadTests`): parallel random `ReadAt` calls on GC/Wii
    containers (mixed with `ReadFully`) must match the reference ISO byte-for-byte.
 7. **Continuous integration** (`.github/workflows/ci.yml`): builds the solution and runs the
-   fast suite on `net8.0`/`net9.0`/`net10.0` with coverage uploaded as an artifact, packs
-   the library (API-compat against 1.0.0 + embedded SBOM) and publishes a smoke-tested
-   framework-dependent single-file CLI. The slow suite and differential tests stay opt-in
+   fast suite on `net8.0`/`net9.0`/`net10.0` with coverage uploaded as an artifact, repeats
+   the net10.0 build/tests on Windows and macOS, builds the DocFX API reference, packs the
+   library (API-compat against 1.0.0 + embedded SBOM) and publishes a smoke-tested
+   framework-dependent single-file CLI. CodeQL, dependency review, the wiki and Pages
+   deployments run in their own workflows; the slow suite and differential tests stay opt-in
    on developer machines.
 8. **1.1.0 correctness review**: a commit-by-commit audit pinned the fixes below with
    regression tests — retail ticket title keys are common-key decrypted
@@ -69,6 +71,11 @@ byte-for-byte against their official No-Intro SHA-1s:
    JSON-only, `convert --verify` honors Ctrl+C (exit 130), writer progress is monotonic
    (`ProgressReader`), and parallel decode/encode failures surface the original exception
    instead of `AggregateException` (`ParallelExecution`).
+9. **1.2.0 hardening review**: overflow and allocation bounds were added across the
+   WIA/TGC/GCZ/NFS/FST parsers, `SectionStream`/`MultiPartStream`, raw-data tables and the
+   PRNG/PURGE helpers, with regression tests for the section overflow, raw-size overflow,
+   PRNG argument validation, multipart positions and TGC extraction sizes. The CLI's
+   `convert` defaults and the bug-report sink's fault tolerance are also pinned by tests.
 
 ## Test files
 

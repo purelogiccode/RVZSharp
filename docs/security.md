@@ -8,7 +8,8 @@ built into the repository.
 
 | Version | Supported |
 |---|---|
-| 1.1.x | Yes — active development |
+| 1.2.x | Yes - active development |
+| 1.1.x | Security fixes only |
 | 1.0.x | Security fixes only |
 | Older | No |
 

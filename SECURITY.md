@@ -7,7 +7,8 @@ are handled privately until a fix is available.
 
 | Version | Supported |
 |---|---|
-| 1.1.x | :white_check_mark: Active |
+| 1.2.x | :white_check_mark: Active |
+| 1.1.x | :white_check_mark: Security fixes only |
 | 1.0.x | :white_check_mark: Security fixes only |
 | &lt; 1.0 | :x: Not supported |
 

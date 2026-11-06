@@ -99,6 +99,27 @@ public class BugReportSinkTests
         Assert.False(sink.HasPending);
     }
 
+    /// <summary>Verifies a faulted transport cannot break shutdown.</summary>
+    [Fact]
+    public async Task FlushAsync_FaultedSender_DoesNotThrow()
+    {
+        var sink = new BugReportSink(new FaultingSender());
+
+        sink.Emit(CreateEvent(LogEventLevel.Error));
+        await sink.FlushAsync();
+
+        Assert.False(sink.HasPending);
+    }
+
+    /// <summary>Verifies a transport that throws synchronously cannot break logging.</summary>
+    [Fact]
+    public void Emit_ThrowingSender_DoesNotThrow()
+    {
+        var sink = new BugReportSink(new ThrowingSender());
+
+        sink.Emit(CreateEvent(LogEventLevel.Error));
+    }
+
     private static LogEvent CreateEvent(LogEventLevel level, Exception? exception = null)
     {
         return new LogEvent(
@@ -117,6 +138,22 @@ public class BugReportSinkTests
         {
             Reports.Enqueue((errorMessage, exception));
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FaultingSender : IBugReportSender
+    {
+        public Task SendBugReportAsync(string errorMessage, Exception? exception)
+        {
+            return Task.FromException(new InvalidOperationException("transport down"));
+        }
+    }
+
+    private sealed class ThrowingSender : IBugReportSender
+    {
+        public Task SendBugReportAsync(string errorMessage, Exception? exception)
+        {
+            throw new InvalidOperationException("transport unavailable");
         }
     }
 }

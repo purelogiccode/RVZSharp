@@ -36,11 +36,11 @@ instead, see [Building](#building) below.
 
 ```
 CSharp_RVZSharp.sln        solution file (fast test suite runs solution-wide)
-Directory.Build.props       net10.0, Nullable, ImplicitUsings, TreatWarningsAsErrors
+Directory.Build.props       net8.0/net9.0/net10.0, Nullable, ImplicitUsings, TreatWarningsAsErrors
 RVZSharp/                   the library
 RVZSharp.Cli/               the header/verify/convert/extract tool
 RVZSharp.Tests/             fast unit + end-to-end tests (613, ×3 frameworks)
-RVZSharp.Cli.Tests/         CLI tests (95: parsing, extract paths, completions, update checker, logging)
+RVZSharp.Cli.Tests/         CLI tests (97: parsing, extract paths, completions, update checker, logging)
 RVZSharp.Slow.Tests/        real-file tests (276) — kept out of the solution; run explicitly
 RVZSharp.Benchmarks/        BenchmarkDotNet throughput suite (net10.0, in the solution)
 References/dolphin-master/  Dolphin source (C++) — format reference

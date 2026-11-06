@@ -294,7 +294,7 @@ highlights are summarized in [WhatsNew.md](https://github.com/purelogiccode/RVZS
   split WBFS, scrubbing), GCZ writer tests, parallel write/decode determinism tests,
   FST/file-system validation tests, async API tests, package-facing API tests (path open,
   ReadFully, progress, cancellation).
-- `RVZSharp.Cli.Tests` — 95 tests (net10.0) for the CLI's option parser, extract path guards,
+- `RVZSharp.Cli.Tests` — 97 tests (net10.0) for the CLI's option parser, extract path guards,
   shell-completion scripts, update checker, ApplicationStats telemetry and the Serilog
   bug-report sink/layout.
 - `RVZSharp.Slow.Tests` — 276 real-file tests (`RealRvzFileTests`) that decode 90 real
@@ -332,7 +332,7 @@ of them (auto-detected by magic). The writers (`rvzsharp convert -f rvz|wia|gcz|
 encode any of them back to RVZ (Zstd/Bzip2/LZMA1/LZMA2/None with Dolphin's level rules —
 including negative Zstd "fast" levels — optional packing, chunks of 32 KiB–2 MiB powers of
 two or multiples of 2 MiB), WIA (None/PURGE/Bzip2/LZMA1/LZMA2, chunks that are multiples of
-2 MiB), GCZ (16 KiB zlib blocks by default, power-of-two sizes), CISO (all-zero blocks
+2 MiB), GCZ (128 KiB zlib blocks by default, power-of-two sizes), CISO (all-zero blocks
 absent), WBFS (Wii only, shared zero cluster) or TGC (GameCube only), with the same SHA-1s
 Dolphin produces. Decode supports progress/cancellation;
 `DiscHasher` computes CRC-32/MD5/SHA-1 in one pass and `DiscVerifier` walks the Wii hash
@@ -351,8 +351,11 @@ partition-table key and falls back to the ticket key for plain ISO inputs.
 **Packaging & CI**: the NuGet package is API-compat validated against the last published
 release (`PackageValidationBaselineVersion` 1.0.0) and carries an embedded SPDX 2.2 SBOM;
 GitHub Actions (`.github/workflows/ci.yml`) builds and tests on `net8.0`/`net9.0`/`net10.0`
-with coverage, packs, and publishes a smoke-tested framework-dependent single-file CLI
-artifact. Dependabot keeps NuGet and Actions dependencies current.
+with coverage, repeats the net10.0 build/tests on Windows and macOS, builds the DocFX API
+reference, packs, and publishes a smoke-tested framework-dependent single-file CLI artifact.
+CodeQL `security-extended`, dependency review, Dependabot, secret scanning and push
+protection run on the repository; `docs/` is mirrored to the wiki and deployed to Pages with
+a side menu. Dependabot keeps NuGet and Actions dependencies current.
 
 **1.1.0 (2026-10-09)** adds the legacy writers (CISO/WBFS/TGC), `DiscVerifier`, the CI and
 packaging gates above, and the CLI conveniences (`--json`, `-` stdin/stdout, completions).
@@ -371,6 +374,16 @@ one-shot, so level 22 no longer reserves ~128 MiB per parallel worker (output ve
 byte-identical in Dolphin's `dolphin-tool`, including a full codec interop matrix in
 both directions), and the NuGet package ships without the empty symbols package
 (assemblies carry embedded PDBs). The public API stays compatible with 1.0.0.
+
+**1.2.0 (2026-11-06)** is a security, robustness and tooling release. `convert` now uses
+Dolphin-compatible defaults (`-f rvz`, 128 KiB RVZ/GCZ blocks, 2 MiB WIA/CISO/WBFS blocks,
+Zstandard/LZMA2 and level 5), hostile-input parsing is bounded across WIA/TGC/GCZ/NFS/FST,
+table/stream arithmetic and CLI extraction depth, and TGC extraction reads unsigned 32-bit
+sizes correctly. Warning-and-above logs are forwarded to the bug-report API with the
+required payload sections, while expected failures stay at Information. CI adds CodeQL,
+dependency review, cross-platform tests and the DocFX API reference; the six
+framework-dependent single-file bundles and NuGet package are published from the same tag.
+The public API stays compatible with 1.0.0.
 
 ## Security
 

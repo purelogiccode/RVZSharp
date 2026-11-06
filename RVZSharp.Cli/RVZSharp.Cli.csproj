@@ -19,8 +19,8 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <!-- The CLI targets net10.0 (current LTS-aligned runtime); published binaries are
-         single-file self-contained, so target machines need no runtime installed. -->
+        <!-- The CLI targets net10.0 (current LTS-aligned runtime); release binaries are
+         framework-dependent single-file, so target machines install the .NET 10 runtime. -->
         <TargetFrameworks>net10.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
@@ -28,7 +28,7 @@
         <!-- Icon embedded in the built rvzsharp executable (Windows explorer). -->
         <ApplicationIcon>icon\icon.ico</ApplicationIcon>
         <Company>PureLogicCode.com</Company>
-        <!-- AssemblyVersion/FileVersion follow Directory.Build.props' Version (1.1.1), so
+        <!-- AssemblyVersion/FileVersion follow Directory.Build.props' Version (1.2.0), so
          the binary, telemetry and the update check all report the same product version. -->
         <NeutralLanguage>en</NeutralLanguage>
         <!-- No XML docs for the CLI: the publish output ships the single binary only. -->

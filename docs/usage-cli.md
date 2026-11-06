@@ -85,8 +85,8 @@ Block-size validation follows Dolphin's `IsDiscImageBlockSizeValid`:
 
 Compression levels: `bzip2`/`lzma`/`lzma2` accept 1–9; `zstd` accepts −131072..22
 (negative levels select Zstd's fast modes, 0 means the default — the same range as
-Dolphin's CLI). A block size outside Dolphin's preferred range (32 KiB–2 MiB) prints a
-warning and continues.
+Dolphin's CLI). A block size outside Dolphin's preferred range (32 KiB-2 MiB) logs a
+note and continues.
 
 Notes:
 
@@ -333,7 +333,7 @@ command runs. When a newer version exists and the console is interactive, the co
 finishes with a notice and a prompt to open the release page:
 
 ```
-A new version of RVZSharp.Cli is available: v1.2.0 (you have 1.1.0).
+A new version of RVZSharp.Cli is available: v1.2.0 (you have 1.1.1).
 Release page: https://github.com/purelogiccode/RVZSharp/releases/tag/v1.2.0
 Open the release page in your browser? [y/N]
 ```

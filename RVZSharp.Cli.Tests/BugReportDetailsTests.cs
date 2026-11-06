@@ -17,12 +17,12 @@ public class BugReportDetailsTests
         var exception = new InvalidOperationException("boom", new IOException("inner"));
 
         var report = BugReportDetails.Build(
-            "Conversion failed", exception, "RVZSharp.Cli", "1.1.1", timestamp);
+            "Conversion failed", exception, "RVZSharp.Cli", "1.2.0", timestamp);
 
         Assert.Contains("=== Environment Details ===", report);
         Assert.Contains("Date: 2026-11-05 12:34:56 -03:00", report);
         Assert.Contains("Application Name: RVZSharp.Cli", report);
-        Assert.Contains("Application Version: 1.1.1", report);
+        Assert.Contains("Application Version: 1.2.0", report);
         Assert.Contains($"OS Version: {Environment.OSVersion}", report);
         Assert.Contains($"Architecture: {RuntimeInformation.OSArchitecture}", report);
         Assert.Contains($"Bitness: {(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")}", report);
@@ -43,7 +43,7 @@ public class BugReportDetailsTests
     [Fact]
     public void Build_WithoutException_UsesPlaceholders()
     {
-        var report = BugReportDetails.Build("Only a message", null, "RVZSharp.Cli", "1.1.1");
+        var report = BugReportDetails.Build("Only a message", null, "RVZSharp.Cli", "1.2.0");
 
         Assert.Contains("=== Error Details ===", report);
         Assert.Contains("Only a message", report);
@@ -60,7 +60,7 @@ public class BugReportDetailsTests
     {
         var exception = new InvalidOperationException(new string('x', 10_000));
         var report = BugReportDetails.Build(
-            new string('y', 10_000), exception, "RVZSharp.Cli", "1.1.1");
+            new string('y', 10_000), exception, "RVZSharp.Cli", "1.2.0");
 
         Assert.Contains("=== Environment Details ===", report);
         Assert.Contains("=== Error Details ===", report);

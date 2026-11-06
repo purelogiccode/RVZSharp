@@ -24,38 +24,73 @@ internal static class LogSetup
     {
         Interlocked.Exchange(ref _shutdown, 0);
 
-        // Re-initializing (hosting, tests) must not leak the previous HTTP transport.
-        _bugReportClient?.Dispose();
+        // Re-initializing (hosting, tests) must close the old pipeline before its HTTP
+        // transport is disposed, so queued reports still have a client to use.
+        if (_bugReportClient is not null)
+        {
+            Log.CloseAndFlush();
+            _bugReportClient.Dispose();
+        }
+
         _bugReportClient = new BugReportApiClient();
         // Forward every warning, error and fatal event to the bug-report API.
         _bugReportSink = new BugReportSink(_bugReportClient);
 
+        var logDir = Path.Combine(Path.GetTempPath(), "RVZSharp", "logs");
+        Log.Logger = CreateLogger(logDir, includeFile: true);
+    }
+
+    /// <summary>
+    /// Builds the CLI logger. The daily rolling file is best-effort: an unavailable or
+    /// read-only temp directory must not stop the CLI from running, so a failed file sink
+    /// falls back to console + bug reports and finally to a silent logger.
+    /// </summary>
+    private static ILogger CreateLogger(string logDir, bool includeFile)
+    {
         var configuration = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.Console(
                 outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}",
                 standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
-            .WriteTo.Sink(_bugReportSink)
+            .WriteTo.Sink(_bugReportSink!)
             .Enrich.WithProperty("Application", "RVZSharp");
 
-        // The log file is best-effort: a read-only or missing temp directory must not stop
-        // the CLI from running (console and bug reports still work).
-        var logDir = Path.Combine(Path.GetTempPath(), "RVZSharp", "logs");
-        try
+        if (includeFile)
         {
-            Directory.CreateDirectory(logDir);
-            configuration = configuration.WriteTo.File(
-                Path.Combine(logDir, "rvzsharp-.log"),
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 14);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                      or ArgumentException or NotSupportedException)
-        {
-            // Console logging remains active; there is nowhere safe to write this failure.
+            try
+            {
+                Directory.CreateDirectory(logDir);
+                configuration = configuration.WriteTo.File(
+                    Path.Combine(logDir, "rvzsharp-.log"),
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 14);
+            }
+            catch (Exception e) when (IsLogFileError(e))
+            {
+                // Retry without the file sink; console and bug reports stay active.
+                return CreateLogger(logDir, includeFile: false);
+            }
         }
 
-        Log.Logger = configuration.CreateLogger();
+        try
+        {
+            return configuration.CreateLogger();
+        }
+        catch (Exception e) when (includeFile && IsLogFileError(e))
+        {
+            return CreateLogger(logDir, includeFile: false);
+        }
+        catch (Exception e) when (!includeFile && IsLogFileError(e))
+        {
+            // Last resort: never let diagnostics prevent the command from running.
+            return new LoggerConfiguration().CreateLogger();
+        }
+    }
+
+    private static bool IsLogFileError(Exception e)
+    {
+        return e is IOException or UnauthorizedAccessException or ArgumentException
+            or NotSupportedException;
     }
 
     /// <summary>

@@ -1,9 +1,34 @@
 # What's new in RVZSharp
 
 Release highlights, newest first. The full announcements are in
+[`docs/release-notes-1.2.0.md`](docs/release-notes-1.2.0.md),
 [`docs/release-notes-1.1.1.md`](docs/release-notes-1.1.1.md),
 [`docs/release-notes-1.1.0.md`](docs/release-notes-1.1.0.md) and
 [`docs/release-notes-1.0.0.md`](docs/release-notes-1.0.0.md).
+
+## 1.2.0 (2026-11-06)
+
+A security, robustness and tooling release. The public API stays compatible with 1.0.0.
+
+- **Dolphin-compatible convert defaults** - `-f` defaults to RVZ, `-b` to 128 KiB for
+  GCZ/RVZ and 2 MiB for WIA/CISO/WBFS, `-c` to Zstandard for RVZ and LZMA2 for WIA, and
+  `-l` to 5. A plain `rvzsharp convert -i game.iso -o game.rvz` now works.
+- **Hostile-input hardening** - bounded WIA disc structs, TGC FST/DOL and unsigned 32-bit
+  extraction sizes, GCZ block tables, NFS continuation files, FST depth/path budgets,
+  section/multipart stream arithmetic, raw-data overflow checks, and PRNG/PURGE argument
+  validation. The CLI also bounds recursive extraction depth.
+- **Diagnostics** - every warning/error/fatal log is forwarded to the bug-report API;
+  expected failures stay at Information; bug reports always keep the required
+  Environment/Error/Exception sections within the 4,000-character limit; unhandled and
+  unobserved exceptions are captured and flushed; log setup survives an unwritable temp
+  directory.
+- **CI and docs** - CodeQL `security-extended`, dependency review, cross-platform CI,
+  DocFX API reference under `/api/`, SECURITY/contributing documentation, and wiki + Pages
+  side menus.
+- **Tests and bundles** - **613 library tests** per framework, **97 CLI tests**; six
+  framework-dependent single-file bundles (`win-x64`, `win-arm64`, `linux-x64`,
+  `linux-arm64`, `osx-x64`, `osx-arm64`) with `LICENSE`, `README.md`, `WhatsNew.md` and
+  `THIRD-PARTY-NOTICES.md`.
 
 ## 1.1.1 (2026-10-11)
 

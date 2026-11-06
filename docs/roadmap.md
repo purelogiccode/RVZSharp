@@ -19,6 +19,7 @@
 | 13 — Tooling & packaging | GitHub Actions CI (build + fast tests on net8.0/9.0/10.0, coverage artifact, pack + API validation, CLI publish) and Dependabot; `PackageValidationBaselineVersion` (1.0.0) diffing the public API; SPDX SBOM embedded in the nupkg; CLI `--json`, `-` stdin/stdout and shell completions; per-tag GitHub Releases with CLI bundles + NuGet push; `docs/` mirrored to the wiki and deployed to Pages | ✅ done (1.1.0 published 2026-10-09) |
 | 14 — Correctness review | commit-by-commit audit before 1.1.0: retail ticket-key decryption with the Wii common key (`WiiVolume.GetTitleKey`), extract TMD/cert/H3 partition-relative offsets + H3 guard, WBFS header size/copy fixes, `convert --json` stdout hygiene, Ctrl+C exit 130, monotonic writer progress, original-exception propagation from parallel loops — each pinned by a regression test | ✅ done |
 | 15 — Audit follow-up | second commit-by-commit audit: zero-group decode of all-zero partition chunks, extract path-traversal guards (`-s`/image names cannot escape `-o`), FST validation hardening, `decode -h`, help-run telemetry/update-prompt skips, stdin-spool cancellation in every command, release/wiki workflow fixes — each pinned by a regression test | ✅ done |
+| 16 — Security & release 1.2.0 | hostile-input bounds across WIA/TGC/GCZ/NFS/FST, stream/table overflow checks, unsigned TGC extraction sizes, Dolphin-compatible CLI convert defaults, warning-to-bug-report pipeline, CodeQL/dependency-review/cross-platform CI, DocFX API under `/api/`, six framework-dependent 1.2.0 bundles and NuGet package | ✅ done (1.2.0) |
 
 ## Supported
 
@@ -72,5 +73,5 @@
 
 - Run the legacy/differential slow tests against a real collection of GCZ/CISO/WBFS/TGC/NFS
   files and `dolphin-tool`/`wit`/`wwt` on a machine that has them.
-- Keep the 1.1.x line current: dependency bumps via Dependabot and patch releases from
+- Keep the 1.2.x line current: dependency bumps via Dependabot and patch releases from
   `master` when a regression is reported.

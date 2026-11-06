@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 
@@ -40,7 +41,16 @@ internal sealed class BugReportSink : ILogEventSink
 
         var message = logEvent.RenderMessage();
         var exception = logEvent.Exception;
-        _pending.Enqueue(_client.SendBugReportAsync(message, exception));
+        try
+        {
+            _pending.Enqueue(_client.SendBugReportAsync(message, exception));
+        }
+        catch (Exception e)
+        {
+            // A failing transport must never take down the CLI or recurse into logging.
+            // Debug stays below the sink's minimum level, so this cannot file a report.
+            Log.Debug(e, "Bug-report transport threw while queueing a report");
+        }
     }
 
     /// <summary>True when bug-report requests are still queued (nothing to wait for otherwise).</summary>
@@ -56,6 +66,14 @@ internal sealed class BugReportSink : ILogEventSink
             pending.Add(task);
         }
 
-        await Task.WhenAll(pending).ConfigureAwait(false);
+        try
+        {
+            await Task.WhenAll(pending).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            // Best-effort delivery: a faulted report must not break shutdown.
+            Log.Debug(e, "A queued bug report failed during shutdown");
+        }
     }
 }

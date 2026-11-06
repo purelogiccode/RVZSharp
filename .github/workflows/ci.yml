@@ -49,6 +49,49 @@ jobs:
           path: artifacts/coverage
           if-no-files-found: ignore
 
+  cross-platform:
+    name: Build + tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore CSharp_RVZSharp.sln
+      - name: Build
+        run: dotnet build CSharp_RVZSharp.sln -c Release --no-restore
+      # The full matrix runs on Ubuntu above; this job proves the library and CLI also
+      # build and pass on the other two supported desktop operating systems.
+      - name: Tests (net10.0)
+        run: dotnet test CSharp_RVZSharp.sln -c Release --no-build --framework net10.0
+
+  docs:
+    name: Build DocFX API reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore tools
+        run: dotnet tool restore
+      - name: Build API reference
+        run: dotnet docfx docfx/docfx.json
+      - name: Upload API reference
+        uses: actions/upload-artifact@v7
+        with:
+          name: docfx-api
+          path: docfx/_site
+          if-no-files-found: error
+
   pack:
     name: Pack + API validation + SBOM
     runs-on: ubuntu-latest

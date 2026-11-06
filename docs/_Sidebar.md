@@ -19,8 +19,12 @@
 
 - [Architecture](architecture)
 - [Testing](testing)
+- [API reference](https://purelogiccode.github.io/RVZSharp/api/)
 
 **Project**
+
+- [Contributing](contributing)
+- [Security](security)
 
 - [What's new](whats-new)
 - [Release notes 1.1.1](release-notes-1.1.1)

@@ -1,5 +1,7 @@
 [![CI](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/purelogiccode/RVZSharp/actions/workflows/codeql.yml/badge.svg)](https://github.com/purelogiccode/RVZSharp/actions/workflows/codeql.yml)
 [![Docs](https://github.com/purelogiccode/RVZSharp/actions/workflows/pages.yml/badge.svg)](https://purelogiccode.github.io/RVZSharp/)
+[![API reference](https://img.shields.io/badge/API-DocFX-blue)](https://purelogiccode.github.io/RVZSharp/api/)
 [![.NET](https://img.shields.io/badge/.NET-8.0_%7C_9.0_%7C_10.0-blueviolet)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
@@ -265,8 +267,12 @@ The full documentation lives in [`docs/`](https://github.com/purelogiccode/RVZSh
 [compression & packing](https://github.com/purelogiccode/RVZSharp/blob/master/docs/format/compression-packing.md),
 [Wii partitions](https://github.com/purelogiccode/RVZSharp/blob/master/docs/format/wii-partitions.md), the
 [legacy formats](https://github.com/purelogiccode/RVZSharp/blob/master/docs/format/legacy.md), [testing](https://github.com/purelogiccode/RVZSharp/blob/master/docs/testing.md),
-[packaging & distribution](https://github.com/purelogiccode/RVZSharp/blob/master/docs/packaging.md), [roadmap](https://github.com/purelogiccode/RVZSharp/blob/master/docs/roadmap.md) and a
-[FAQ](https://github.com/purelogiccode/RVZSharp/blob/master/docs/faq.md). Release highlights are summarized in [WhatsNew.md](https://github.com/purelogiccode/RVZSharp/blob/master/WhatsNew.md).
+[packaging & distribution](https://github.com/purelogiccode/RVZSharp/blob/master/docs/packaging.md), [roadmap](https://github.com/purelogiccode/RVZSharp/blob/master/docs/roadmap.md),
+[contributing](https://github.com/purelogiccode/RVZSharp/blob/master/docs/contributing.md),
+[security](https://github.com/purelogiccode/RVZSharp/blob/master/docs/security.md) and a
+[FAQ](https://github.com/purelogiccode/RVZSharp/blob/master/docs/faq.md). The generated
+[API reference](https://purelogiccode.github.io/RVZSharp/api/) is built with DocFX. Release
+highlights are summarized in [WhatsNew.md](https://github.com/purelogiccode/RVZSharp/blob/master/WhatsNew.md).
 
 ## Project layout
 
@@ -281,15 +287,16 @@ The full documentation lives in [`docs/`](https://github.com/purelogiccode/RVZSh
 - `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
   surface, plus the legacy `info`/`decode` commands, `--json` output, `-` stdin/stdout and
   shell completions).
-- `RVZSharp.Tests` — 609 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 610 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild, metadata/offset edge cases,
   low-level IO helpers) and end-to-end round-trips of synthetic RVZ files built by
   `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii, legacy → RVZ,
   split WBFS, scrubbing), GCZ writer tests, parallel write/decode determinism tests,
   FST/file-system validation tests, async API tests, package-facing API tests (path open,
   ReadFully, progress, cancellation).
-- `RVZSharp.Cli.Tests` — 57 tests (net10.0) for the CLI's option parser, extract path guards, shell-completion scripts and the
-  update checker's release-tag parsing and `RVZSHARP_NO_UPDATE_CHECK` switch.
+- `RVZSharp.Cli.Tests` — 94 tests (net10.0) for the CLI's option parser, extract path guards,
+  shell-completion scripts, update checker, ApplicationStats telemetry and the Serilog
+  bug-report sink/layout.
 - `RVZSharp.Slow.Tests` — 276 real-file tests (`RealRvzFileTests`) that decode 90 real
   GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
   Kept out of the solution, so a plain `dotnet test` never runs them (~30 min); run
@@ -364,6 +371,23 @@ one-shot, so level 22 no longer reserves ~128 MiB per parallel worker (output ve
 byte-identical in Dolphin's `dolphin-tool`, including a full codec interop matrix in
 both directions), and the NuGet package ships without the empty symbols package
 (assemblies carry embedded PDBs). The public API stays compatible with 1.0.0.
+
+## Security
+
+Please report vulnerabilities privately through
+[GitHub Security Advisories](https://github.com/purelogiccode/RVZSharp/security/advisories/new),
+not in a public issue. Supported versions, scope and the disclosure policy are in
+[SECURITY.md](https://github.com/purelogiccode/RVZSharp/blob/master/SECURITY.md). CodeQL,
+dependency review, Dependabot security updates and secret scanning run on every change.
+
+## Contributing and automation
+
+Development setup, test conventions and the logging/telemetry contract are in
+[AGENTS.md](https://github.com/purelogiccode/RVZSharp/blob/master/AGENTS.md) and
+[docs/contributing.md](https://github.com/purelogiccode/RVZSharp/blob/master/docs/contributing.md).
+The CLI sends an anonymous launch hit to ApplicationStats, forwards warning-or-higher logs to
+the bug-report API, and checks GitHub Releases for updates; the library performs no network
+I/O.
 
 ## License
 

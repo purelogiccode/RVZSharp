@@ -53,7 +53,7 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
    `dotnet pack`; intentional breaks must be suppressed in a `CompatibilitySuppressions.xml`
    with a justification.
 3. **Tests on every framework** — `dotnet test CSharp_RVZSharp.sln -c Release` runs the
-   fast suite (609 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
+   fast suite (610 tests) on `net8.0`, `net9.0` and `net10.0`; the real-file slow suite
    (`dotnet test RVZSharp.Slow.Tests -c Release`) runs on machines with the games mounted.
 4. **Consumer smoke test** — before publishing, a fresh project consuming only the nupkg
    (from a local feed) must compile and run on .NET 8 and .NET 10, converting and decoding
@@ -64,13 +64,17 @@ dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:ContinuousIntegrationBuild=tr
    frameworks. Release smoke test: `dotnet publish RVZSharp.Cli -r win-x64
    -p:PublishTrimmed=true` (and `-p:PublishAot=true`) must produce warning-free binaries
    that round-trip a disc image byte-exactly.
-6. **CI** — `.github/workflows/ci.yml` builds and runs the fast suite on all three
-   frameworks (coverage artifact), packs with API validation + SBOM, and publishes the
+6. **CI** - `.github/workflows/ci.yml` builds and runs the fast suite on all three
+   frameworks (coverage artifact), repeats the `net10.0` build/tests on Windows and macOS,
+   builds the DocFX API reference, packs with API validation + SBOM, and publishes the
    framework-dependent single-file CLI (win-x64) that is smoke-tested before upload.
+   `.github/workflows/codeql.yml` runs CodeQL `security-extended` on every push/PR and
+   weekly; `.github/workflows/dependency-review.yml` blocks vulnerable dependency changes.
    `.github/workflows/release.yml` builds the release bundles (below),
    `.github/workflows/wiki.yml` mirrors `docs/` to the wiki and
-   `.github/workflows/pages.yml` deploys `docs/` to GitHub Pages. Dependabot
-   (`.github/dependabot.yml`) keeps NuGet and GitHub Actions dependencies current.
+   `.github/workflows/pages.yml` deploys `docs/` plus the generated `/api/` reference to
+   GitHub Pages. Dependabot (`.github/dependabot.yml`) keeps NuGet and GitHub Actions
+   dependencies current; secret scanning and push protection are enabled on the repository.
 
 ## Release process
 
@@ -114,8 +118,10 @@ Release is created and nothing is pushed to nuget.org.
 
 `docs/` is the single source of the documentation and is published twice by CI:
 
-- **GitHub Pages** — `.github/workflows/pages.yml` builds `docs/` with Jekyll on
-  every `master` push touching `docs/` (plus manual runs). `_config.yml` selects
+- **GitHub Pages** - `.github/workflows/pages.yml` builds `docs/` with Jekyll on
+  every `master` push touching `docs/` (plus manual runs), after generating the DocFX
+  API reference from the library XML comments with `dotnet docfx docfx/docfx.json`
+  and copying it to `docs/api/`. `_config.yml` selects
   the Cayman theme, `index.md` renders this folder's `README.md` as the home
   page, `_data/nav.yml` + `_layouts/default.html` render the side menu, and
   internal links use the `.md` form (`[CLI](usage-cli.md)`), which Jekyll converts

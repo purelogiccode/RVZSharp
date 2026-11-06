@@ -18,6 +18,12 @@ artifacts/
 # Benchmark results
 BenchmarkDotNet.Artifacts/
 
+# Generated API documentation (DocFX)
+docfx/api/
+docfx/_site/
+docfx/.docfx/
+docs/api/
+
 # NuGet
 *.nupkg
 packages/

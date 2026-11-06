@@ -10,7 +10,7 @@ namespace RVZSharp.Cli.Logging;
 /// exception information with bounded message and stack-trace lengths. Submission
 /// failures are logged but never thrown.
 /// </summary>
-internal sealed class BugReportApiClient : IDisposable
+internal sealed class BugReportApiClient : IBugReportSender, IDisposable
 {
     private const string ApiUrl = "https://www.purelogiccode.com/bugreport/api/send-bug-report";
     private const string ApiKey = "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
@@ -26,9 +26,19 @@ internal sealed class BugReportApiClient : IDisposable
     /// calling assembly's name and version for the report.
     /// </summary>
     public BugReportApiClient()
+        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(15) })
     {
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         _httpClient.DefaultRequestHeaders.Add("X-API-KEY", ApiKey);
+    }
+
+    /// <summary>
+    /// Creates a client around an existing <see cref="HttpClient"/>. Used by the tests to
+    /// exercise the request and response handling without network access.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client to use.</param>
+    internal BugReportApiClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
         var assembly = typeof(BugReportApiClient).Assembly.GetName();
         _applicationName = assembly.Name ?? "RVZSharp";
         _version = CliVersion.Product;
@@ -45,7 +55,7 @@ internal sealed class BugReportApiClient : IDisposable
     {
         try
         {
-            var details = BuildBugReportDetails(errorMessage, exception);
+            var details = BugReportDetails.Build(errorMessage, exception, _applicationName, _version);
             // JsonObject (not reflection-based serialization) keeps the CLI trim/AOT-safe.
             var payload = new JsonObject
             {
@@ -76,9 +86,9 @@ internal sealed class BugReportApiClient : IDisposable
         _httpClient?.Dispose();
     }
 
-    /// <summary>Logs a bug-report submission problem. Guarded so a failure while
-    /// reporting a failure cannot recurse (the API being down would otherwise produce
-    /// an endless warning -> report -> warning loop).</summary>
+    /// <summary>Logs a bug-report submission problem at Information level, below the sink's
+    /// Warning threshold, so a failing API cannot recurse (warning -> report -> warning).
+    /// The guard also prevents nested submission failures from reporting each other.</summary>
     private void ReportFailure(string detail)
     {
         if (Interlocked.Exchange(ref _failureReporting, 1) != 0)
@@ -88,64 +98,12 @@ internal sealed class BugReportApiClient : IDisposable
 
         try
         {
-            Log.Warning("{Detail}", detail);
+            Log.Information("{Detail}", detail);
         }
         finally
         {
             Interlocked.Exchange(ref _failureReporting, 0);
         }
-    }
-
-    private string BuildBugReportDetails(string errorMessage, Exception? exception)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine("=== Environment Details ===");
-        sb.AppendLine("Date: " + DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss zzz"));
-        sb.AppendLine($"Application Name: {_applicationName}");
-        sb.AppendLine($"Application Version: {_version}");
-        sb.AppendLine($"OS Version: {Environment.OSVersion}");
-        sb.AppendLine($"Architecture: {RuntimeInformation.OSArchitecture}");
-        sb.AppendLine($"Bitness: {(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")}");
-        sb.AppendLine($"{PlatformLabel()} Version: {RuntimeInformation.OSDescription}");
-        sb.AppendLine($"Processor Count: {Environment.ProcessorCount}");
-        sb.AppendLine($"Base Directory: {AppContext.BaseDirectory}");
-        sb.AppendLine($"Temp Path: {Path.GetTempPath()}");
-        sb.AppendLine();
-        sb.AppendLine("=== Error Details ===");
-        sb.AppendLine(errorMessage);
-        sb.AppendLine();
-        sb.AppendLine("=== Exception Details ===");
-        if (exception is null)
-        {
-            sb.AppendLine("Type: (none)");
-            sb.AppendLine("Message: (none)");
-            sb.AppendLine("Source: (none)");
-            sb.AppendLine("StackTrace: (none)");
-        }
-        else
-        {
-            sb.AppendLine($"Type: {exception.GetType().FullName}");
-            sb.AppendLine($"Message: {exception.Message}");
-            sb.AppendLine($"Source: {exception.Source}");
-            sb.AppendLine($"StackTrace: {exception.StackTrace}");
-        }
-
-        return sb.ToString();
-    }
-
-    private static string PlatformLabel()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return "Windows";
-        }
-
-        if (OperatingSystem.IsMacOS())
-        {
-            return "macOS";
-        }
-
-        return OperatingSystem.IsLinux() ? "Linux" : "OS";
     }
 
     private static string? Truncate(string? value, int maxLength)

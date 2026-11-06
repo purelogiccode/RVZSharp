@@ -29,6 +29,12 @@ internal static class Program
     {
         LogSetup.Initialize();
 
+        // Last-resort logging: exceptions that escape Main or a background task are still
+        // routed through Serilog (and therefore to the bug-report sink) before the process
+        // exits or the finalizer thread swallows them.
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
@@ -103,6 +109,39 @@ internal static class Program
         }
     }
 
+    /// <summary>
+    /// Logs an exception that escaped all managed callers and flushes Serilog so the
+    /// corresponding bug report is not lost when the process terminates.
+    /// </summary>
+    /// <param name="sender">The event source (the application domain).</param>
+    /// <param name="e">The unhandled-exception event arguments.</param>
+    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception exception)
+        {
+            Log.Fatal(exception, "Unhandled exception (terminating: {Terminating})", e.IsTerminating);
+        }
+        else
+        {
+            Log.Fatal("Unhandled non-exception failure: {Failure}", e.ExceptionObject);
+        }
+
+        // Flush the logger and wait for the queued bug report before the process dies.
+        LogSetup.Shutdown();
+    }
+
+    /// <summary>
+    /// Logs an unobserved task exception as an error (so it reaches the bug-report API) and
+    /// marks it observed instead of letting the runtime terminate the process.
+    /// </summary>
+    /// <param name="sender">The event source (the task scheduler).</param>
+    /// <param name="e">The unobserved-task-exception event arguments.</param>
+    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        Log.Error(e.Exception, "Unobserved task exception");
+        e.SetObserved();
+    }
+
     private static void PrintUsage()
     {
         Console.Error.WriteLine("""
@@ -149,7 +188,7 @@ internal static class Program
     private static int Fail(string message)
     {
         ConsoleProgress.Clear();
-        Log.Warning("Command failed: {Message}", message);
+        Log.Information("Command failed: {Message}", message);
         Console.Error.WriteLine($"Error: {message}");
         return 1;
     }
@@ -165,8 +204,9 @@ internal static class Program
         {
             return Blob.Open(stream, filePath: path, leaveOpen: false);
         }
-        catch
+        catch (Exception e)
         {
+            Log.Debug(e, "Failed to open '{Path}'; disposing the file stream", path);
             stream.Dispose();
             throw;
         }
@@ -193,6 +233,7 @@ internal static class Program
         }
         catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
         {
+            Log.Debug(e, "Could not compare input '{Input}' and output '{Output}'", input, output);
             return false;
         }
     }
@@ -214,7 +255,7 @@ internal static class Program
 
         if (IsExpectedFailure(e))
         {
-            Log.Warning(e, "{Context}", context);
+            Log.Information(e, "{Context}", context);
         }
         else
         {
@@ -409,8 +450,9 @@ internal static class Program
 
                 return file;
             }
-            catch
+            catch (Exception e)
             {
+                Log.Debug(e, "Spooling stdin failed; deleting '{Path}'", file.Path);
                 file.Dispose();
                 throw;
             }
@@ -433,6 +475,7 @@ internal static class Program
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 // The OS cleans the temp directory up eventually.
+                Log.Debug(e, "Could not delete temporary file '{Path}'", Path);
             }
         }
     }
@@ -629,7 +672,7 @@ internal static class Program
             }
             catch (CliErrorException e)
             {
-                Log.Warning(e, "CLI parse error in ConvertCommand");
+                Log.Information(e, "CLI parse error in ConvertCommand");
                 return Fail(e.Message);
             }
 
@@ -694,7 +737,7 @@ internal static class Program
 
                 if (blockSize is < 0x8000 or > 0x200000)
                 {
-                    Log.Warning("Block size is not ideal for performance. Continuing anyway.");
+                    Log.Information("Block size is not ideal for performance. Continuing anyway.");
                 }
             }
 
@@ -762,7 +805,7 @@ internal static class Program
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Warning(e, "Failed to open input file '{InputPath}'", inputPath);
+                Log.Information(e, "Failed to open input file '{InputPath}'", inputPath);
                 return Fail("The input file could not be opened.");
             }
 
@@ -781,11 +824,11 @@ internal static class Program
                     switch (format)
                     {
                         case "rvz":
-                            Log.Warning(
+                            Log.Information(
                                 "Scrubbing an RVZ container does not offer significant space advantages. Continuing anyway.");
                             break;
                         case "iso":
-                            Log.Warning(
+                            Log.Information(
                                 "Scrubbing does not save space when converting to ISO unless using external compression. Continuing anyway.");
                             break;
                     }
@@ -829,7 +872,7 @@ internal static class Program
                             if (!options.HasFlag("scrub") &&
                                 Blob.GetDiscType(input) == DiscType.Wii)
                             {
-                                Log.Warning(
+                                Log.Information(
                                     "Converting Wii disc images to GCZ without scrubbing may not "
                                     + "offer space advantages over ISO. Continuing anyway.");
                             }
@@ -1024,7 +1067,7 @@ internal static class Program
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
         {
-            Log.Warning(e, "Failed to open output file '{OutputPath}' for verification", outputPath);
+            Log.Information(e, "Failed to open output file '{OutputPath}' for verification", outputPath);
             return Fail("The output file could not be opened for verification.");
         }
 
@@ -1170,7 +1213,7 @@ internal static class Program
             }
             catch (CliErrorException e)
             {
-                Log.Warning(e, "CLI parse error in HeaderCommand");
+                Log.Information(e, "CLI parse error in HeaderCommand");
                 return Fail(e.Message);
             }
 
@@ -1190,7 +1233,7 @@ internal static class Program
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Warning(e, "Failed to open input file '{InputPath}'", path);
+                Log.Information(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("Unable to open disc image");
             }
 
@@ -1366,7 +1409,7 @@ internal static class Program
             }
             catch (CliErrorException e)
             {
-                Log.Warning(e, "CLI parse error in VerifyCommand");
+                Log.Information(e, "CLI parse error in VerifyCommand");
                 return Fail(e.Message);
             }
 
@@ -1389,7 +1432,7 @@ internal static class Program
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Warning(e, "Failed to open input file '{InputPath}'", path);
+                Log.Information(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("Unable to open input file");
             }
 
@@ -1589,7 +1632,7 @@ internal static class Program
             }
             catch (CliErrorException e)
             {
-                Log.Warning(e, "CLI parse error in ExtractCommand");
+                Log.Information(e, "CLI parse error in ExtractCommand");
                 return Fail(e.Message);
             }
 
@@ -1630,7 +1673,7 @@ internal static class Program
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
-                Log.Warning(e, "Failed to open input file '{InputPath}'", path);
+                Log.Information(e, "Failed to open input file '{InputPath}'", path);
                 return Fail("The input file could not be opened.");
             }
 
@@ -1723,7 +1766,7 @@ internal static class Program
         {
             if (partitionName.Length > 0)
             {
-                Log.Warning("{Path} does not exist in partition {Partition}", path, partitionName);
+                Log.Information("{Path} does not exist in partition {Partition}", path, partitionName);
             }
 
             return false;
@@ -1758,7 +1801,7 @@ internal static class Program
         {
             if (specificPartition.Length > 0)
             {
-                Log.Warning(
+                Log.Information(
                     "--partition has a value even though this image doesn't have any partitions.");
             }
 
@@ -1936,7 +1979,7 @@ internal static class Program
         }
         catch (RvzException e)
         {
-            Log.Warning("Partition '{Partition}' has no usable file system ({Message})",
+            Log.Information("Partition '{Partition}' has no usable file system ({Message})",
                 partitionName, e.Message);
             return null;
         }
@@ -2216,7 +2259,7 @@ internal static class Program
             }
             catch (CliErrorException e)
             {
-                Log.Warning(e, "CLI parse error in Decode");
+                Log.Information(e, "CLI parse error in Decode");
                 return Fail(e.Message);
             }
 
@@ -2291,7 +2334,7 @@ internal static class Program
 
                 if (!string.Equals(actual, expectedSha1.Trim().ToLowerInvariant(), StringComparison.Ordinal))
                 {
-                    Log.Warning("SHA-1 mismatch: expected {Expected}, got {Actual}", expectedSha1, actual);
+                    Log.Information("SHA-1 mismatch: expected {Expected}, got {Actual}", expectedSha1, actual);
                     Console.Error.WriteLine($"error: SHA-1 mismatch (expected {expectedSha1}).");
                     return 1;
                 }

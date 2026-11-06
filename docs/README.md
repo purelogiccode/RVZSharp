@@ -31,7 +31,7 @@ implementations in
 |---|---|
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 610 fast library tests (every framework, ~1 min) + 57 CLI tests + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 610 fast library tests (every framework, ~1 min) + 94 CLI tests + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing), WIA (None, PURGE, Bzip2, LZMA1, LZMA2) and GCZ (zlib deflate) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
@@ -51,6 +51,9 @@ implementations in
 | [Wii partitions](format/wii-partitions.md) | Encryption, hash tree, hash exceptions, tickets |
 | [Legacy formats](format/legacy.md) | GCZ, CISO/WBI, WBFS, TGC, NFS byte layouts |
 | [Testing](testing.md) | Test strategy and synthetic image builders |
+| [Contributing](contributing.md) | Development setup, conventions, tests and pull requests |
+| [Security](security.md) | Vulnerability reporting, supported versions and repository protections |
+| [API reference](https://purelogiccode.github.io/RVZSharp/api/) | Generated DocFX reference for the public library API |
 | [Release notes](release-notes-1.1.1.md) | 1.1.1, [1.1.0](release-notes-1.1.0.md) and [1.0.0](release-notes-1.0.0.md) announcement content (GitHub release posts) |
 | [Roadmap & status](roadmap.md) | Milestones, limitations, open questions |
 | [FAQ](faq.md) | Common questions |
@@ -67,8 +70,9 @@ implementations in
 These pages are published twice from the same files, automatically:
 
 - **GitHub Pages** (`.github/workflows/pages.yml`) builds this folder with Jekyll on
-  every `master` push touching `docs/`; `index.md` renders this page as the home page
-  and the side menu comes from [`_data/nav.yml`](_data/nav.yml) rendered by
+  every `master` push touching `docs/`; it first generates the DocFX API reference from
+  the library XML comments into `/api/`, then `index.md` renders this page as the home
+  page and the side menu comes from [`_data/nav.yml`](_data/nav.yml) rendered by
   [`_layouts/default.html`](_layouts/default.html). Internal links use the `.md` form,
   which Jekyll converts to `.html`.
 - **GitHub Wiki** (`.github/workflows/wiki.yml`) mirrors these pages to the wiki root

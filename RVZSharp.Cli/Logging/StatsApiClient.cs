@@ -24,10 +24,20 @@ internal sealed class StatsApiClient : IDisposable
     /// assembly's name and version for the usage hit.
     /// </summary>
     public StatsApiClient()
+        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
     {
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         _httpClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiKey);
+    }
+
+    /// <summary>
+    /// Creates a client around an existing <see cref="HttpClient"/>. Used by the tests to
+    /// exercise the response handling without network access.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client to use.</param>
+    internal StatsApiClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
         var assembly = typeof(StatsApiClient).Assembly.GetName();
         _applicationId = assembly.Name ?? "rvzsharp-cli";
         _version = CliVersion.Product;

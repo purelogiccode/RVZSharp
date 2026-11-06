@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/purelogiccode/RVZSharp/security/advisories/new
+    about: Please report security issues privately, never in a public issue. See SECURITY.md.
+  - name: Documentation
+    url: https://purelogiccode.github.io/RVZSharp/
+    about: Getting started, CLI reference, library guide, API reference and FAQ.

@@ -22,6 +22,12 @@
   url: "/format/legacy.html"
 - title: Testing
   url: "/testing.html"
+- title: Contributing
+  url: "/contributing.html"
+- title: Security
+  url: "/security.html"
+- title: API reference
+  url: "/api/"
 - title: Release notes 1.1.1
   url: "/release-notes-1.1.1.html"
 - title: Release notes 1.1.0

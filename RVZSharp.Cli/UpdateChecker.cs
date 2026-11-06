@@ -25,12 +25,22 @@ internal sealed class UpdateChecker : IDisposable
     /// build's product version (the informational version, without build metadata).
     /// </summary>
     public UpdateChecker()
+        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
     {
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
             new ProductInfoHeaderValue("RVZSharp.Cli", CurrentVersionText()));
         _httpClient.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+    }
+
+    /// <summary>
+    /// Creates a checker around an existing <see cref="HttpClient"/>. Used by the tests to
+    /// exercise release parsing and update decisions without network access.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client to use.</param>
+    internal UpdateChecker(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
         _currentVersion = CurrentVersion();
     }
 
@@ -133,8 +143,9 @@ internal sealed class UpdateChecker : IDisposable
         {
             answer = Console.ReadLine();
         }
-        catch (IOException)
+        catch (IOException e)
         {
+            Log.Debug("Could not read the update prompt answer: {Message}", e.Message);
             return;
         }
 

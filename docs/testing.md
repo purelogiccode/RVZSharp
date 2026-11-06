@@ -4,10 +4,10 @@ The test suite is split into **three projects**, so the default run is always th
 
 - **`RVZSharp.Tests`** — **610 synthetic tests** (unit + end-to-end round trips), ~1
   minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
-- **`RVZSharp.Cli.Tests`** — **57 tests** (net10.0) for the CLI: option parsing, extract path
-  guards, shell-completion scripts and
-  the update checker's release-tag parsing / `RVZSHARP_NO_UPDATE_CHECK` switch. Part of the
-  solution.
+- **`RVZSharp.Cli.Tests`** — **94 tests** (net10.0) for the CLI: option parsing, extract path
+  guards, shell-completion scripts, the update checker (release tags, HTTP responses and
+  `RVZSHARP_NO_UPDATE_CHECK`), ApplicationStats telemetry, the Serilog bug-report sink and
+  the required bug-report environment/error/exception layout. Part of the solution.
 - **`RVZSharp.Slow.Tests`** — **276 real-file tests** (full decode, structural checks,
   writer round trips against 90 real game images), ~30 minutes when the games are mounted.
   It is deliberately kept **out of the solution**, so a plain `dotnet test` / solution run

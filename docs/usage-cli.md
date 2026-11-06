@@ -341,3 +341,30 @@ Open the release page in your browser? [y/N]
 The check is best-effort and silent on any failure, never changes the exit code, and never
 prompts when stdin/stderr are redirected (scripts and pipelines stay clean). Set the
 `RVZSHARP_NO_UPDATE_CHECK` environment variable to disable it entirely.
+
+## Logging, telemetry and bug reports
+
+The CLI logs through Serilog to stderr and to a daily rolling file under
+`%TEMP%/RVZSharp/logs` (14 files retained). stdout stays clean for command output.
+
+At launch the CLI also sends an anonymous usage hit to
+[ApplicationStats](https://www.purelogiccode.com/ApplicationStats) (`applicationId` and
+`version`). The server records one hit per hour per IP/application; HTTP 429 is expected and
+ignored. Any warning, error or fatal event is forwarded to the bug-report API with the
+following payload:
+
+```text
+=== Environment Details ===
+Date / Application Name / Application Version / OS Version / Architecture / Bitness
+Windows | Linux | MacOSX Version / Processor Count / Base Directory / Temp Path
+
+=== Error Details ===
+Error message
+
+=== Exception Details ===
+Type / Message / Source / StackTrace
+```
+
+Expected user failures (bad options, unsupported input, missing files, cancellation,
+verification mismatches) are logged at Information and are **not** reported as bugs. The
+library itself performs no logging and no network I/O.

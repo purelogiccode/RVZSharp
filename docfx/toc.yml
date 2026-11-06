@@ -1,0 +1,6 @@
+- name: API Reference
+  href: api/
+- name: User guides
+  href: https://purelogiccode.github.io/RVZSharp/
+- name: GitHub
+  href: https://github.com/purelogiccode/RVZSharp

@@ -101,6 +101,12 @@ public static class TableParser
             // Round the offset down to the previous 32 KiB boundary and grow the size so the
             // end offset stays the same (handles the first raw entry at 0x80 without special casing).
             var remainder = entry.RawDataOffset % WiaDisc.SectorSize;
+            if (entry.RawDataSize > uint.MaxValue - remainder)
+            {
+                throw new RvzFormatException(
+                    $"Raw-data entry {i} has an overflowing size {entry.RawDataSize}.");
+            }
+
             entries[i] = new WiaRawDataEntry(
                 entry.RawDataOffset - remainder,
                 entry.RawDataSize + remainder,

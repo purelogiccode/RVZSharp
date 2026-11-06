@@ -2,9 +2,9 @@
 
 The test suite is split into **three projects**, so the default run is always the fast one:
 
-- **`RVZSharp.Tests`** — **610 synthetic tests** (unit + end-to-end round trips), ~1
+- **`RVZSharp.Tests`** — **613 synthetic tests** (unit + end-to-end round trips), ~1
   minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
-- **`RVZSharp.Cli.Tests`** — **94 tests** (net10.0) for the CLI: option parsing, extract path
+- **`RVZSharp.Cli.Tests`** — **95 tests** (net10.0) for the CLI: option parsing, extract path
   guards, shell-completion scripts, the update checker (release tags, HTTP responses and
   `RVZSHARP_NO_UPDATE_CHECK`), ApplicationStats telemetry, the Serilog bug-report sink and
   the required bug-report environment/error/exception layout. Part of the solution.

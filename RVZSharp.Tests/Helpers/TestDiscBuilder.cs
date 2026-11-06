@@ -81,21 +81,10 @@ public sealed class TestDiscBuilder
         return b;
     }
 
-    /// <summary>Writes the disc hash into a file head builder (hash over the built disc bytes).</summary>
-    public byte[] DiscHash
-    {
-        set => _discHashOverride = value;
-    }
-
-    private byte[]? _discHashOverride;
-
-    /// <summary>
-    /// Returns the disc hash: the override set through <see cref="DiscHash"/> when present,
-    /// otherwise the SHA-1 of the built disc struct.
-    /// </summary>
+    /// <summary>Returns the SHA-1 of the built disc struct.</summary>
     public byte[] GetDiscHash()
     {
-        return _discHashOverride ?? SHA1.HashData(Build());
+        return SHA1.HashData(Build());
     }
 
     private static void WriteBe(byte[] b, int offset, uint value)

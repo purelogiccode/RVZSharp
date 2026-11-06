@@ -17,7 +17,7 @@ public class ParserRobustnessTests
     /// Mutations per format (default 80). Set <c>RVZSHARP_FUZZ_ITERATIONS</c> to run a
     /// deeper local fuzzing pass, e.g. <c>RVZSHARP_FUZZ_ITERATIONS=2000</c>.
     /// </summary>
-    private static int MutationsPerFormat =>
+    private static int _mutationsPerFormat =>
         int.TryParse(Environment.GetEnvironmentVariable("RVZSHARP_FUZZ_ITERATIONS"), out var n) && n > 0
             ? n
             : 80;
@@ -93,7 +93,7 @@ public class ParserRobustnessTests
         foreach (var sample in BuildSamples())
         {
             var rng = new Random(0x5EED + sampleIndex++);
-            for (var i = 0; i < MutationsPerFormat; i++)
+            for (var i = 0; i < _mutationsPerFormat; i++)
             {
                 var mutated = Mutate(sample.Data, rng, i);
                 Probe(mutated, sample, failures, $"{sample.Name} mutation {i}");
@@ -122,7 +122,7 @@ public class ParserRobustnessTests
         var rng = new Random(0xF00D);
         foreach (var (name, magic) in magics)
         {
-            for (var i = 0; i < MutationsPerFormat; i++)
+            for (var i = 0; i < _mutationsPerFormat; i++)
             {
                 var data = new byte[rng.Next(4, 0x40000)];
                 rng.NextBytes(data);

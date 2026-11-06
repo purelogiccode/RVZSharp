@@ -12,14 +12,14 @@ namespace RVZSharp.Tests;
 public class WiaWriterTests
 {
     /// <summary>Compression methods used by the WIA round-trip tests.</summary>
-    public static TheoryData<CompressionType> CompressionCases => new()
-    {
+    public static TheoryData<CompressionType> CompressionCases =>
+    [
         CompressionType.None,
         CompressionType.Purge,
         CompressionType.Bzip2,
         CompressionType.Lzma,
         CompressionType.Lzma2
-    };
+    ];
 
     /// <summary>Verifies that game cube ISO round trips.</summary>
     [Theory]

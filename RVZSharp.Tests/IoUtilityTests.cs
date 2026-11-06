@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using RVZSharp.Compression;
 using RVZSharp.IO;
 
@@ -86,9 +87,11 @@ public class IoUtilityTests
     public void ParallelExecution_For_PropagatesOriginalException()
     {
         var options = new ParallelOptions { MaxDegreeOfParallelism = 2 };
+        var visited = new ConcurrentBag<int>();
         var exception = Assert.Throws<InvalidOperationException>(() =>
             ParallelExecution.For(0, 8, options, i =>
             {
+                visited.Add(i);
                 if (i == 3)
                 {
                     throw new InvalidOperationException("boom");
@@ -96,6 +99,7 @@ public class IoUtilityTests
             }));
 
         Assert.Equal("boom", exception.Message);
+        Assert.NotEmpty(visited);
     }
 
     /// <summary>Verifies that the thread-local overload rethrows the original exception too.</summary>
@@ -103,6 +107,7 @@ public class IoUtilityTests
     public void ParallelExecution_ForLocal_PropagatesOriginalException()
     {
         var options = new ParallelOptions { MaxDegreeOfParallelism = 2 };
+        var visited = new ConcurrentBag<int>();
         var exception = Assert.Throws<RvzFormatException>(() =>
             ParallelExecution.For(
                 0,
@@ -111,6 +116,7 @@ public class IoUtilityTests
                 () => 0,
                 (i, _, state) =>
                 {
+                    visited.Add(i);
                     if (i == 5)
                     {
                         throw new RvzFormatException("bad data");
@@ -121,6 +127,7 @@ public class IoUtilityTests
                 _ => { }));
 
         Assert.Equal("bad data", exception.Message);
+        Assert.NotEmpty(visited);
     }
 
     /// <summary>Verifies that ParallelExecution observes cancellation.</summary>
@@ -277,6 +284,18 @@ public class IoUtilityTests
         stream.Flush();
         Assert.Throws<NotSupportedException>(() => stream.SetLength(1));
         Assert.Throws<NotSupportedException>(() => stream.Write(new byte[1], 0, 1));
+    }
+
+    /// <summary>Verifies that positions outside the concatenated image are rejected.</summary>
+    [Fact]
+    public void MultiPartStream_PositionOutsideRange_Throws()
+    {
+        using var first = new MemoryStream(new byte[4]);
+        using var stream = new MultiPartStream([first], leaveOpen: true);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => stream.Position = -1);
+        Assert.Throws<ArgumentOutOfRangeException>(() => stream.Position = stream.Length + 1);
+        Assert.Throws<ArgumentOutOfRangeException>(() => stream.Seek(-1, SeekOrigin.Begin));
     }
 
     /// <summary>Verifies that disposing the stream disposes the parts unless leaveOpen is set.</summary>

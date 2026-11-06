@@ -19,6 +19,7 @@ public sealed class TgcBlob : IBlobReader
     private const int DolOffsetField = 0x0420;
     private const int FstOffsetField = 0x0424;
     private const int FstEntrySize = 12;
+    private const int MaxFstSize = 128 * 1024 * 1024;
 
     private readonly Stream _file;
     private readonly bool _leaveOpen;
@@ -93,7 +94,9 @@ public sealed class TgcBlob : IBlobReader
         // The FST is stored in the file at fst_real_offset; on read failure Dolphin tolerates
         // an empty FST, so do the same. Clamp hostile sizes so a bad header cannot allocate
         // gigabytes, and use the clamped size for every subsequent bound.
-        var fstSizeClamped = (int)Math.Min(fstSize, Math.Max(0, stream.Length - fstRealOffset));
+        var availableFstBytes = Math.Max(0L, stream.Length - fstRealOffset);
+        var maxFstSize = Math.Min(MaxFstSize, availableFstBytes);
+        var fstSizeClamped = Math.Min(fstSize, maxFstSize);
         var rawFst = new byte[fstSizeClamped];
         // An out-of-range FST offset clamps the size to 0; that is a failed read, not an
         // empty-but-valid FST (Dolphin clears m_fst in that case).
@@ -108,7 +111,8 @@ public sealed class TgcBlob : IBlobReader
         if (haveFst && fstSizeClamped >= FstEntrySize)
         {
             var claimedEntries = ReadBe32(rawFst, 8);
-            var entryCount = Math.Min(claimedEntries, fstSizeClamped / FstEntrySize);
+            // fstSizeClamped is capped at 128 MiB, so the entry count fits an int.
+            var entryCount = (int)Math.Min(claimedEntries, fstSizeClamped / FstEntrySize);
             for (var i = 0; i < entryCount; i++)
             {
                 var entryOffset = i * FstEntrySize;

@@ -216,7 +216,7 @@ internal sealed class LzmaStream : Stream
             _outWindow.SetLimit(toProcess);
             if (_uncompressedChunk)
             {
-                CompressedBytesRead += _outWindow.CopyStream(_inputStream, toProcess);
+                _compressedBytesRead += _outWindow.CopyStream(_inputStream, toProcess);
             }
             else if (_decoder!.Code(_dictionarySize, _outWindow, _rangeDecoder))
             {
@@ -253,7 +253,7 @@ internal sealed class LzmaStream : Stream
 
                 _rangeDecoder.ReleaseStream();
 
-                CompressedBytesRead += _rangeDecoder.Total;
+                _compressedBytesRead += _rangeDecoder.Total;
                 if (_outWindow.HasPending)
                 {
                     throw new DataErrorException();
@@ -263,7 +263,7 @@ internal sealed class LzmaStream : Stream
 
         if (_endReached)
         {
-            if ((_inputSize >= 0 && CompressedBytesRead != _inputSize) ||
+            if ((_inputSize >= 0 && _compressedBytesRead != _inputSize) ||
                 (_outputSize >= 0 && _position != _outputSize))
             {
                 throw new DataErrorException();
@@ -296,7 +296,7 @@ internal sealed class LzmaStream : Stream
 
         if (_endReached)
         {
-            if ((_inputSize >= 0 && CompressedBytesRead != _inputSize) ||
+            if ((_inputSize >= 0 && _compressedBytesRead != _inputSize) ||
                 (_outputSize >= 0 && _position != _outputSize))
             {
                 throw new DataErrorException();
@@ -308,7 +308,7 @@ internal sealed class LzmaStream : Stream
         _outWindow.SetLimit(1);
         if (_uncompressedChunk)
         {
-            CompressedBytesRead += _outWindow.CopyStream(_inputStream, 1);
+            _compressedBytesRead += _outWindow.CopyStream(_inputStream, 1);
         }
         else if (_decoder!.Code(_dictionarySize, _outWindow, _rangeDecoder))
         {
@@ -343,7 +343,7 @@ internal sealed class LzmaStream : Stream
 
             _rangeDecoder.ReleaseStream();
 
-            CompressedBytesRead += _rangeDecoder.Total;
+            _compressedBytesRead += _rangeDecoder.Total;
             if (_outWindow.HasPending)
             {
                 throw new DataErrorException();
@@ -356,7 +356,7 @@ internal sealed class LzmaStream : Stream
     private void DecodeChunkHeader()
     {
         var control = _inputStream!.ReadByte();
-        CompressedBytesRead++;
+        _compressedBytesRead++;
 
         switch (control)
         {
@@ -389,16 +389,16 @@ internal sealed class LzmaStream : Stream
 
                 _availableBytes = (control & 0x1F) << 16;
                 _availableBytes += (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-                CompressedBytesRead += 2;
+                _compressedBytesRead += 2;
 
                 _rangeDecoderLimit = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-                CompressedBytesRead += 2;
+                _compressedBytesRead += 2;
 
                 if (control >= 0xC0)
                 {
                     _needProps = false;
                     Properties[0] = (byte)_inputStream.ReadByte();
-                    CompressedBytesRead++;
+                    _compressedBytesRead++;
 
                     _decoder = new Decoder();
                     _decoder.SetDecoderProperties(Properties);
@@ -426,7 +426,7 @@ internal sealed class LzmaStream : Stream
             default:
                 _uncompressedChunk = true;
                 _availableBytes = (_inputStream.ReadByte() << 8) + _inputStream.ReadByte() + 1;
-                CompressedBytesRead += 2;
+                _compressedBytesRead += 2;
                 break;
         }
     }
@@ -473,5 +473,5 @@ internal sealed class LzmaStream : Stream
     public byte[] Properties { get; }
 
     /// <summary>Number of compressed bytes consumed from the input stream so far (including LZMA2 chunk headers).</summary>
-    private long CompressedBytesRead { get; set; }
+    private long _compressedBytesRead { get; set; }
 }

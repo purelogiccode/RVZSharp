@@ -25,7 +25,7 @@ public class WiiHashCalculatorTests
     [Fact]
     public void HashAreaLayout_MatchesTheWiiHashTree()
     {
-        var data = SectorData(1);
+        var data = SectorData();
         var hashArea = ComputeHashArea(data);
 
         // h0: SHA-1 of each 0x400 data block, 31 entries starting at 0.

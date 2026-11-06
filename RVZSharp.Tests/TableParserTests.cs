@@ -267,6 +267,22 @@ public class TableParserTests
         }
     }
 
+    /// <summary>Verifies that a raw-data size that overflows when sector-aligned is rejected.</summary>
+    [Fact]
+    public void ParseRawDataEntries_SizeOverflow_Throws()
+    {
+        var rawTable = MakeRawEntry(1, uint.MaxValue, 0, 1);
+        var disc = new TestDiscBuilder
+        {
+            NumRawDataEntries = 1,
+            RawDataEntriesSize = (uint)rawTable.Length
+        };
+        var (file, discBytes) = BuildFile(disc, [], rawTable, []);
+
+        Assert.Throws<RvzFormatException>(() =>
+            TableParser.ParseRawDataEntries(file, WiaDisc.Parse(discBytes)));
+    }
+
     /// <summary>Verifies that parse raw data entries no entries returns empty.</summary>
     [Fact]
     public void ParseRawDataEntries_NoEntries_ReturnsEmpty()

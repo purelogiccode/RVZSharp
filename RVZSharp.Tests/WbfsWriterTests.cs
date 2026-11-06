@@ -84,7 +84,7 @@ public class WbfsWriterTests
         var wbfs = Convert(iso);
 
         var blocksPerDisc = (int)((WbfsBlob.WiiDataSize + ClusterSize - 1) / ClusterSize);
-        var contentClusters = (int)((iso.Length + ClusterSize - 1) / ClusterSize);
+        var contentClusters = (iso.Length + ClusterSize - 1) / ClusterSize;
         var shared = ReadWlba(wbfs, contentClusters);
         for (var i = contentClusters; i < blocksPerDisc; i++)
         {

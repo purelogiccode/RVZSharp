@@ -487,7 +487,7 @@ internal partial class Decoder
         // bias that makes a single *arithmetic* (signed) shift reproduce UPDATE_1's
         // logical-shift result from a target of 0, so both formulas collapse into one
         // branchless expression selected by the same mask used above.
-        int target = (int)(
+        var target = (int)(
             (KBitModelTotal & ~mask) | (KBitModelOffsetFast & mask)
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));
@@ -533,7 +533,7 @@ internal partial class Decoder
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static unsafe void UpdateProbFast(ushort* probSlot, uint prob, uint mask)
     {
-        int target = (int)(
+        var target = (int)(
             (KBitModelTotal & ~mask) | (KBitModelOffsetFast & mask)
         );
         *probSlot = (ushort)((int)prob + ((target - (int)prob) >> KNumMoveBitsFast));

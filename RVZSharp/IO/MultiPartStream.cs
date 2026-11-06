@@ -43,7 +43,21 @@ internal sealed class MultiPartStream : Stream
     public override long Length { get; }
 
     /// <summary>Current position in the concatenated image.</summary>
-    public override long Position { get; set; }
+    public override long Position
+    {
+        get => _position;
+        set
+        {
+            if (value < 0 || value > Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            _position = value;
+        }
+    }
+
+    private long _position;
 
     /// <summary>Reads bytes across part boundaries.</summary>
     public override int Read(byte[] buffer, int offset, int count)
@@ -55,9 +69,9 @@ internal sealed class MultiPartStream : Stream
     public override int Read(Span<byte> buffer)
     {
         var total = 0;
-        while (total < buffer.Length && Position < Length)
+        while (total < buffer.Length && _position < Length)
         {
-            var partIndex = Array.BinarySearch(_starts, Position);
+            var partIndex = Array.BinarySearch(_starts, _position);
             if (partIndex < 0)
             {
                 partIndex = ~partIndex - 1;
@@ -66,7 +80,7 @@ internal sealed class MultiPartStream : Stream
             // Skip parts that end at or before the position (zero-length continuations share
             // their start with the next part, and a zero-length read would look like EOF).
             while (partIndex < _parts.Length &&
-                   _starts[partIndex] + _parts[partIndex].Length <= Position)
+                   _starts[partIndex] + _parts[partIndex].Length <= _position)
             {
                 partIndex++;
             }
@@ -77,7 +91,7 @@ internal sealed class MultiPartStream : Stream
             }
 
             var part = _parts[partIndex];
-            var local = Position - _starts[partIndex];
+            var local = _position - _starts[partIndex];
             if (part.Position != local)
             {
                 part.Position = local;
@@ -91,7 +105,7 @@ internal sealed class MultiPartStream : Stream
             }
 
             total += read;
-            Position += read;
+            _position += read;
         }
 
         return total;
@@ -103,10 +117,11 @@ internal sealed class MultiPartStream : Stream
         Position = origin switch
         {
             SeekOrigin.Begin => offset,
-            SeekOrigin.Current => Position + offset,
-            _ => Length + offset
+            SeekOrigin.Current => checked(_position + offset),
+            SeekOrigin.End => checked(Length + offset),
+            _ => throw new ArgumentOutOfRangeException(nameof(origin))
         };
-        return Position;
+        return _position;
     }
 
     /// <summary>No-op; reads always go to the parts.</summary>

@@ -54,6 +54,24 @@ public class BugReportDetailsTests
         Assert.Contains("StackTrace: (none)", report);
     }
 
+    /// <summary>Verifies a huge exception still keeps every required section and field.</summary>
+    [Fact]
+    public void Build_LongException_KeepsAllSectionsAndFields()
+    {
+        var exception = new InvalidOperationException(new string('x', 10_000));
+        var report = BugReportDetails.Build(
+            new string('y', 10_000), exception, "RVZSharp.Cli", "1.1.1");
+
+        Assert.Contains("=== Environment Details ===", report);
+        Assert.Contains("=== Error Details ===", report);
+        Assert.Contains("=== Exception Details ===", report);
+        Assert.Contains("Type: System.InvalidOperationException", report);
+        Assert.Contains("Message:", report);
+        Assert.Contains("Source:", report);
+        Assert.Contains("StackTrace:", report);
+        Assert.True(report.Length <= 4000, $"report was {report.Length} characters");
+    }
+
     /// <summary>Verifies the platform label is one of the documented values.</summary>
     [Fact]
     public void PlatformLabel_ReturnsSupportedFamily()

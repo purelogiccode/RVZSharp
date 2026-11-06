@@ -6,7 +6,7 @@ namespace RVZSharp.IO;
 /// </summary>
 internal static class Crc32
 {
-    private static readonly uint[] Table = BuildTable();
+    private static readonly uint[] _table = BuildTable();
 
     /// <summary>Feeds <paramref name="data"/> into the running CRC (init 0xFFFFFFFF, xor-out 0xFFFFFFFF).</summary>
     /// <param name="crc">The running CRC value.</param>
@@ -16,7 +16,7 @@ internal static class Crc32
     {
         foreach (var value in data)
         {
-            crc = Table[(crc ^ value) & 0xFF] ^ (crc >> 8);
+            crc = _table[(crc ^ value) & 0xFF] ^ (crc >> 8);
         }
 
         return crc;

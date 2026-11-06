@@ -38,9 +38,9 @@ public class ScrubOptionTests
             WriteBe32(iso, 0x40004 + group * 8, 0);
         }
 
-        WriteBe32(iso, tableAddress, (uint)(GamePartition >> 2));
+        WriteBe32(iso, tableAddress, GamePartition >> 2);
         WriteBe32(iso, tableAddress + 4, 0);
-        WriteBe32(iso, tableAddress + 8, (uint)(UpdatePartition >> 2));
+        WriteBe32(iso, tableAddress + 8, UpdatePartition >> 2);
         WriteBe32(iso, tableAddress + 12, 1);
         WritePartitionHeader(iso, GamePartition);
         WritePartitionHeader(iso, UpdatePartition);

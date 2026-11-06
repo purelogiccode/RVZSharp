@@ -163,13 +163,18 @@ public static class TgcWriter
         {
             var offsetField = i < 7 ? 0x00 + i * 4 : 0x1C + (i - 7) * 4;
             var sizeField = i < 7 ? 0x90 + i * 4 : 0xAC + (i - 7) * 4;
-            if (!TryReadExactly(input, dolOffset + (uint)offsetField, offsetBytes) ||
-                !TryReadExactly(input, dolOffset + (uint)sizeField, sizeBytes))
+            // Compute in long: a hostile DOL offset near uint.MaxValue must not wrap.
+            if (!TryReadExactly(input, dolOffset + offsetField, offsetBytes) ||
+                !TryReadExactly(input, dolOffset + sizeField, sizeBytes))
             {
                 return 0;
             }
 
-            size = Math.Max(size, ReadBe32(offsetBytes, 0) + ReadBe32(sizeBytes, 0));
+            var end = (ulong)ReadBe32(offsetBytes, 0) + ReadBe32(sizeBytes, 0);
+            if (end > size)
+            {
+                size = (uint)Math.Min(end, uint.MaxValue);
+            }
         }
 
         return size;

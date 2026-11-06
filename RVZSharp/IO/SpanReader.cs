@@ -84,6 +84,11 @@ public ref struct SpanReader
     /// <returns>The bytes read.</returns>
     public ReadOnlySpan<byte> ReadBytes(int count)
     {
+        if (count < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count));
+        }
+
         Ensure(count);
         var value = _data.Slice(Position, count);
         Position += count;

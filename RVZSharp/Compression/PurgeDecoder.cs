@@ -27,6 +27,11 @@ public static class PurgeDecoder
     /// <exception cref="RvzHashMismatchException">The SHA-1 trailer does not match.</exception>
     public static byte[] Decode(ReadOnlySpan<byte> stream, ReadOnlySpan<byte> precedingData, int outputSize)
     {
+        if (outputSize < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(outputSize));
+        }
+
         if (stream.Length < TrailerSize)
         {
             throw new RvzFormatException(

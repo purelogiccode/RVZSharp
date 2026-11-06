@@ -287,14 +287,14 @@ highlights are summarized in [WhatsNew.md](https://github.com/purelogiccode/RVZS
 - `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
   surface, plus the legacy `info`/`decode` commands, `--json` output, `-` stdin/stdout and
   shell completions).
-- `RVZSharp.Tests` — 610 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+- `RVZSharp.Tests` — 613 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild, metadata/offset edge cases,
   low-level IO helpers) and end-to-end round-trips of synthetic RVZ files built by
   `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii, legacy → RVZ,
   split WBFS, scrubbing), GCZ writer tests, parallel write/decode determinism tests,
   FST/file-system validation tests, async API tests, package-facing API tests (path open,
   ReadFully, progress, cancellation).
-- `RVZSharp.Cli.Tests` — 94 tests (net10.0) for the CLI's option parser, extract path guards,
+- `RVZSharp.Cli.Tests` — 95 tests (net10.0) for the CLI's option parser, extract path guards,
   shell-completion scripts, update checker, ApplicationStats telemetry and the Serilog
   bug-report sink/layout.
 - `RVZSharp.Slow.Tests` — 276 real-file tests (`RealRvzFileTests`) that decode 90 real

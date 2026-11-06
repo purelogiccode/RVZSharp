@@ -35,7 +35,7 @@ public interface IBlobReader : IDisposable
     /// </exception>
     byte[] ReadFully()
     {
-        return ReadFully(null, default);
+        return ReadFully(null);
     }
 
     /// <summary>

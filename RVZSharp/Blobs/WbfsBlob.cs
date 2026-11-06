@@ -22,17 +22,15 @@ public sealed class WbfsBlob : IBlobReader
 
     private readonly Stream _file;
     private readonly bool _leaveOpen;
-    private readonly long _hdSectorSize;
     private readonly long _clusterSize;
     private readonly ushort[] _wlbaTable;
     private readonly long _blocksPerDisc;
 
-    private WbfsBlob(Stream file, bool leaveOpen, long hdSectorSize, long clusterSize,
+    private WbfsBlob(Stream file, bool leaveOpen, long clusterSize,
         ushort[] wlbaTable, long blocksPerDisc)
     {
         _file = file;
         _leaveOpen = leaveOpen;
-        _hdSectorSize = hdSectorSize;
         _clusterSize = clusterSize;
         _wlbaTable = wlbaTable;
         _blocksPerDisc = blocksPerDisc;
@@ -152,7 +150,7 @@ public sealed class WbfsBlob : IBlobReader
                 table[i] = (ushort)((entry[0] << 8) | entry[1]);
             }
 
-            return new WbfsBlob(file, leaveOpen, hdSectorSize, clusterSize, table, blocksPerDisc);
+            return new WbfsBlob(file, leaveOpen, clusterSize, table, blocksPerDisc);
         }
         catch
         {

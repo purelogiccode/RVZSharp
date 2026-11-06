@@ -123,7 +123,7 @@ public class AsyncApiTests
     {
         var iso = BuildGcIso();
         using var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         using var input = PlainBlob.Open(new MemoryStream(iso));
         using var output = new MemoryStream();

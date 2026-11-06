@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
@@ -62,6 +63,8 @@ public sealed class PartitionReader : IBlobReader
     }
 
     /// <summary>The partition this reader decrypts.</summary>
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global",
+        Justification = "Public API: callers use the partition that was wrapped.")]
     public Partition Partition { get; }
 
     /// <summary>The container type of the underlying disc.</summary>

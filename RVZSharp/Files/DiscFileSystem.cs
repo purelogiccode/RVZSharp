@@ -16,8 +16,13 @@ public sealed class DiscFileSystem : IDisposable
 {
     private const int FstEntrySize = 12; // three 32-bit integers per entry
     private const int MaxFstSize = 128 * 1024 * 1024; // Dolphin: ARBITRARY_FILE_SYSTEM_SIZE_LIMIT
+    // Full paths are stored on every node, so a hostile tree with very deep or very long
+    // names could otherwise allocate gigabytes of path strings.
+    private const int MaxDirectoryDepth = 512;
+    private const int MaxPathLength = 4096;
+    private const long MaxTotalPathCharacters = 64L * 1024 * 1024;
 
-    private static readonly Encoding ShiftJis = CreateShiftJisEncoding();
+    private static readonly Encoding _shiftJis = CreateShiftJisEncoding();
 
     private readonly IBlobReader _reader;
     private readonly bool _ownsReader;
@@ -219,6 +224,7 @@ public sealed class DiscFileSystem : IDisposable
         // range [index + 1, dirEnd). The stack holds the open directories.
         var stack = new Stack<uint>();
         stack.Push(0);
+        var totalPathCharacters = 0L;
         for (uint i = 1; i < totalEntries; i++)
         {
             while (stack.Count > 0 && i >= ends[stack.Peek()])
@@ -232,9 +238,28 @@ public sealed class DiscFileSystem : IDisposable
                     $"File system entry {i} lies outside every directory's subtree range.");
             }
 
+            if (stack.Count >= MaxDirectoryDepth)
+            {
+                throw new RvzFormatException(
+                    $"The file system is nested deeper than {MaxDirectoryDepth} levels.");
+            }
+
             var parentIndex = stack.Peek();
             var node = nodes[i];
             var parent = nodes[parentIndex];
+            var pathLength = parent.Path.Length + node.Name.Length + (node.IsDirectory ? 1 : 0);
+            if (pathLength > MaxPathLength)
+            {
+                throw new RvzFormatException(
+                    $"File system entry {i} has a path longer than {MaxPathLength} characters.");
+            }
+
+            totalPathCharacters += pathLength;
+            if (totalPathCharacters > MaxTotalPathCharacters)
+            {
+                throw new RvzFormatException(
+                    "The file system paths exceed the in-memory path budget.");
+            }
 
             if (node.IsDirectory)
             {
@@ -283,7 +308,7 @@ public sealed class DiscFileSystem : IDisposable
             end++;
         }
 
-        return ShiftJis.GetString(fst, offset, end - offset);
+        return _shiftJis.GetString(fst, offset, end - offset);
     }
 
     private static Encoding CreateShiftJisEncoding()

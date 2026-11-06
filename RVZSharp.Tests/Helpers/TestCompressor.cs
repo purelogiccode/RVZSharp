@@ -23,7 +23,7 @@ public static class TestCompressor
             case CompressionType.Zstd:
             {
                 using var ms = new MemoryStream();
-                using (var cs = new ZstdSharp.CompressionStream(ms, 3, 0, leaveOpen: true))
+                using (var cs = new ZstdSharp.CompressionStream(ms, leaveOpen: true))
                 {
                     cs.Write(data);
                 }

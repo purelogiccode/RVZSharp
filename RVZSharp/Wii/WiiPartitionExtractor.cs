@@ -13,7 +13,6 @@ namespace RVZSharp.Wii;
 public sealed class WiiPartitionExtractor : IDisposable
 {
     private readonly Interfaces.IBlobReader _input;
-    private readonly byte[] _key;
     private readonly Aes _aes;
 
     /// <summary>Creates an extractor that reads encrypted region data from a blob and decrypts it with the partition key.</summary>
@@ -22,9 +21,8 @@ public sealed class WiiPartitionExtractor : IDisposable
     public WiiPartitionExtractor(Interfaces.IBlobReader input, ReadOnlySpan<byte> key)
     {
         _input = input;
-        _key = key.ToArray();
         _aes = Aes.Create();
-        _aes.Key = _key;
+        _aes.Key = key.ToArray();
         _aes.Mode = CipherMode.CBC;
         _aes.Padding = PaddingMode.None;
     }
@@ -116,13 +114,6 @@ public sealed class WiiPartitionExtractor : IDisposable
         var exceptions = new List<HashExceptionEntry>();
         for (var block = 0; block < blockCount; block++)
         {
-            if (hashBlocks[block] == null || hashBlocks[block].Length != WiiHashCalculator.HashBlockSize ||
-                computed[block] == null || computed[block].Length != WiiHashCalculator.HashBlockSize)
-            {
-                throw new InvalidOperationException(
-                    $"hash block {block} invalid: got={hashBlocks[block]?.Length}/{computed[block]?.Length}");
-            }
-
             CompareHashFields(hashBlocks[block], computed[block], block, exceptions);
         }
 

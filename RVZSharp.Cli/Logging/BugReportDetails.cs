@@ -11,6 +11,15 @@ namespace RVZSharp.Cli.Logging;
 /// </summary>
 internal static class BugReportDetails
 {
+    // The bug-report API accepts at most 4,000 characters in the message field. Bound every
+    // variable-length field so a huge exception can never truncate away the required section
+    // headers or the exception details.
+    private const int MaxErrorMessageLength = 600;
+    private const int MaxExceptionTypeLength = 150;
+    private const int MaxExceptionMessageLength = 600;
+    private const int MaxSourceLength = 150;
+    private const int MaxStackTraceLength = 900;
+
     /// <summary>
     /// Formats a complete bug report.
     /// </summary>
@@ -33,16 +42,16 @@ internal static class BugReportDetails
         sb.AppendLine("Date: " + now.ToString("yyyy-MM-dd HH:mm:ss zzz"));
         sb.AppendLine($"Application Name: {applicationName}");
         sb.AppendLine($"Application Version: {version}");
-        sb.AppendLine($"OS Version: {Environment.OSVersion}");
+        sb.AppendLine($"OS Version: {Truncate(Environment.OSVersion.ToString(), 200)}");
         sb.AppendLine($"Architecture: {RuntimeInformation.OSArchitecture}");
         sb.AppendLine($"Bitness: {(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")}");
-        sb.AppendLine($"{PlatformLabel()} Version: {RuntimeInformation.OSDescription}");
+        sb.AppendLine($"{PlatformLabel()} Version: {Truncate(RuntimeInformation.OSDescription, 200)}");
         sb.AppendLine($"Processor Count: {Environment.ProcessorCount}");
-        sb.AppendLine($"Base Directory: {AppContext.BaseDirectory}");
-        sb.AppendLine($"Temp Path: {Path.GetTempPath()}");
+        sb.AppendLine($"Base Directory: {Truncate(AppContext.BaseDirectory, 260)}");
+        sb.AppendLine($"Temp Path: {Truncate(Path.GetTempPath(), 260)}");
         sb.AppendLine();
         sb.AppendLine("=== Error Details ===");
-        sb.AppendLine(errorMessage);
+        sb.AppendLine(Truncate(errorMessage, MaxErrorMessageLength));
         sb.AppendLine();
         sb.AppendLine("=== Exception Details ===");
         if (exception is null)
@@ -54,13 +63,23 @@ internal static class BugReportDetails
         }
         else
         {
-            sb.AppendLine($"Type: {exception.GetType().FullName}");
-            sb.AppendLine($"Message: {exception.Message}");
-            sb.AppendLine($"Source: {exception.Source}");
-            sb.AppendLine($"StackTrace: {exception.StackTrace}");
+            sb.AppendLine($"Type: {Truncate(exception.GetType().FullName, MaxExceptionTypeLength)}");
+            sb.AppendLine($"Message: {Truncate(exception.Message, MaxExceptionMessageLength)}");
+            sb.AppendLine($"Source: {Truncate(exception.Source, MaxSourceLength)}");
+            sb.AppendLine($"StackTrace: {Truncate(exception.StackTrace, MaxStackTraceLength)}");
         }
 
         return sb.ToString();
+    }
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+        {
+            return value ?? string.Empty;
+        }
+
+        return value[..maxLength] + "…";
     }
 
     /// <summary>

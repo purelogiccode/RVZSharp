@@ -23,25 +23,39 @@ internal static class LogSetup
     public static void Initialize()
     {
         Interlocked.Exchange(ref _shutdown, 0);
-        var logDir = Path.Combine(Path.GetTempPath(), "RVZSharp", "logs");
-        Directory.CreateDirectory(logDir);
 
+        // Re-initializing (hosting, tests) must not leak the previous HTTP transport.
+        _bugReportClient?.Dispose();
         _bugReportClient = new BugReportApiClient();
         // Forward every warning, error and fatal event to the bug-report API.
-        _bugReportSink = new BugReportSink(_bugReportClient, Serilog.Events.LogEventLevel.Warning);
+        _bugReportSink = new BugReportSink(_bugReportClient);
 
-        Log.Logger = new LoggerConfiguration()
+        var configuration = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.Console(
                 outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}",
                 standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
-            .WriteTo.File(
+            .WriteTo.Sink(_bugReportSink)
+            .Enrich.WithProperty("Application", "RVZSharp");
+
+        // The log file is best-effort: a read-only or missing temp directory must not stop
+        // the CLI from running (console and bug reports still work).
+        var logDir = Path.Combine(Path.GetTempPath(), "RVZSharp", "logs");
+        try
+        {
+            Directory.CreateDirectory(logDir);
+            configuration = configuration.WriteTo.File(
                 Path.Combine(logDir, "rvzsharp-.log"),
                 rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 14)
-            .WriteTo.Sink(_bugReportSink)
-            .Enrich.WithProperty("Application", "RVZSharp")
-            .CreateLogger();
+                retainedFileCountLimit: 14);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException
+                                      or ArgumentException or NotSupportedException)
+        {
+            // Console logging remains active; there is nowhere safe to write this failure.
+        }
+
+        Log.Logger = configuration.CreateLogger();
     }
 
     /// <summary>

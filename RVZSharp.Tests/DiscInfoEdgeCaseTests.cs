@@ -67,7 +67,7 @@ public class DiscInfoEdgeCaseTests
     {
         var data = BuildDisc(wii: false, code: "GAL", country: 'E', maker: "01", regionWord: 1);
         // 0xE9 is 'é' in CP1252 (0x82 is its Shift-JIS lead byte).
-        Encoding.ASCII.GetBytes("Caf").CopyTo(data, 0x20);
+        "Caf"u8.CopyTo(data.AsSpan(0x20));
         data[0x23] = 0xE9;
         using var blob = PlainBlob.Open(new MemoryStream(data));
 

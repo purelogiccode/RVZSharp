@@ -1,6 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace RVZSharp.Compression.Lzma;
 
 /// <summary>LZMA format constants and the decoder state machine (literal/match/repeat state transitions).</summary>
+[SuppressMessage("ReSharper", "InconsistentNaming",
+    Justification = "Names mirror the LZMA SDK reference implementation.")]
 internal abstract class Base
 {
     /// <summary>Number of LZMA decoder states.</summary>

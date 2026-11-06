@@ -19,10 +19,10 @@ public sealed class NfsBlob : IBlobReader
     private const int BlocksPerFile = (int)(MaxFileSize / BlockSizeValue); // 0x1F40
     private const int MaxLbaRanges = 61;
     private const int KeySize = 16;
+    private const int MaxContinuationFiles = 4096;
 
     private readonly Stream[] _files;
     private readonly bool _leaveOpen;
-    private readonly byte[] _key;
     private readonly (uint Start, uint Num)[] _ranges;
     private readonly Aes _aes;
 
@@ -31,7 +31,6 @@ public sealed class NfsBlob : IBlobReader
     {
         _files = files;
         _leaveOpen = leaveOpen;
-        _key = key;
         _ranges = ranges;
         Length = length;
         _aes = Aes.Create();
@@ -133,6 +132,13 @@ public sealed class NfsBlob : IBlobReader
             }
 
             var fileCount = (int)((expectedRawSize + MaxFileSize - 1) / MaxFileSize);
+            if (fileCount > MaxContinuationFiles)
+            {
+                throw new RvzFormatException(
+                    $"The NFS LBA ranges require {fileCount} continuation files "
+                    + $"(the limit is {MaxContinuationFiles}).");
+            }
+
             var rawSize = stream.Length;
             try
             {
@@ -232,6 +238,13 @@ public sealed class NfsBlob : IBlobReader
         else
         {
             var fileIndex = physical / BlocksPerFile;
+            if (fileIndex >= _files.Length)
+            {
+                throw new RvzFormatException(
+                    $"NFS block {logicalBlockIndex} is stored in file {fileIndex}, but only "
+                    + $"{_files.Length} file(s) are available.");
+            }
+
             var blockInFile = (int)(physical % BlocksPerFile);
             var offsetInFile = HeaderSize + blockInFile * BlockSizeValue;
 

@@ -24,6 +24,10 @@ docfx/_site/
 docfx/.docfx/
 docs/api/
 
+# JetBrains InspectCode reports
+InspectCode.log
+InspectCode.xml
+
 # NuGet
 *.nupkg
 packages/

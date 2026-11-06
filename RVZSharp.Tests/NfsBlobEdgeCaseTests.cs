@@ -79,7 +79,7 @@ public class NfsBlobEdgeCaseTests
     public void ReadAt_OutOfRange_ReturnsZero()
     {
         var key = MakeKey();
-        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 2, new (uint, uint)[] { (0, 2) });
+        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 2, [(0, 2)]);
         using var blob = NfsBlob.Open(new MemoryStream(nfs), key);
 
         var buffer = new byte[16];
@@ -94,7 +94,7 @@ public class NfsBlobEdgeCaseTests
     public void ReadAt_AcrossBlockBoundary_MatchesImage()
     {
         var key = MakeKey();
-        var (nfs, iso) = TestLegacyBuilders.BuildNfs(key, 3, new (uint, uint)[] { (0, 3) });
+        var (nfs, iso) = TestLegacyBuilders.BuildNfs(key, 3, [(0, 3)]);
         using var blob = NfsBlob.Open(new MemoryStream(nfs), key);
 
         var buffer = new byte[16];
@@ -111,7 +111,7 @@ public class NfsBlobEdgeCaseTests
     public void TypeAndBlockSize_AreNfsDefaults()
     {
         var key = MakeKey();
-        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 1, new (uint, uint)[] { (0, 1) });
+        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 1, [(0, 1)]);
         using var blob = NfsBlob.Open(new MemoryStream(nfs), key);
 
         Assert.Equal(BlobType.Nfs, blob.Type);
@@ -123,7 +123,7 @@ public class NfsBlobEdgeCaseTests
     public void Dispose_RespectsLeaveOpen()
     {
         var key = MakeKey();
-        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 1, new (uint, uint)[] { (0, 1) });
+        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 1, [(0, 1)]);
 
         var kept = new TrackingStream(nfs);
         NfsBlob.Open(kept, key, leaveOpen: true).Dispose();

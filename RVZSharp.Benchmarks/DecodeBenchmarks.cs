@@ -21,28 +21,28 @@ public class DecodeBenchmarks
     {
         var iso = BenchmarkDisc.BuildGameCubeImage();
 
-        _rvzZstd = Encode(iso, output => RvzWriter.Write(
+        _rvzZstd = Encode(output => RvzWriter.Write(
             PlainBlob.Open(new MemoryStream(iso)), output, new RvzWriteOptions
             {
                 Compression = CompressionType.Zstd,
                 CompressionLevel = 3,
                 ChunkSize = 0x20000
             }));
-        _rvzLzma2 = Encode(iso, output => RvzWriter.Write(
+        _rvzLzma2 = Encode(output => RvzWriter.Write(
             PlainBlob.Open(new MemoryStream(iso)), output, new RvzWriteOptions
             {
                 Compression = CompressionType.Lzma2,
                 CompressionLevel = 3,
                 ChunkSize = 0x20000
             }));
-        _wiaLzma2 = Encode(iso, output => WiaWriter.Write(
+        _wiaLzma2 = Encode(output => WiaWriter.Write(
             PlainBlob.Open(new MemoryStream(iso)), output, new RvzWriteOptions
             {
                 Compression = CompressionType.Lzma2,
                 CompressionLevel = 3,
                 ChunkSize = 0x200000
             }));
-        _gcz = Encode(iso, output => GczWriter.Write(
+        _gcz = Encode(output => GczWriter.Write(
             PlainBlob.Open(new MemoryStream(iso)), output, new GczWriteOptions
             {
                 BlockSize = 0x4000
@@ -73,7 +73,7 @@ public class DecodeBenchmarks
         return Hash(_gcz);
     }
 
-    private static byte[] Encode(byte[] iso, Action<MemoryStream> write)
+    private static byte[] Encode(Action<MemoryStream> write)
     {
         using var output = new MemoryStream();
         write(output);

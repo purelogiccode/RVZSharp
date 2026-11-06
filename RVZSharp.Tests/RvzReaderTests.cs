@@ -206,7 +206,7 @@ public class RvzReaderTests
         rvz[groupOffset + 3] = 0xF0;
 
         using var reader = RvzReader.Open(new MemoryStream(rvz));
-        Assert.Throws<RvzFormatException>(() => reader.ReadFully());
+        Assert.Throws<RvzFormatException>(reader.ReadFully);
     }
 
     /// <summary>Verifies that open tampered group table hash throws.</summary>
@@ -366,6 +366,6 @@ public class RvzReaderMatrixTests
         corrupted[(int)g0.FileOffset] ^= 0xFF; // break the zstd frame magic
 
         using var reader = RvzReader.Open(new MemoryStream(corrupted));
-        Assert.ThrowsAny<RvzException>(() => reader.ReadFully());
+        Assert.ThrowsAny<RvzException>(reader.ReadFully);
     }
 }

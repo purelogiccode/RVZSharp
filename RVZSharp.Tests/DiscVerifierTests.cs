@@ -143,7 +143,7 @@ public class DiscVerifierTests
         var iso = BuildWiiIso(1, encrypt: false);
         // Declare 4× the data that exists.
         WriteBe32(iso, PartitionOffset + 0x2BC,
-            (uint)((ClusterSectors * SectorSize * 4) >> 2));
+            (ClusterSectors * SectorSize * 4) >> 2);
 
         var report = Verify(iso);
         Assert.False(report.IsValid);
@@ -234,7 +234,7 @@ public class DiscVerifierTests
             WriteBe32(iso, 0x40004 + group * 8, 0);
         }
 
-        WriteBe32(iso, tableAddress, (uint)(PartitionOffset >> 2));
+        WriteBe32(iso, tableAddress, PartitionOffset >> 2);
         WriteBe32(iso, tableAddress + 4, 0);
 
         var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 7 + 3)).ToArray();
@@ -361,10 +361,9 @@ public class DiscVerifierTests
     /// <summary>Reports progress synchronously (Progress&lt;T&gt; posts asynchronously).</summary>
     private sealed class InlineProgress(Action<double> report) : IProgress<double>
     {
-        private readonly Action<double> Report1 = report;
         public void Report(double value)
         {
-            Report1(value);
+            report(value);
         }
     }
 }

@@ -12,8 +12,8 @@ namespace RVZSharp.Models;
 /// </summary>
 public sealed class DiscInfo
 {
-    private static readonly Encoding Cp1252 = GetCodePageEncoding(1252);
-    private static readonly Encoding ShiftJis = GetCodePageEncoding(932);
+    private static readonly Encoding _cp1252 = GetCodePageEncoding(1252);
+    private static readonly Encoding _shiftJis = GetCodePageEncoding(932);
 
     private DiscInfo(DiscType discType, string gameId, string makerId, byte revision,
         string internalName, string region, string country, char countryCode, ulong? titleId)
@@ -171,7 +171,7 @@ public sealed class DiscInfo
 
     private static Encoding NameEncoding(string region)
     {
-        return region == "NTSC-J" ? ShiftJis : Cp1252;
+        return region == "NTSC-J" ? _shiftJis : _cp1252;
     }
 
     private static Encoding GetCodePageEncoding(int codePage)

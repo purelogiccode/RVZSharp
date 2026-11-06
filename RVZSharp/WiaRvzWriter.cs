@@ -427,9 +427,8 @@ internal static class WiaRvzWriter
             file.Write(new byte[pad]);
         }
 
-        for (var i = 0; i < groupData.Count; i++)
+        foreach (var data in groupData)
         {
-            var data = groupData[i];
             file.Write(data);
             var padding = (4 - data.Length % 4) % 4;
             if (padding > 0)

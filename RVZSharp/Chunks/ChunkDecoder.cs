@@ -78,7 +78,7 @@ public static class ChunkDecoder
         var isPurge = group.UsesDiscCompression && disc.Compression == CompressionType.Purge;
         var usesDecompressor = group.UsesDiscCompression && !isPurge;
 
-        using Stream input = usesDecompressor
+        using var input = usesDecompressor
             ? OpenDecompressor(file, disc, codec, group)
             : new SectionStream(file, (long)group.FileOffset, group.StoredSize);
 

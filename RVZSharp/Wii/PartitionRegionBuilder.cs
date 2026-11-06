@@ -24,7 +24,7 @@ public sealed class PartitionRegionBuilder
     public const int IvOffset = 0x3D0;
 
     private readonly byte[] _key;
-    private readonly byte[][] _h0Areas = new byte[SectorsPerRegion][];
+    private readonly byte[]?[] _h0Areas = new byte[SectorsPerRegion][];
     private readonly byte[][] _sectorData = new byte[SectorsPerRegion][];
     private readonly List<HashExceptionEntry>[] _exceptions = new List<HashExceptionEntry>[SectorsPerRegion];
 
@@ -101,8 +101,8 @@ public sealed class PartitionRegionBuilder
                 // normally (Dolphin: VolumeWii.cpp EncryptGroup; Go: part.go DevZero), so the
                 // h0 area is 31 × SHA1(0x400 zeros) and h1 = SHA1 of that area — not SHA1 of
                 // a raw zero buffer.
-                var h0 = sector < _h0Areas.Length && _h0Areas[sector] != null
-                    ? _h0Areas[sector].AsSpan(0, WiiHashCalculator.H0Size)
+                var h0 = _h0Areas[sector] is { } area
+                    ? area.AsSpan(0, WiiHashCalculator.H0Size)
                     : WiiHashCalculator.ZeroSectorH0Area;
                 var hash = new byte[20];
                 SHA1.HashData(h0, hash);
@@ -128,7 +128,7 @@ public sealed class PartitionRegionBuilder
         for (var sector = 0; sector < SectorCount; sector++)
         {
             // Assemble the hash block: h0 + padding + h1 array + padding + h2 array + padding.
-            _h0Areas[sector].CopyTo(hashBlock, 0);
+            _h0Areas[sector]!.CopyTo(hashBlock, 0);
             h1Arrays[sector / 8].CopyTo(hashBlock, 0x280);
             h2Array.CopyTo(hashBlock, 0x340);
 

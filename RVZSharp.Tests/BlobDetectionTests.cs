@@ -87,7 +87,7 @@ public class BlobDetectionTests
         // into an RVZ.
         var content = new byte[350_000];
         new Random(42).NextBytes(content);
-        System.Text.Encoding.ASCII.GetBytes("CISO").CopyTo(content, 0);
+        "CISO"u8.CopyTo(content);
         content[4] = 0x00; // block size 0x8000, little endian
         content[5] = 0x80;
         content[6] = 0x00;

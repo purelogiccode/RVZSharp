@@ -136,9 +136,9 @@ public static class TestWiiIsoBuilder
             WriteBe32(iso, 0x40004 + group * 8, 0);
         }
 
-        WriteBe32(iso, tableAddress, (uint)(GamePartitionOffset >> 2));
+        WriteBe32(iso, tableAddress, GamePartitionOffset >> 2);
         WriteBe32(iso, tableAddress + 4, 0);
-        WriteBe32(iso, tableAddress + 8, (uint)(UpdatePartitionOffset >> 2));
+        WriteBe32(iso, tableAddress + 8, UpdatePartitionOffset >> 2);
         WriteBe32(iso, tableAddress + 12, 1);
 
         WritePartitionHeader(iso, GamePartitionOffset);
@@ -158,7 +158,7 @@ public static class TestWiiIsoBuilder
         WriteTicketKey(iso, partitionOffset, key);
 
         WriteBe32(iso, partitionOffset + 0x2B8, DataOffset >> 2);
-        WriteBe32(iso, partitionOffset + 0x2BC, (uint)(PartitionDataSize >> 2));
+        WriteBe32(iso, partitionOffset + 0x2BC, PartitionDataSize >> 2);
     }
 
     /// <summary>
@@ -171,7 +171,7 @@ public static class TestWiiIsoBuilder
         var iv = new byte[16];
         Array.Copy(iso, partitionOffset + 0x1DC, iv, 0, 8);
         using var aes = Aes.Create();
-        aes.Key = RetailCommonKey;
+        aes.Key = _retailCommonKey;
         aes.Mode = CipherMode.CBC;
         aes.Padding = PaddingMode.None;
         using var encryptor = aes.CreateEncryptor(aes.Key, iv);
@@ -179,7 +179,7 @@ public static class TestWiiIsoBuilder
         encrypted.CopyTo(iso, partitionOffset + 0x1BF);
     }
 
-    private static readonly byte[] RetailCommonKey =
+    private static readonly byte[] _retailCommonKey =
     [
         0xEB, 0xE4, 0x2A, 0x22, 0x5E, 0x85, 0x93, 0xE4,
         0x48, 0xD9, 0xC5, 0x45, 0x73, 0x81, 0xAA, 0xF7

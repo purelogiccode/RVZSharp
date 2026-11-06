@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using BenchmarkDotNet.Attributes;
 using RVZSharp.Blobs;
 using RVZSharp.Models;
@@ -14,7 +15,10 @@ public class ThreadScalingBenchmarks
 {
     private byte[] _iso = null!;
 
-    [Params(1, 2, 4, 8, 0)] public int Threads { get; set; }
+    [Params(1, 2, 4, 8, 0)]
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global",
+        Justification = "BenchmarkDotNet assigns [Params] properties by reflection.")]
+    public int Threads { get; set; }
 
     [GlobalSetup]
     public void Setup()

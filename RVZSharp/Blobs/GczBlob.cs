@@ -17,6 +17,7 @@ public sealed class GczBlob : IBlobReader
 
     private const ulong UncompressedFlag = 1UL << 63;
     private const int HeaderSize = 32;
+    private const uint MaxBlocks = 16 * 1024 * 1024;
 
     private readonly Stream _file;
     private readonly bool _leaveOpen;
@@ -82,6 +83,14 @@ public sealed class GczBlob : IBlobReader
             throw new RvzFormatException("The GCZ file has zero blocks.");
         }
 
+        // A real Wii image needs at most ~573k blocks at the smallest 16 KiB block size.
+        // Bound the table allocation before creating the offset/hash arrays.
+        if (numBlocks > MaxBlocks)
+        {
+            throw new RvzFormatException(
+                $"The GCZ file declares {numBlocks} blocks (the limit is {MaxBlocks}).");
+        }
+
         switch (blockSize)
         {
             case 0:
@@ -90,6 +99,11 @@ public sealed class GczBlob : IBlobReader
             // (hostile headers only; Dolphin's own converter writes 0x4000-byte blocks).
             case > int.MaxValue:
                 throw new RvzFormatException($"The GCZ block size {blockSize} is too large.");
+        }
+
+        if (discSize > long.MaxValue)
+        {
+            throw new RvzFormatException($"The GCZ disc size {discSize} is not representable.");
         }
 
         // The decoded size must fit the declared blocks, otherwise the block index computed

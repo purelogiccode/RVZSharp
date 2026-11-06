@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using RVZSharp.Interfaces;
 using RVZSharp.Chunks;
@@ -31,6 +32,7 @@ public sealed class RvzReader : IBlobReader
     private const byte KindPartitionRegion = 2;
 
     private readonly Stream _file;
+    private readonly long _fileLength;
     private readonly bool _leaveOpen;
     private readonly WiaRvzFormat _format;
     private readonly ICompressionDecoder _codec;
@@ -43,6 +45,8 @@ public sealed class RvzReader : IBlobReader
     private readonly LruCache<CacheKey, CacheValue> _cache = new(DefaultCacheSize);
 
     [StructLayout(LayoutKind.Sequential)]
+    [SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Local",
+        Justification = "The positional fields participate in the generated equality and hash code.")]
     private readonly record struct CacheKey(byte Kind, int Area, int Segment, long Unit);
 
     private sealed class CacheValue
@@ -71,6 +75,7 @@ public sealed class RvzReader : IBlobReader
         WiaDisc disc, WiaPartEntry[] partitions, WiaRawDataEntry[] rawData, GroupEntry[] groups)
     {
         _file = file;
+        _fileLength = file.Length;
         _leaveOpen = leaveOpen;
         _format = format;
         FileHead = fileHead;
@@ -327,6 +332,13 @@ public sealed class RvzReader : IBlobReader
         {
             if (rawData[i].RawDataSize != 0)
             {
+                if (rawData[i].RawDataOffset > long.MaxValue ||
+                    rawData[i].RawDataSize > (ulong)(long.MaxValue - (long)rawData[i].RawDataOffset))
+                {
+                    throw new RvzFormatException(
+                        $"Raw-data entry {i} extends beyond the addressable image size.");
+                }
+
                 AddEnd((long)(rawData[i].RawDataOffset + rawData[i].RawDataSize), false, i, 0);
             }
         }
@@ -447,7 +459,7 @@ public sealed class RvzReader : IBlobReader
     /// </summary>
     public byte[] ReadFully()
     {
-        return ReadFully(null, default);
+        return ReadFully(null);
     }
 
     /// <summary>
@@ -578,31 +590,31 @@ public sealed class RvzReader : IBlobReader
             }
 
             var areaSize = area.End - area.Start;
-            var unitSize = area.Kind == AreaKind.Raw ? (long)Disc.ChunkSize : regionBytes;
+            var unitSize = area.Kind == AreaKind.Raw ? Disc.ChunkSize : regionBytes;
             var unitCount = (areaSize + unitSize - 1) / unitSize;
             // The disc header can leave the current position in the middle of the first unit.
             var firstUnit = (copied - area.Start) / unitSize;
             var batchSize = (int)Math.Max(1, Math.Min((long)threads * 2, maxBatchBytes / unitSize));
             var results = new byte[batchSize][];
 
-            for (long first = firstUnit; first < unitCount; first += batchSize)
+            for (var first = firstUnit; first < unitCount; first += batchSize)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var count = (int)Math.Min(batchSize, unitCount - first);
                 if (count == 1)
                 {
-                    results[0] = DecodeUnit(area, first, unitSize);
+                    results[0] = DecodeUnit(area, first);
                 }
                 else
                 {
-                    var First = first;
+                    var firstCopy = first;
                     ParallelExecution.For(0, count,
                         new ParallelOptions
                         {
                             MaxDegreeOfParallelism = threads,
                             CancellationToken = cancellationToken
                         },
-                        i => results[i] = DecodeUnit(area, First + i, unitSize));
+                        i => results[i] = DecodeUnit(area, firstCopy + i));
                 }
 
                 for (var i = 0; i < count; i++)
@@ -634,7 +646,7 @@ public sealed class RvzReader : IBlobReader
         return copied;
     }
 
-    private byte[] DecodeUnit(DataArea area, long unitIndex, long unitSize)
+    private byte[] DecodeUnit(DataArea area, long unitIndex)
     {
         if (area.Kind == AreaKind.Raw)
         {
@@ -709,7 +721,7 @@ public sealed class RvzReader : IBlobReader
         }
 
         var result = DecodeStoredGroup(GroupEntries[groupIndex], isPartition: true, expectedSize,
-            chunkIndex * PartitionChunkPayloadSize);
+            chunkIndex * _partitionChunkPayloadSize);
         return (result.Payload, result.ExceptionLists);
     }
 
@@ -728,7 +740,7 @@ public sealed class RvzReader : IBlobReader
 
         // Untrusted size fields: never allocate or read beyond the actual file.
         if (group.StoredSize > int.MaxValue ||
-            (long)group.FileOffset + group.StoredSize > _file.Length)
+            (long)group.FileOffset + group.StoredSize > _fileLength)
         {
             throw new RvzFormatException(
                 $"Group at file offset 0x{group.FileOffset:X} with size {group.StoredSize} "
@@ -876,7 +888,7 @@ public sealed class RvzReader : IBlobReader
             return [];
         }
 
-        var chunkRegionBase = chunkIndex * PartitionChunkPayloadSize / RegionDataSize;
+        var chunkRegionBase = chunkIndex * _partitionChunkPayloadSize / RegionDataSize;
         var listIndex = (int)(regionIndex - chunkRegionBase);
         if (listIndex < 0 || listIndex >= lists.Length)
         {
@@ -887,7 +899,7 @@ public sealed class RvzReader : IBlobReader
 
         // The writer stores exception offsets relative to the chunk; the chunk's position
         // within its 2 MiB region shifts them to region-relative (Dolphin: additional_offset).
-        var additionalOffset = (int)((chunkIndex * PartitionChunkPayloadSize % RegionDataSize) /
+        var additionalOffset = (int)((chunkIndex * _partitionChunkPayloadSize % RegionDataSize) /
             WiiHashCalculator.SectorDataSize * WiiHashCalculator.HashBlockSize);
 
         // Each entry names a sector (offset >> 10) and a position within its hash area.
@@ -915,7 +927,7 @@ public sealed class RvzReader : IBlobReader
         return exceptions.ToArray();
     }
 
-    private int PartitionChunkPayloadSize =>
+    private int _partitionChunkPayloadSize =>
         (int)((long)Disc.ChunkSize * WiiHashCalculator.SectorDataSize / WiaDisc.SectorSize);
 
     private DataArea? FindArea(long offset)

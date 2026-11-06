@@ -83,7 +83,7 @@ internal sealed class BugReportApiClient : IBugReportSender, IDisposable
     /// <summary>Releases the underlying HttpClient.</summary>
     public void Dispose()
     {
-        _httpClient?.Dispose();
+        _httpClient.Dispose();
     }
 
     /// <summary>Logs a bug-report submission problem at Information level, below the sink's

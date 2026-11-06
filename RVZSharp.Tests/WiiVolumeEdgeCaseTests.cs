@@ -207,7 +207,7 @@ public class WiiVolumeEdgeCaseTests
     public void GetTitleKey_KoreanIndex_UsesKoreanKey()
     {
         var titleKey = Enumerable.Range(0, 16).Select(i => (byte)(i * 7 + 3)).ToArray();
-        var ticket = BuildTicket(titleKey, KoreanCommonKey);
+        var ticket = BuildTicket(titleKey, _koreanCommonKey);
         ticket[0x1F1] = 1;
 
         Assert.Equal(titleKey, WiiVolume.GetTitleKey(ticket));
@@ -218,7 +218,7 @@ public class WiiVolumeEdgeCaseTests
     public void GetTitleKey_RvtIssuer_UsesRvtKey()
     {
         var titleKey = Enumerable.Range(0, 16).Select(i => (byte)(i * 11 + 5)).ToArray();
-        var ticket = BuildTicket(titleKey, RvtCommonKey);
+        var ticket = BuildTicket(titleKey, _rvtCommonKey);
         "Root-CA00000002-XS00000006"u8.CopyTo(ticket.AsSpan(0x140));
 
         Assert.Equal(titleKey, WiiVolume.GetTitleKey(ticket));
@@ -229,7 +229,7 @@ public class WiiVolumeEdgeCaseTests
     public void GetTitleKey_UnknownIndex_FallsBackToRetailKey()
     {
         var titleKey = Enumerable.Range(0, 16).Select(i => (byte)(i * 13 + 9)).ToArray();
-        var ticket = BuildTicket(titleKey, RetailCommonKey);
+        var ticket = BuildTicket(titleKey, _retailCommonKey);
         ticket[0x1F1] = 2;
 
         Assert.Equal(titleKey, WiiVolume.GetTitleKey(ticket));
@@ -240,7 +240,7 @@ public class WiiVolumeEdgeCaseTests
     public void GetTitleKey_WrongCommonKey_DoesNotMatch()
     {
         var titleKey = Enumerable.Range(0, 16).Select(i => (byte)(i * 7 + 3)).ToArray();
-        var ticket = BuildTicket(titleKey, KoreanCommonKey); // index 0 => retail key
+        var ticket = BuildTicket(titleKey, _koreanCommonKey); // index 0 => retail key
 
         Assert.NotEqual(titleKey, WiiVolume.GetTitleKey(ticket));
     }
@@ -320,19 +320,19 @@ public class WiiVolumeEdgeCaseTests
     }
 
     // Dolphin IOSC common keys (the same constants the library selects between).
-    private static readonly byte[] RetailCommonKey =
+    private static readonly byte[] _retailCommonKey =
     [
         0xEB, 0xE4, 0x2A, 0x22, 0x5E, 0x85, 0x93, 0xE4,
         0x48, 0xD9, 0xC5, 0x45, 0x73, 0x81, 0xAA, 0xF7
     ];
 
-    private static readonly byte[] KoreanCommonKey =
+    private static readonly byte[] _koreanCommonKey =
     [
         0x63, 0xB8, 0x2B, 0xB4, 0xF4, 0x61, 0x4E, 0x2E,
         0x13, 0xF2, 0xFE, 0xFB, 0xBA, 0x4C, 0x9B, 0x7E
     ];
 
-    private static readonly byte[] RvtCommonKey =
+    private static readonly byte[] _rvtCommonKey =
     [
         0xA1, 0x60, 0x4A, 0x6A, 0x71, 0x23, 0xB5, 0x29,
         0xAE, 0x8B, 0xEC, 0x32, 0xC8, 0x16, 0xFC, 0xAA

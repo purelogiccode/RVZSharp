@@ -19,11 +19,15 @@ namespace RVZSharp.Cli;
 /// </summary>
 internal static class Program
 {
+    // A hostile FST can describe an arbitrarily deep tree; recursive listing/extraction
+    // must not overflow the process stack.
+    private const int MaxDirectoryDepth = 512;
+
     /// <summary>
     /// Cancellation source for the running command: Ctrl+C requests cancellation and the
     /// command observes the token between reads instead of the process dying mid-write.
     /// </summary>
-    private static readonly CancellationTokenSource Cancellation = new();
+    private static readonly CancellationTokenSource _cancellation = new();
 
     private static int Main(string[] args)
     {
@@ -38,7 +42,7 @@ internal static class Program
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
-            Cancellation.Cancel();
+            _cancellation.Cancel();
         };
 
         // Usage telemetry: fire-and-forget hit at launch so application usage can
@@ -225,7 +229,9 @@ internal static class Program
 
         try
         {
-            var comparison = OperatingSystem.IsWindows()
+            // Windows and macOS default to case-insensitive file systems; a path pair that
+            // differs only by case can still be the same file and must not be truncated.
+            var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
                 ? StringComparison.OrdinalIgnoreCase
                 : StringComparison.Ordinal;
             return string.Equals(
@@ -241,7 +247,7 @@ internal static class Program
     /// <summary>
     /// Handles a command-level exception. Cancellation exits quietly with code 130,
     /// expected failures (bad usage, unsupported input, file-system problems) are logged
-    /// as warnings so the bug-report sink ignores them, and unexpected failures are
+    /// at Information so the bug-report sink ignores them, and unexpected failures are
     /// logged as errors so the sink files them as bugs.
     /// </summary>
     private static int CommandFailed(Exception e, string context)
@@ -517,8 +523,8 @@ internal static class Program
             var arg = args[i];
             string name;
             string? inlineValue = null;
-            var takesValue = false;
-            string[]? choices = null;
+            bool takesValue;
+            string[]? choices;
 
             if (arg.StartsWith("--", StringComparison.Ordinal))
             {
@@ -563,7 +569,7 @@ internal static class Program
                 continue;
             }
 
-            string value = inlineValue ?? (i + 1 < args.Count ? args[++i] : string.Empty);
+            var value = inlineValue ?? (i + 1 < args.Count ? args[++i] : string.Empty);
             if (value.Length == 0)
             {
                 throw new CliErrorException($"option {arg} requires an argument");
@@ -594,7 +600,7 @@ internal static class Program
     // convert — DolphinTool-compatible.
     // ------------------------------------------------------------------
 
-    private static readonly Dictionary<string, OptionSpec> ConvertSpec = new()
+    private static readonly Dictionary<string, OptionSpec> _convertSpec = new()
     {
         ["user"] = new OptionSpec("-u", true, null),
         ["input"] = new OptionSpec("-i", true, null),
@@ -653,7 +659,7 @@ internal static class Program
                     return Fail("The input and output files must be different.");
                 }
 
-                using var legacyInput = args[0] == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
+                using var legacyInput = args[0] == "-" ? TemporaryFile.SpoolStdin(_cancellation.Token) : null;
                 using var legacyOutput = args[1] == "-" ? TemporaryFile.Create() : null;
                 var legacyResult = ConvertLegacy(legacyInput?.Path ?? args[0],
                     legacyOutput?.Path ?? args[1], args.Skip(2).ToArray());
@@ -668,7 +674,7 @@ internal static class Program
             ParsedArgs options;
             try
             {
-                options = ParseArgs(args, ConvertSpec);
+                options = ParseArgs(args, _convertSpec);
             }
             catch (CliErrorException e)
             {
@@ -793,7 +799,7 @@ internal static class Program
                 }
             }
 
-            using var spooledInput = originalInput == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
+            using var spooledInput = originalInput == "-" ? TemporaryFile.SpoolStdin(_cancellation.Token) : null;
             using var spooledOutput = originalOutput == "-" ? TemporaryFile.Create() : null;
             var inputPath = spooledInput?.Path ?? originalInput;
             var writePath = spooledOutput?.Path ?? originalOutput;
@@ -839,7 +845,7 @@ internal static class Program
                 if (options.HasFlag("verify"))
                 {
                     var verifyProgress = new ConsoleProgress("Verifying ");
-                    inputHashes = DiscHasher.Compute(input, verifyProgress, Cancellation.Token);
+                    inputHashes = DiscHasher.Compute(input, verifyProgress, _cancellation.Token);
                     ConsoleProgress.Clear();
                 }
 
@@ -881,33 +887,33 @@ internal static class Program
                             {
                                 BlockSize = blockSize,
                                 MaxThreads = maxThreads
-                            }, progress, Cancellation.Token);
+                            }, progress, _cancellation.Token);
                         }
                         else if (format == "ciso")
                         {
                             CisoWriter.Write(input, output, new CisoWriteOptions
                             {
                                 BlockSize = blockSize
-                            }, progress, Cancellation.Token);
+                            }, progress, _cancellation.Token);
                         }
                         else if (format == "wbfs")
                         {
                             WbfsWriter.Write(input, output, new WbfsWriteOptions
                             {
                                 BlockSize = blockSize
-                            }, progress, Cancellation.Token);
+                            }, progress, _cancellation.Token);
                         }
                         else if (format == "tgc")
                         {
-                            TgcWriter.Write(input, output, progress, Cancellation.Token);
+                            TgcWriter.Write(input, output, progress, _cancellation.Token);
                         }
                         else if (format == "wia")
                         {
-                            WiaWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                            WiaWriter.Write(input, output, writeOptions, progress, _cancellation.Token);
                         }
                         else
                         {
-                            RvzWriter.Write(input, output, writeOptions, progress, Cancellation.Token);
+                            RvzWriter.Write(input, output, writeOptions, progress, _cancellation.Token);
                         }
                     }
                     catch (OperationCanceledException)
@@ -1035,7 +1041,7 @@ internal static class Program
             var progress = new ConsoleProgress("Encoding ");
             try
             {
-                RvzWriter.Write(blob, output, options, progress, Cancellation.Token);
+                RvzWriter.Write(blob, output, options, progress, _cancellation.Token);
             }
             catch (OperationCanceledException)
             {
@@ -1086,7 +1092,7 @@ internal static class Program
             // CISO/WBFS decode to a padded image (map capacity / fixed Wii size); only the
             // first inputLength bytes correspond to the input image, so hash the prefix.
             var progress = new ConsoleProgress("Verifying ");
-            var outputHashes = DiscHasher.Compute(blob, inputLength, progress, Cancellation.Token);
+            var outputHashes = DiscHasher.Compute(blob, inputLength, progress, _cancellation.Token);
             ConsoleProgress.Clear();
 
             if (!inputHashes.Matches(outputHashes))
@@ -1181,7 +1187,7 @@ internal static class Program
     // header — DolphinTool-compatible.
     // ------------------------------------------------------------------
 
-    private static readonly Dictionary<string, OptionSpec> HeaderSpec = new()
+    private static readonly Dictionary<string, OptionSpec> _headerSpec = new()
     {
         ["input"] = new OptionSpec("-i", true, null),
         ["json"] = new OptionSpec("-j", false, null),
@@ -1209,7 +1215,7 @@ internal static class Program
             ParsedArgs options;
             try
             {
-                options = ParseArgs(args, HeaderSpec);
+                options = ParseArgs(args, _headerSpec);
             }
             catch (CliErrorException e)
             {
@@ -1223,7 +1229,7 @@ internal static class Program
                 return Fail("No input set");
             }
 
-            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(_cancellation.Token) : null;
             var path = spooledInput?.Path ?? inputPath;
 
             IBlobReader blob;
@@ -1372,7 +1378,7 @@ internal static class Program
     // verify — DolphinTool-compatible.
     // ------------------------------------------------------------------
 
-    private static readonly Dictionary<string, OptionSpec> VerifySpec = new()
+    private static readonly Dictionary<string, OptionSpec> _verifySpec = new()
     {
         ["user"] = new OptionSpec("-u", true, null),
         ["input"] = new OptionSpec("-i", true, null),
@@ -1405,7 +1411,7 @@ internal static class Program
             ParsedArgs options;
             try
             {
-                options = ParseArgs(args, VerifySpec);
+                options = ParseArgs(args, _verifySpec);
             }
             catch (CliErrorException e)
             {
@@ -1422,7 +1428,7 @@ internal static class Program
             var json = options.HasFlag("json");
 
             var inputPath = options.Get("input")!;
-            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(_cancellation.Token) : null;
             var path = spooledInput?.Path ?? inputPath;
 
             IBlobReader blob;
@@ -1446,13 +1452,13 @@ internal static class Program
                 if (options.HasFlag("partitions"))
                 {
                     var verifyProgress = new ConsoleProgress("Verifying ");
-                    var report = DiscVerifier.Verify(blob, verifyProgress, Cancellation.Token);
+                    var report = DiscVerifier.Verify(blob, verifyProgress, _cancellation.Token);
                     ConsoleProgress.Clear();
                     return PrintVerificationReport(report, json, inputPath);
                 }
 
                 var progress = new ConsoleProgress("Verifying ");
-                var hashes = DiscHasher.Compute(blob, progress, Cancellation.Token);
+                var hashes = DiscHasher.Compute(blob, progress, _cancellation.Token);
                 ConsoleProgress.Clear();
 
                 if (json)
@@ -1577,11 +1583,22 @@ internal static class Program
         var array = new JsonArray();
         foreach (var issue in issues)
         {
-            array.Add((JsonNode)new JsonObject
+            var node = new JsonObject
             {
                 ["severity"] = issue.Severity.ToString(),
                 ["message"] = issue.Message
-            });
+            };
+            if (issue.PartitionOffset is { } offset)
+            {
+                node["partition_offset"] = offset;
+            }
+
+            if (issue.PartitionType is { } type)
+            {
+                node["partition_type"] = type;
+            }
+
+            array.Add((JsonNode)node);
         }
 
         return array;
@@ -1596,7 +1613,7 @@ internal static class Program
     // extract — DolphinTool-compatible surface.
     // ------------------------------------------------------------------
 
-    private static readonly Dictionary<string, OptionSpec> ExtractSpec = new()
+    private static readonly Dictionary<string, OptionSpec> _extractSpec = new()
     {
         ["input"] = new OptionSpec("-i", true, null),
         ["output"] = new OptionSpec("-o", true, null),
@@ -1628,7 +1645,7 @@ internal static class Program
             ParsedArgs options;
             try
             {
-                options = ParseArgs(args, ExtractSpec);
+                options = ParseArgs(args, _extractSpec);
             }
             catch (CliErrorException e)
             {
@@ -1663,7 +1680,7 @@ internal static class Program
                 specificPartition = "DATA";
             }
 
-            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(_cancellation.Token) : null;
             var path = spooledInput?.Path ?? inputPath;
 
             IBlobReader blob;
@@ -1695,7 +1712,7 @@ internal static class Program
                 return listOnly
                     ? ExtractList(blob, partitions, singlePath, specificPartition, outputPath)
                     : ExtractToFolder(blob, partitions, singlePath, specificPartition, outputPath,
-                        quiet, Cancellation.Token);
+                        quiet, _cancellation.Token);
             }
         }
         catch (Exception e)
@@ -1772,12 +1789,20 @@ internal static class Program
             return false;
         }
 
-        ListRecursively(info, text);
+        ListRecursively(info, text, depth: 0);
         return true;
     }
 
-    private static void ListRecursively(DiscFileInfo info, StringBuilder text)
+    [SuppressMessage("ReSharper", "ParameterOnlyUsedForPreconditionCheck.Local",
+        Justification = "The depth parameter is the recursion guard.")]
+    private static void ListRecursively(DiscFileInfo info, StringBuilder text, int depth)
     {
+        if (depth > MaxDirectoryDepth)
+        {
+            throw new RvzFormatException(
+                $"The image's file system is nested deeper than {MaxDirectoryDepth} levels.");
+        }
+
         if (!info.IsRoot)
         {
             var line = info.Path + "\n";
@@ -1787,7 +1812,7 @@ internal static class Program
 
         foreach (var child in info.Children)
         {
-            ListRecursively(child, text);
+            ListRecursively(child, text, depth + 1);
         }
     }
 
@@ -1905,7 +1930,7 @@ internal static class Program
             var target = BuildSingleTarget(basePath, singlePath);
             if (info.IsDirectory)
             {
-                ExtractDirectory(fs, info, target, quiet, cancellationToken);
+                ExtractDirectory(fs, info, target, quiet, cancellationToken, depth: 0);
             }
             else
             {
@@ -1928,16 +1953,25 @@ internal static class Program
 
         if (fs is not null)
         {
-            ExtractDirectory(fs, fs.Root, Path.Combine(basePath, "files"), quiet, cancellationToken);
+            ExtractDirectory(fs, fs.Root, Path.Combine(basePath, "files"), quiet,
+                cancellationToken, depth: 0);
         }
 
         ExportSystemData(blob, fs, partition, basePath, cancellationToken);
         return true;
     }
 
+    [SuppressMessage("ReSharper", "ParameterOnlyUsedForPreconditionCheck.Local",
+        Justification = "The depth parameter is the recursion guard.")]
     private static void ExtractDirectory(DiscFileSystem fs, DiscFileInfo directory,
-        string exportFolder, bool quiet, CancellationToken cancellationToken)
+        string exportFolder, bool quiet, CancellationToken cancellationToken, int depth)
     {
+        if (depth > MaxDirectoryDepth)
+        {
+            throw new RvzFormatException(
+                $"The image's file system is nested deeper than {MaxDirectoryDepth} levels.");
+        }
+
         Directory.CreateDirectory(exportFolder);
         foreach (var child in directory.Children)
         {
@@ -1954,7 +1988,7 @@ internal static class Program
                 child.Name + (child.IsDirectory ? Path.DirectorySeparatorChar.ToString() : string.Empty));
             if (child.IsDirectory)
             {
-                ExtractDirectory(fs, child, path, quiet, cancellationToken);
+                ExtractDirectory(fs, child, path, quiet, cancellationToken, depth + 1);
             }
             else
             {
@@ -1993,7 +2027,7 @@ internal static class Program
     private static void ExportSystemData(IBlobReader blob, DiscFileSystem? fs,
         Partition? partition, string basePath, CancellationToken cancellationToken)
     {
-        IBlobReader view = blob;
+        var view = blob;
         PartitionReader? partitionView = null;
         if (partition is not null)
         {
@@ -2063,7 +2097,9 @@ internal static class Program
     private static void CopyPartitionBlob(IBlobReader blob, long partitionOffset, long sizeAddress,
         long? offsetAddress, string path, CancellationToken cancellationToken, int fixedSize = 0)
     {
-        var size = fixedSize;
+        // The size/offset fields are unsigned 32-bit values; reading them as int would make
+        // sizes above 2 GiB negative and silently produce empty files.
+        var size = (uint)fixedSize;
         if (size == 0 && !TryReadBe32(blob, sizeAddress, out size))
         {
             return;
@@ -2086,12 +2122,13 @@ internal static class Program
         }
     }
 
-    private static bool TryReadBe32(IBlobReader blob, long offset, out int value)
+    private static bool TryReadBe32(IBlobReader blob, long offset, out uint value)
     {
         Span<byte> bytes = stackalloc byte[4];
         if (blob.ReadAt(offset, bytes) == 4)
         {
-            value = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+            value = ((uint)bytes[0] << 24) | ((uint)bytes[1] << 16) |
+                    ((uint)bytes[2] << 8) | bytes[3];
             return true;
         }
 
@@ -2159,7 +2196,7 @@ internal static class Program
     {
         try
         {
-            using var spooledInput = path == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
+            using var spooledInput = path == "-" ? TemporaryFile.SpoolStdin(_cancellation.Token) : null;
             var readPath = spooledInput?.Path ?? path;
 
             using var file = File.OpenRead(readPath);
@@ -2228,7 +2265,7 @@ internal static class Program
         }
     }
 
-    private static readonly Dictionary<string, OptionSpec> DecodeSpec = new()
+    private static readonly Dictionary<string, OptionSpec> _decodeSpec = new()
     {
         ["sha1"] = new OptionSpec("--sha1", true, null),
         ["threads"] = new OptionSpec("--threads", true, null)
@@ -2255,7 +2292,7 @@ internal static class Program
             ParsedArgs options;
             try
             {
-                options = ParseArgs(args, DecodeSpec);
+                options = ParseArgs(args, _decodeSpec);
             }
             catch (CliErrorException e)
             {
@@ -2281,7 +2318,7 @@ internal static class Program
                 return Fail("The input and output files must be different.");
             }
 
-            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(Cancellation.Token) : null;
+            using var spooledInput = inputPath == "-" ? TemporaryFile.SpoolStdin(_cancellation.Token) : null;
             using var spooledOutput = outputPath == "-" ? TemporaryFile.Create() : null;
             var readPath = spooledInput?.Path ?? inputPath;
             var writePath = spooledOutput?.Path ?? outputPath;
@@ -2313,7 +2350,7 @@ internal static class Program
             var progress = new ConsoleProgress("Decoding ");
             try
             {
-                reader.CopyTo(hashing, progress, maxThreads, Cancellation.Token);
+                reader.CopyTo(hashing, progress, maxThreads, _cancellation.Token);
             }
             catch (OperationCanceledException)
             {

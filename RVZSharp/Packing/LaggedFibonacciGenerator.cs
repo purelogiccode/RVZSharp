@@ -26,6 +26,11 @@ public sealed class LaggedFibonacciGenerator
     /// <summary>Seeds the generator from the 68-byte big-endian seed.</summary>
     public void SetSeed(ReadOnlySpan<byte> seed)
     {
+        if (seed.Length != SeedSize)
+        {
+            throw new ArgumentException($"Seed must be {SeedSize} bytes.", nameof(seed));
+        }
+
         _positionBytes = 0;
         for (var i = 0; i < SeedWords; i++)
         {
@@ -53,6 +58,11 @@ public sealed class LaggedFibonacciGenerator
     /// <summary>Advances the state by <paramref name="count"/> bytes of output.</summary>
     public void ForwardBytes(long count)
     {
+        if (count < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count));
+        }
+
         // count is long (callers pass up to 0x8000, but the signature must not overflow):
         // accumulate in long and forward whole buffers.
         var position = _positionBytes + count;
@@ -68,6 +78,11 @@ public sealed class LaggedFibonacciGenerator
     /// <summary>Writes <paramref name="count"/> output bytes.</summary>
     public void GetBytes(long count, Span<byte> output)
     {
+        if (count < 0 || count > output.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count));
+        }
+
         var outPos = 0;
         while (count > 0)
         {
@@ -193,6 +208,16 @@ public sealed class LaggedFibonacciGenerator
     public static (byte[] Seed, long BytesReconstructed) GetSeed(
         ReadOnlySpan<byte> data, long size, long dataOffset)
     {
+        if (size < 0 || size > data.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(size));
+        }
+
+        if (dataOffset < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dataOffset));
+        }
+
         var result = (Seed: Array.Empty<byte>(), BytesReconstructed: 0L);
         var bytesToSkip = (int)((4 - dataOffset % 4) % 4);
         if (size - bytesToSkip < BufferWords * 4)

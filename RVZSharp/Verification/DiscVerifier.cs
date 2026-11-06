@@ -18,7 +18,7 @@ public static class DiscVerifier
     private const int HashBlockSize = 0x400;
     private const int BlocksPerSector = 31;
     private const int HashSize = 20;
-    private static readonly byte[] ZeroIv = new byte[16];
+    private static readonly byte[] _zeroIv = new byte[16];
     private const int H0Size = BlocksPerSector * HashSize; // 0x26C
     private const int H1Offset = 0x280;
     private const int H1Size = 8 * HashSize; // 0xA0
@@ -271,9 +271,7 @@ public static class DiscVerifier
             return false;
         }
 
-        // ReSharper disable once ArrangeRedundantParentheses
-        // ReSharper disable once UselessBinaryOperation
-        if ((long)TmdContentsOffset + ((long)contentCount * TmdContentSize) > tmd.Length)
+        if (TmdContentsOffset + TmdContentSize > tmd.Length)
         {
             issues.Add(new VerificationIssue(VerificationSeverity.Medium,
                 "The partition TMD content table is truncated.", partition.Offset, partition.Type));
@@ -376,7 +374,7 @@ public static class DiscVerifier
                 {
                     aes.DecryptCbc(sector.AsSpan(HashBlockSize, data.Length),
                         sector.AsSpan(IvOffset, 16), data, PaddingMode.None);
-                    aes.DecryptCbc(sector.AsSpan(0, HashBlockSize), ZeroIv,
+                    aes.DecryptCbc(sector.AsSpan(0, HashBlockSize), _zeroIv,
                         hashArea.AsSpan(0, HashBlockSize), PaddingMode.None);
                 }
                 else

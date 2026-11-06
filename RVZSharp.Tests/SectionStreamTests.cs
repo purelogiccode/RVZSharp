@@ -53,6 +53,9 @@ public class SectionStreamTests
         Assert.Throws<RvzFormatException>(() => new SectionStream(baseStream, -1, 4));
         Assert.Throws<RvzFormatException>(() => new SectionStream(baseStream, 0, -1));
         Assert.Throws<RvzFormatException>(() => new SectionStream(baseStream, 0xF0, 0x20));
+        // start + length would overflow a signed long; the bounds check must not wrap.
+        Assert.Throws<RvzFormatException>(() =>
+            new SectionStream(baseStream, long.MaxValue, long.MaxValue));
     }
 
     /// <summary>Verifies that the position setter validates the section bounds.</summary>

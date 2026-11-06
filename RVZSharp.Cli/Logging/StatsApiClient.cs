@@ -97,7 +97,7 @@ internal sealed class StatsApiClient : IDisposable
     /// <summary>Releases the underlying HttpClient.</summary>
     public void Dispose()
     {
-        _httpClient?.Dispose();
+        _httpClient.Dispose();
     }
 
     /// <summary>Logs a telemetry submission problem (at Debug level so it never

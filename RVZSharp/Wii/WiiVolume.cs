@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using RVZSharp.Interfaces;
 using RVZSharp.Models;
@@ -8,6 +9,8 @@ namespace RVZSharp.Wii;
 /// Wii disc volume helpers for the writer (Dolphin: VolumeWii): partition table discovery,
 /// ticket parsing and the "shifted" big-endian reads of the partition header.
 /// </summary>
+[SuppressMessage("ReSharper", "InconsistentNaming",
+    Justification = "Public constants keep the names used by Dolphin's headers.")]
 public static class WiiVolume
 {
     /// <summary>Size of the disc header (0x80 bytes).</summary>
@@ -30,19 +33,19 @@ public static class WiiVolume
 
     // Console common keys (Dolphin: IOSC.cpp). A ticket stores its title key AES-CBC
     // encrypted with the console's common key, using the ticket's title ID as the IV.
-    private static readonly byte[] RetailCommonKey =
+    private static readonly byte[] _retailCommonKey =
     [
         0xEB, 0xE4, 0x2A, 0x22, 0x5E, 0x85, 0x93, 0xE4,
         0x48, 0xD9, 0xC5, 0x45, 0x73, 0x81, 0xAA, 0xF7
     ];
 
-    private static readonly byte[] KoreanCommonKey =
+    private static readonly byte[] _koreanCommonKey =
     [
         0x63, 0xB8, 0x2B, 0xB4, 0xF4, 0x61, 0x4E, 0x2E,
         0x13, 0xF2, 0xFE, 0xFB, 0xBA, 0x4C, 0x9B, 0x7E
     ];
 
-    private static readonly byte[] RvtCommonKey =
+    private static readonly byte[] _rvtCommonKey =
     [
         0xA1, 0x60, 0x4A, 0x6A, 0x71, 0x23, 0xB5, 0x29,
         0xAE, 0x8B, 0xEC, 0x32, 0xC8, 0x16, 0xFC, 0xAA
@@ -255,11 +258,11 @@ public static class WiiVolume
         if (ticket.Length >= 0x180 &&
             ticket.Slice(0x140, 0x40).StartsWith("Root-CA00000002-XS00000006"u8))
         {
-            return RvtCommonKey;
+            return _rvtCommonKey;
         }
 
         // Any index other than 1 falls back to the retail key, like Dolphin.
-        return ticket[0x1F1] == 1 ? KoreanCommonKey : RetailCommonKey;
+        return ticket[0x1F1] == 1 ? _koreanCommonKey : _retailCommonKey;
     }
 
     /// <summary>

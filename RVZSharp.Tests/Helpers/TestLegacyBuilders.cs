@@ -30,7 +30,7 @@ public static class TestLegacyBuilders
             Array.Copy(iso, i * blockSize, block, 0,
                 Math.Min(blockSize, iso.Length - i * blockSize));
 
-            byte[] bytes = block;
+            var bytes = block;
             var isRaw = true;
             if (compress)
             {

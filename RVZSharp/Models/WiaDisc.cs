@@ -168,10 +168,11 @@ public readonly struct WiaDisc
     public void Validate(uint discSize, ReadOnlySpan<byte> rawDisc, ReadOnlySpan<byte> expectedDiscHash,
         WiaRvzFormat format)
     {
-        if (discSize < MinSize)
+        if (discSize < MinSize || discSize > Size || discSize > rawDisc.Length)
         {
             throw new RvzFormatException(
-                $"Disc struct size {discSize} is smaller than the minimum {MinSize}.");
+                $"Disc struct size {discSize} is outside the supported range "
+                + $"{MinSize}..{Size} or larger than the {rawDisc.Length}-byte buffer.");
         }
 
         if (ComprDataLen > ComprDataCapacity || discSize < MinSize + ComprDataLen)

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using RVZSharp.Interfaces;
 
 namespace RVZSharp.Models;
@@ -26,5 +27,7 @@ public sealed record GczWriteOptions
     /// like Dolphin's DiscScrubber and the CLI's <c>--scrub</c>. Ignored for GameCube discs
     /// and Wii images without a game partition (ScrubbedBlob.Create returns null).
     /// </summary>
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global",
+        Justification = "Public API: the CLI wraps the input instead, but library callers set this.")]
     public bool Scrub { get; init; }
 }

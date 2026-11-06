@@ -104,7 +104,6 @@ public static class WbfsWriter
         output.Position = start + dataStart;
 
         var wlba = new ushort[blocksPerDisc];
-        var zeroCluster = -1;
         var volumeCluster = dataClusterBase;
         var cluster = new byte[clusterSize];
         var blockCount = (int)blocksPerDisc;
@@ -141,7 +140,7 @@ public static class WbfsWriter
 
         // Every all-zero disc cluster maps to one shared zero-filled volume cluster
         // (Dolphin's scrubber does the same); the reader rejects unmapped clusters.
-        zeroCluster = volumeCluster;
+        var zeroCluster = volumeCluster;
         if (zeroCluster > ushort.MaxValue)
         {
             throw new RvzFormatException(

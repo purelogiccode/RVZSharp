@@ -30,11 +30,11 @@ public class DiscFileSystemTests
         Assert.NotNull(hello);
         Assert.False(hello.IsDirectory);
         Assert.Equal("files/hello.txt", hello.Path);
-        Assert.Equal(HelloText.Length, hello.Size);
+        Assert.Equal(_helloText.Length, hello.Size);
 
         using var contents = new MemoryStream();
-        Assert.Equal(HelloText.Length, fs.CopyFileTo(hello, contents));
-        Assert.Equal(HelloText, contents.ToArray());
+        Assert.Equal(_helloText.Length, fs.CopyFileTo(hello, contents));
+        Assert.Equal(_helloText, contents.ToArray());
     }
 
     /// <summary>Verifies that game cube find is case insensitive and accepts leading slash.</summary>
@@ -57,7 +57,7 @@ public class DiscFileSystemTests
     {
         var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
         const int sectorCount = 130;
-        var data = TestWiiIsoBuilder.RandomData(sectorCount, 7);
+        var data = TestWiiIsoBuilder.RandomData(sectorCount);
 
         // The decrypted boot sector carries the Wii magic and the FST fields.
         WriteBe32(data, 0x18, WiiVolume.WII_MAGIC);
@@ -68,8 +68,8 @@ public class DiscFileSystemTests
         WriteBe32(data, 0x424, fstOffset >> 2);
         WriteBe32(data, 0x428, (uint)(fst.Length >> 2));
         fst.CopyTo(data, fstOffset);
-        HelloText.CopyTo(data, helloOffset);
-        DataBytes.CopyTo(data, dataOffset);
+        _helloText.CopyTo(data, helloOffset);
+        _dataBytes.CopyTo(data, dataOffset);
 
         var iso = TestWiiIsoBuilder.Build(key, sectorCount, data);
         using var blob = PlainBlob.Open(new MemoryStream(iso));
@@ -88,11 +88,11 @@ public class DiscFileSystemTests
 
         using var helloContents = new MemoryStream();
         fs.CopyFileTo(hello, helloContents);
-        Assert.Equal(HelloText, helloContents.ToArray());
+        Assert.Equal(_helloText, helloContents.ToArray());
 
         using var dataContents = new MemoryStream();
         fs.CopyFileTo(bytes, dataContents);
-        Assert.Equal(DataBytes, dataContents.ToArray());
+        Assert.Equal(_dataBytes, dataContents.ToArray());
     }
 
     /// <summary>
@@ -112,7 +112,7 @@ public class DiscFileSystemTests
 
         var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
         const int sectorCount = 130;
-        var data = TestWiiIsoBuilder.RandomData(sectorCount, 7);
+        var data = TestWiiIsoBuilder.RandomData(sectorCount);
         WriteBe32(data, 0x18, WiiVolume.WII_MAGIC);
         WriteBe32(data, 0x420, 0x800 >> 2);
         var iso = TestWiiIsoBuilder.Build(key, sectorCount, data);
@@ -128,7 +128,7 @@ public class DiscFileSystemTests
     {
         var key = Enumerable.Range(0, 16).Select(i => (byte)(i * 3 + 1)).ToArray();
         const int sectorCount = 70;
-        var data = TestWiiIsoBuilder.RandomData(sectorCount, 7);
+        var data = TestWiiIsoBuilder.RandomData(sectorCount);
         var iso = TestWiiIsoBuilder.Build(key, sectorCount, data);
 
         using var blob = PlainBlob.Open(new MemoryStream(iso));
@@ -365,8 +365,8 @@ public class DiscFileSystemTests
         return fst;
     }
 
-    private static readonly byte[] HelloText = "hello from the disc!\n"u8.ToArray();
-    private static readonly byte[] DataBytes = [0x00, 0x01, 0x02, 0x03, 0xFE, 0xFF, 0x7F, 0x80];
+    private static readonly byte[] _helloText = "hello from the disc!\n"u8.ToArray();
+    private static readonly byte[] _dataBytes = [0x00, 0x01, 0x02, 0x03, 0xFE, 0xFF, 0x7F, 0x80];
 
     /// <summary>
     /// A GameCube ISO with one directory and two files. The FST lives at 0x3000 and the file
@@ -390,8 +390,8 @@ public class DiscFileSystemTests
         WriteBe32(iso, 0x424, fstOffset);
         WriteBe32(iso, 0x428, (uint)fst.Length);
         fst.CopyTo(iso, fstOffset);
-        HelloText.CopyTo(iso, helloOffset);
-        DataBytes.CopyTo(iso, dataOffset);
+        _helloText.CopyTo(iso, helloOffset);
+        _dataBytes.CopyTo(iso, dataOffset);
         return iso;
     }
 
@@ -428,12 +428,12 @@ public class DiscFileSystemTests
         // Entry 2: file "hello.txt" at helloOffset.
         WriteBe32(fst, 24, 7);
         WriteBe32(fst, 28, (uint)(helloOffset >> offsetShift));
-        WriteBe32(fst, 32, (uint)HelloText.Length);
+        WriteBe32(fst, 32, (uint)_helloText.Length);
 
         // Entry 3: file "data.bin" at dataOffset.
         WriteBe32(fst, 36, 17);
         WriteBe32(fst, 40, (uint)(dataOffset >> offsetShift));
-        WriteBe32(fst, 44, (uint)DataBytes.Length);
+        WriteBe32(fst, 44, (uint)_dataBytes.Length);
 
         return fst;
     }

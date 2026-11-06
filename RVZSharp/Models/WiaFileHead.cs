@@ -170,13 +170,14 @@ public readonly struct WiaFileHead
 
         // Bound the disc struct before the caller allocates it: a hostile head can otherwise
         // request a multi-gigabyte allocation (the SHA-1 is unkeyed and recomputable).
-        if (DiscSize < WiaDisc.MinSize)
+        if (DiscSize < WiaDisc.MinSize || DiscSize > WiaDisc.Size)
         {
             throw new RvzFormatException(
-                $"The disc struct size {DiscSize} is smaller than the minimum {WiaDisc.MinSize}.");
+                $"The disc struct size {DiscSize} is outside the supported range "
+                + $"{WiaDisc.MinSize}..{WiaDisc.Size}.");
         }
 
-        if ((ulong)DiscSize > (ulong)actualFileSize - Size)
+        if (actualFileSize < Size || DiscSize > (ulong)actualFileSize - Size)
         {
             throw new RvzFormatException(
                 $"The disc struct size {DiscSize} does not fit the {actualFileSize}-byte file.");

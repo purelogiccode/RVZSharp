@@ -21,10 +21,11 @@ public sealed class SectionStream : Stream
         // A section outside the stream means a truncated/corrupt container: report it as a
         // format error (Dolphin's OffsetRead fails cleanly, WIABlob.cpp:168-171, 698) instead
         // of leaking an ArgumentOutOfRangeException out of RvzReader.Open.
-        if (start < 0 || length < 0 || start + length > baseStream.Length)
+        if (start < 0 || length < 0 || start > baseStream.Length ||
+            length > baseStream.Length - start)
         {
             throw new RvzFormatException(
-                $"Section [{start}, {start + length}) is outside the stream of length {baseStream.Length}.");
+                $"Section [{start}, +{length}) is outside the stream of length {baseStream.Length}.");
         }
 
         _base = baseStream;

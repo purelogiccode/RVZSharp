@@ -75,7 +75,7 @@ public class CompressionCodecTests
         byte[] compressed;
         using (var ms = new MemoryStream())
         {
-            using (var cs = new ZstdSharp.CompressionStream(ms, 3, 0, leaveOpen: true))
+            using (var cs = new ZstdSharp.CompressionStream(ms, leaveOpen: true))
             {
                 cs.Write(payload);
             }
@@ -177,7 +177,7 @@ public class CompressionCodecTests
     public void Bzip2_WithProperties_IgnoresThem()
     {
         var payload = MakePayload(200_000);
-        var (encoder, _) = CompressionEncoderFactory.Create(CompressionType.Bzip2, 5);
+        var (encoder, _) = CompressionEncoderFactory.Create(CompressionType.Bzip2);
         var compressed = encoder.Compress(payload);
 
         using var input = new MemoryStream(compressed);

@@ -146,7 +146,7 @@ public class BlobFactoryTests
     public void Open_NfsKeyOverload_OpensNfs()
     {
         var key = Enumerable.Range(0, 16).Select(i => (byte)(i + 1)).ToArray();
-        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 4, new (uint, uint)[] { (0, 4) });
+        var (nfs, _) = TestLegacyBuilders.BuildNfs(key, 4, [(0, 4)]);
 
         using var blob = Blob.Open(new MemoryStream(nfs), key);
         Assert.Equal(BlobType.Nfs, blob.Type);

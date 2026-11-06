@@ -50,6 +50,20 @@ public class LaggedFibonacciGeneratorTests
         _ = seed;
     }
 
+    /// <summary>Verifies that invalid seed/size/count arguments are rejected.</summary>
+    [Fact]
+    public void Arguments_AreValidated()
+    {
+        var generator = new LaggedFibonacciGenerator();
+        Assert.Throws<ArgumentException>(() => generator.SetSeed(new byte[67]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => generator.ForwardBytes(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => generator.GetBytes(2, new byte[1]));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            LaggedFibonacciGenerator.GetSeed(new byte[1], 2, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            LaggedFibonacciGenerator.GetSeed(new byte[1], 1, -1));
+    }
+
     /// <summary>Verifies that generator matches reference PRNG.</summary>
     [Fact]
     public void Generator_MatchesReferencePrng()

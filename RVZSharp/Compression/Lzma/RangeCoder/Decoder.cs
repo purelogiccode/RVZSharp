@@ -1,6 +1,7 @@
 #nullable disable
 
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace RVZSharp.Compression.Lzma.RangeCoder;
@@ -9,6 +10,8 @@ namespace RVZSharp.Compression.Lzma.RangeCoder;
 /// Range decoder: maintains the Code/Range interval state and pulls bytes from the
 /// compressed stream so probability-coded and direct bits can be extracted.
 /// </summary>
+[SuppressMessage("ReSharper", "InconsistentNaming",
+    Justification = "Names mirror the LZMA SDK reference implementation.")]
 internal class Decoder
 {
     /// <summary>Interval width below which the code state must be re-normalized.</summary>

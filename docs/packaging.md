@@ -122,14 +122,14 @@ Release is created and nothing is pushed to nuget.org.
   every `master` push touching `docs/` (plus manual runs), after generating the DocFX
   API reference from the library XML comments with `dotnet docfx docfx/docfx.json`
   and copying it to `docs/api/`. `_config.yml` selects
-  the Cayman theme, `index.md` renders this folder's `README.md` as the home
-  page, `_data/nav.yml` + `_layouts/default.html` render the side menu, and
+  the Cayman theme, `README.md` is the home page (`permalink: /`),
+  `_data/nav.yml` + `_layouts/default.html` render the side menu, and
   internal links use the `.md` form (`[CLI](usage-cli.md)`), which Jekyll converts
   to `.html`.
 - **GitHub Wiki** — `.github/workflows/wiki.yml` mirrors `docs/` into the
-  repository wiki on the same trigger: `README.md` → `Home.md`, `format/*.md` →
-  `format/…` subpages, `_Sidebar.md` kept as-is (the wiki sidebar), Jekyll-only
-  files (`index.md`, `_config.yml`, `_data/`, `_layouts/`) dropped, and relative
+  repository wiki on the same trigger: `README.md` → `Home.md` (front matter
+  stripped), `format/*.md` → `format/…` subpages, `_Sidebar.md` kept as-is (the wiki
+  sidebar), Jekyll-only files (`_config.yml`, `_data/`, `_layouts/`) dropped, and relative
   `page.md` links rewritten to the extensionless wiki form (`[CLI](usage-cli)`;
   anchors and absolute URLs untouched). The wiki is fully generated — edit
   `docs/`, never the wiki pages (manual edits are overwritten on the next sync).

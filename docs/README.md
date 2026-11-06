@@ -1,3 +1,9 @@
+---
+layout: default
+title: RVZSharp
+permalink: /
+---
+
 [![CI](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/RVZSharp/actions/workflows/ci.yml)
 [![Docs](https://github.com/purelogiccode/RVZSharp/actions/workflows/pages.yml/badge.svg)](https://purelogiccode.github.io/RVZSharp/)
 [![.NET](https://img.shields.io/badge/.NET-8.0_%7C_9.0_%7C_10.0-blueviolet)](https://dotnet.microsoft.com/)
@@ -71,8 +77,8 @@ These pages are published twice from the same files, automatically:
 
 - **GitHub Pages** (`.github/workflows/pages.yml`) builds this folder with Jekyll on
   every `master` push touching `docs/`; it first generates the DocFX API reference from
-  the library XML comments into `/api/`, then `index.md` renders this page as the home
-  page and the side menu comes from [`_data/nav.yml`](_data/nav.yml) rendered by
+  the library XML comments into `/api/`, then `README.md` is the home page
+  (`permalink: /`) and the side menu comes from [`_data/nav.yml`](_data/nav.yml) rendered by
   [`_layouts/default.html`](_layouts/default.html). Internal links use the `.md` form,
   which Jekyll converts to `.html`.
 - **GitHub Wiki** (`.github/workflows/wiki.yml`) mirrors these pages to the wiki root

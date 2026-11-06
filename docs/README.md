@@ -78,13 +78,13 @@ These pages are published twice from the same files, automatically:
 - **GitHub Pages** (`.github/workflows/pages.yml`) builds this folder with Jekyll on
   every `master` push touching `docs/`; it first generates the DocFX API reference from
   the library XML comments into `/api/`, then `README.md` is the home page
-  (`permalink: /`) and the side menu comes from [`_data/nav.yml`](_data/nav.yml) rendered by
-  [`_layouts/default.html`](_layouts/default.html). Internal links use the `.md` form,
-  which Jekyll converts to `.html`.
+  (`permalink: /`) and the side menu comes from `_data/nav.yml` rendered by
+  `_layouts/default.html`. Internal links use the `.md` form, which Jekyll converts
+  to `.html`.
 - **GitHub Wiki** (`.github/workflows/wiki.yml`) mirrors these pages to the wiki root
   on the same trigger (`README.md` → `Home.md`, `format/*.md` → `format/…` subpages,
-  [`_Sidebar.md`](_Sidebar.md) kept as the wiki sidebar, Jekyll-only files dropped);
-  relative links are rewritten to the extensionless wiki form. The wiki is fully
+  `_Sidebar.md` kept as the wiki sidebar, Jekyll-only files dropped); relative links
+  are rewritten to the extensionless wiki form. The wiki is fully
   generated — edit these files, never the wiki pages.
 
 Releases (bundled CLI zips, NuGet publishing) and the automation setup are documented

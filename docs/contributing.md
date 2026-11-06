@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # Contributing
 
 Contributions are welcome: bug reports, format-compatibility fixes, documentation and tests.

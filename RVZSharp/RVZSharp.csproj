@@ -5,8 +5,8 @@
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Company>PureLogicCode.com</Company>
-        <AssemblyVersion>1.2.0</AssemblyVersion>
-        <FileVersion>1.2.0</FileVersion>
+        <AssemblyVersion>1.3.0</AssemblyVersion>
+        <FileVersion>1.3.0</FileVersion>
         <NeutralLanguage>en</NeutralLanguage>
         <!-- Native AOT / trimming: the library is fully reflection-free, so the trim and AOT
          analyzers must stay clean for every target framework. -->
@@ -30,6 +30,11 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageReleaseNotes>
+            1.3.0: distribution release. Targets net8.0, net9.0, net10.0 and net11.0
+            (C# 15), adds the RVZSharp.Cli .NET tool package and WinGet distribution, and
+            fixes literal surrounding quotes in CLI path arguments. Dependency updates
+            include Microsoft.NET.Test.Sdk 18.12.0 (CVE-2026-105544 fix). Public API stays
+            compatible with 1.0.0.
             1.2.0: security and robustness release. CLI convert now defaults to RVZ with
             Dolphin-compatible block/compression defaults, hostile-input parsing is bounded
             (WIA/TGC/GCZ/NFS/FST, table and stream arithmetic), TGC extraction handles
@@ -60,8 +65,8 @@
          nuget.org rejects it ("does not contain any symbol files"). Debuggers read the
          embedded PDBs directly. -->
         <IncludeSymbols>false</IncludeSymbols>
-        <!-- Validates that every target framework (net8.0/net9.0/net10.0) asset is compatible
-         with the package's supported frameworks, and that the public API stays compatible
+        <!-- Validates that every target framework (net8.0/net9.0/net10.0/net11.0) asset is
+         compatible with the package's supported frameworks, and that the public API stays compatible
          with the last published release (1.0.0). Breaking changes must be suppressed with a
          justification in CompatibilitySuppressions.xml (see docs/packaging.md). -->
         <EnablePackageValidation>true</EnablePackageValidation>

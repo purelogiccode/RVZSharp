@@ -1,10 +1,30 @@
 # What's new in RVZSharp
 
 Release highlights, newest first. The full announcements are in
+[`docs/release-notes-1.3.0.md`](docs/release-notes-1.3.0.md),
 [`docs/release-notes-1.2.0.md`](docs/release-notes-1.2.0.md),
 [`docs/release-notes-1.1.1.md`](docs/release-notes-1.1.1.md),
 [`docs/release-notes-1.1.0.md`](docs/release-notes-1.1.0.md) and
 [`docs/release-notes-1.0.0.md`](docs/release-notes-1.0.0.md).
+
+## 1.3.0 (2026-11-27)
+
+A distribution and compatibility release. The public API stays compatible with 1.0.0.
+
+- **.NET 8 through .NET 11** - library, CLI and tests target `net8.0`/`net9.0`/`net10.0`/
+  `net11.0` with C# 15; benchmarks target `net11.0`.
+- **Two NuGet packages** - `RVZSharp` (library) and the new multi-target `RVZSharp.Cli`
+  .NET tool package (`rvzsharp` command).
+- **WinGet** - Windows CLI releases are published as `PureLogicCode.RVZSharp`.
+- **Release archives** - Linux bundles are `.tar.gz`, Apple Silicon macOS bundles are
+  `.dmg`, and Windows/macOS Intel bundles remain `.zip`.
+- **Quoted paths fixed** - literal surrounding quotes are stripped from CLI arguments and
+  file-open errors include the path.
+- **Dependencies** - coverlet.collector 10.1.1, Meziantou.Analyzer 3.0.342,
+  Microsoft.NET.Test.Sdk 18.12.0 (CVE-2026-105544 fix), Microsoft.SourceLink.GitHub
+  10.0.404 and ZstdSharp.Port 0.9.1.
+- **Tests** - **613 library tests** and **106 CLI tests** per framework, plus **301 slow
+  tests** per framework.
 
 ## 1.2.0 (2026-11-06)
 

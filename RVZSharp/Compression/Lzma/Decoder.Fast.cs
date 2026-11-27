@@ -5,7 +5,7 @@ using RVZSharp.Compression.Lzma.LZ;
 
 namespace RVZSharp.Compression.Lzma;
 
-// Fast LZMA decode path (net8.0+ only, see Directory.Build.props target frameworks). This
+// Fast LZMA decode path (see Directory.Build.props target framework). This
 // mirrors the design of the reference LZMA SDK / 7-Zip C decoder (LzmaDec.c): probabilities
 // are stored in flat ushort arrays (instead of arrays of BitDecoder structs reached through
 // nested decoder objects),

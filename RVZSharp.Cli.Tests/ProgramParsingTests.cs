@@ -68,11 +68,48 @@ public class ProgramParsingTests
         Assert.Contains("invalid choice", exception.Message);
     }
 
+    /// <summary>Verifies that literal surrounding quotes are stripped from arguments.</summary>
+    [Theory]
+    [InlineData("\"C:\\Games\\game.rvz\"", "C:\\Games\\game.rvz")]
+    [InlineData("'game.iso'", "game.iso")]
+    [InlineData("\"game.rvz", "\"game.rvz")]
+    [InlineData("game.rvz\"", "game.rvz\"")]
+    [InlineData("\"\"", "")]
+    [InlineData("", "")]
+    public void UnquoteArgument_RemovesOnlyMatchingOuterQuotes(string argument, string expected)
+    {
+        Assert.Equal(expected, Program.UnquoteArgument(argument));
+    }
+
+    /// <summary>Verifies quoted path values are unquoted before they reach file I/O.</summary>
+    [Fact]
+    public void ParseArgs_QuotedSeparateValue_IsUnquoted()
+    {
+        var result = Program.ParseArgs(["-i", "\"game.iso\""], _spec);
+        Assert.Equal("game.iso", result.Get("input"));
+    }
+
+    /// <summary>Verifies quoted inline values are unquoted before they reach file I/O.</summary>
+    [Fact]
+    public void ParseArgs_QuotedInlineValue_IsUnquoted()
+    {
+        var result = Program.ParseArgs(["--input='game.rvz'"], _spec);
+        Assert.Equal("game.rvz", result.Get("input"));
+    }
+
+    /// <summary>Verifies quoted choices are unquoted before choice validation.</summary>
+    [Fact]
+    public void ParseArgs_QuotedChoice_IsUnquotedBeforeValidation()
+    {
+        var result = Program.ParseArgs(["-f", "\"rvz\""], _spec);
+        Assert.Equal("rvz", result.Get("format"));
+    }
+
     /// <summary>Verifies that the product version matches the released version and parses.</summary>
     [Fact]
     public void CliVersion_MatchesProductVersion()
     {
-        Assert.StartsWith("1.2.0", CliVersion.Product);
-        Assert.Equal(new Version(1, 2, 0), CliVersion.Parsed);
+        Assert.StartsWith("1.3.0", CliVersion.Product);
+        Assert.Equal(new Version(1, 3, 0), CliVersion.Parsed);
     }
 }

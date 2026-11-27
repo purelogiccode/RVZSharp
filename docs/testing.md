@@ -3,8 +3,8 @@
 The test suite is split into **three projects**, so the default run is always the fast one:
 
 - **`RVZSharp.Tests`** — **613 synthetic tests** (unit + end-to-end round trips), ~1
-  minute per framework (`net8.0`, `net9.0`, `net10.0`). It is part of the solution.
-- **`RVZSharp.Cli.Tests`** — **97 tests** (net10.0) for the CLI: option parsing, extract path
+  minute per framework (`net8.0`, `net9.0`, `net10.0`, `net11.0`). It is part of the solution.
+- **`RVZSharp.Cli.Tests`** — **106 tests** (net8.0–net11.0) for the CLI: option parsing, extract path
   guards, shell-completion scripts, the update checker (release tags, HTTP responses and
   `RVZSHARP_NO_UPDATE_CHECK`), ApplicationStats telemetry, the Serilog bug-report sink and
   the required bug-report environment/error/exception layout. Part of the solution.
@@ -17,7 +17,7 @@ Throughput measurements live in **`RVZSharp.Benchmarks`** (BenchmarkDotNet; see
 [Benchmarks](#benchmarks) below).
 
 ```bash
-# fast suite (default; runs per target framework of the solution)
+# fast suite (default)
 dotnet test CSharp_RVZSharp.sln -c Release
 
 # a single class
@@ -26,7 +26,7 @@ dotnet test CSharp_RVZSharp.sln -c Release --filter "FullyQualifiedName~RvzWrite
 # slow / real-file suite (explicit opt-in; not part of the solution)
 dotnet test RVZSharp.Slow.Tests -c Release
 
-# a single framework (either project)
+# a single framework
 dotnet test RVZSharp.Slow.Tests -c Release --framework net8.0
 ```
 
@@ -56,10 +56,11 @@ byte-for-byte against their official No-Intro SHA-1s:
 6. **Concurrency** (`ConcurrentReadTests`): parallel random `ReadAt` calls on GC/Wii
    containers (mixed with `ReadFully`) must match the reference ISO byte-for-byte.
 7. **Continuous integration** (`.github/workflows/ci.yml`): builds the solution and runs the
-   fast suite on `net8.0`/`net9.0`/`net10.0` with coverage uploaded as an artifact, repeats
-   the net10.0 build/tests on Windows and macOS, builds the DocFX API reference, packs the
-   library (API-compat against 1.0.0 + embedded SBOM) and publishes a smoke-tested
-   framework-dependent single-file CLI. CodeQL, dependency review, the wiki and Pages
+   fast suite on `net8.0`, `net9.0`, `net10.0` and `net11.0` with coverage uploaded as an
+   artifact, repeats the net11.0 build/tests on Windows and macOS, builds the DocFX API
+   reference, packs the library and CLI tool packages (API-compat against 1.0.0 + embedded
+   SBOM for the library) and publishes a smoke-tested framework-dependent single-file CLI.
+   CodeQL, dependency review, the wiki and Pages
    deployments run in their own workflows; the slow suite and differential tests stay opt-in
    on developer machines.
 8. **1.1.0 correctness review**: a commit-by-commit audit pinned the fixes below with
@@ -197,7 +198,7 @@ All of them no-op when the tool or the ISO is unset.
 
 ## Benchmarks
 
-`RVZSharp.Benchmarks` (BenchmarkDotNet, net10.0) measures encode and decode throughput on a
+`RVZSharp.Benchmarks` (BenchmarkDotNet, net11.0) measures encode and decode throughput on a
 16 MiB synthetic GameCube image (half random data, a quarter zeroes):
 
 | Class | What it measures |

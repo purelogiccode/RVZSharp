@@ -25,6 +25,7 @@ RVZSharp is a pure managed .NET library and command-line tool for GameCube/Wii d
 | `RVZSharp.Cli.Tests/` | CLI parser, update-check and logging tests. |
 | `RVZSharp.Slow.Tests/` | Real-file and differential tests against `DolphinTool.exe`. |
 | `RVZSharp.Benchmarks/` | BenchmarkDotNet suites. |
+| `scripts/` | WinGet manifest generator used by the release workflow. |
 | `docs/` | Jekyll site, GitHub Wiki source and user documentation. |
 | `docfx/` | API reference configuration (DocFX) published under `/api/`. |
 | `.github/workflows/` | CI, CodeQL, dependency review, Pages, Wiki and Release automation. |
@@ -32,8 +33,9 @@ RVZSharp is a pure managed .NET library and command-line tool for GameCube/Wii d
 
 ## Prerequisites
 
-- .NET SDK **10.0** (see `global.json`; it rolls forward to the latest major).
-- The library targets `net8.0`, `net9.0` and `net10.0`; tests run on all three.
+- .NET SDK **11.0** (see `global.json`; it rolls forward to the latest major).
+- The library, CLI and tests target `net8.0`, `net9.0`, `net10.0` and `net11.0` with
+  C# 15; the benchmarks target `net11.0`.
 - Windows, Linux or macOS. The CLI ships framework-dependent single-file builds for
   `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64` and `osx-arm64`.
 - Optional for slow tests: `DolphinTool.exe` at the repository root.
@@ -155,8 +157,11 @@ live in `RVZSharp.Cli` and use Serilog exclusively:
    `RVZSharp/RVZSharp.csproj`, and update `WhatsNew.md`.
 2. Add `docs/release-notes-<version>.md`.
 3. Push a `v<version>` tag. `.github/workflows/release.yml` builds all RIDs, runs the
-   smoke tests, packs the NuGet package, creates the GitHub Release with checksums and
-   pushes stable versions to nuget.org when `NUGET_API_KEY` is configured.
+   smoke tests, packages Windows/macOS Intel bundles as `.zip`, Linux as `.tar.gz` and
+   Apple Silicon as `.dmg`, packs both NuGet packages (`RVZSharp` and the `RVZSharp.Cli`
+   .NET tool), creates the GitHub Release with checksums and the WinGet manifest bundle,
+   pushes stable versions to nuget.org when `NUGET_API_KEY` is configured, and submits
+   the WinGet manifest when `WINGET_TOKEN` is configured.
 4. Dry-run with `workflow_dispatch` and a version input; no release is created.
 
 ## Linux VM validation
@@ -166,7 +171,7 @@ machine-specific IP addresses or credentials. Use environment variables or a loc
 git-ignored file (for example `AGENTS.local.md`) for host details, then:
 
 ```powershell
-dotnet publish RVZSharp.Cli/RVZSharp.Cli.csproj -c Release -f net10.0 -r linux-x64 --self-contained false -p:PublishSingleFile=true -o artifacts/linux-x64
+dotnet publish RVZSharp.Cli/RVZSharp.Cli.csproj -c Release -f net11.0 -r linux-x64 --self-contained false -p:PublishSingleFile=true -o artifacts/linux-x64
 # copy artifacts/linux-x64/RVZSharp to the VM and run:
 ./RVZSharp --help
 ./RVZSharp header -i /path/to/sample.rvz

@@ -2,23 +2,29 @@ name: Release
 
 # Builds the release bundles and publishes them on GitHub.
 #
-#   Push a tag `v<version>` (e.g. `v1.1.0`, `v1.2.0-beta.1`; valid SemVer after the
+#   Push a tag `v<version>` (e.g. `v1.2.0`, `v1.3.0-beta.1`; valid SemVer after the
 #   leading `v`, no `+build` metadata) to:
 #     1. publish the framework-dependent single-file CLI for win-x64, win-arm64,
-#        linux-x64, linux-arm64, osx-x64 and osx-arm64 (the .NET 10 runtime is NOT
-#        embedded: target machines install the .NET 10 Runtime), smoke-test each
-#        binary on a native runner, and zip it with LICENSE, THIRD-PARTY-NOTICES.md,
-#        README.md and WhatsNew.md -> rvzsharp_v<version>_<rid>.zip (the naming the
+#        linux-x64, linux-arm64, osx-x64 and osx-arm64 (the .NET 11 runtime is NOT
+#        embedded: target machines install the .NET 11 Runtime), smoke-test each
+#        binary on a native runner, and package it with LICENSE, THIRD-PARTY-NOTICES.md,
+#        README.md and WhatsNew.md -> rvzsharp_v<version>_<rid>.zip on Windows and
+#        macOS Intel, .tar.gz on Linux and .dmg on Apple Silicon (the naming the
 #        update-check clients expect)
-#     2. pack the RVZSharp NuGet package (embedded PDBs, so no symbols package)
-#     3. create the GitHub Release with the zips, SHA256SUMS.txt and the packages;
-#        the release notes come from docs/release-notes-<version>.md when present
-#     4. push the package to nuget.org for stable versions (needs the NUGET_API_KEY
+#     2. pack the RVZSharp library and RVZSharp.Cli .NET tool NuGet packages
+#        (embedded PDBs, so no symbols package)
+#     3. create the GitHub Release with the archives, SHA256SUMS.txt, the packages and
+#        the generated WinGet manifest bundle; the release notes come from
+#        docs/release-notes-<version>.md when present
+#     4. push both packages to nuget.org for stable versions (needs the NUGET_API_KEY
 #        repository secret from nuget.org -> API Keys)
+#     5. submit the WinGet manifests to microsoft/winget-pkgs for stable versions
+#        (needs the WINGET_TOKEN repository secret; manifests are still attached to
+#        the release without it)
 #
 #   Run it manually (workflow_dispatch) for a dry run: everything above runs except
-#   the GitHub Release creation and the nuget.org push, and the artifacts stay
-#   available on the workflow run for inspection.
+#   the GitHub Release creation, the nuget.org push and the WinGet submission, and the
+#   artifacts stay available on the workflow run for inspection.
 
 on:
   push:
@@ -26,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g. 1.1.0 or 1.2.0-beta.1). Dry run only: no GitHub Release, no nuget.org push.'
+        description: 'Version to build (e.g. 1.2.0 or 1.3.0-beta.1). Dry run only: no GitHub Release, no nuget.org push.'
         required: true
 
 permissions:
@@ -80,69 +86,91 @@ jobs:
           - rid: win-x64
             os: windows-latest
             exe: RVZSharp.exe
+            archive: zip
           - rid: win-arm64
             os: windows-11-arm
             exe: RVZSharp.exe
+            archive: zip
           - rid: linux-x64
             os: ubuntu-latest
             exe: RVZSharp
+            archive: tar.gz
           - rid: linux-arm64
             os: ubuntu-24.04-arm
             exe: RVZSharp
+            archive: tar.gz
           - rid: osx-x64
             os: macos-15-intel
             exe: RVZSharp
+            archive: zip
           - rid: osx-arm64
             os: macos-latest
             exe: RVZSharp
+            archive: dmg
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
       VERSION: ${{ needs.version.outputs.version }}
       RID: ${{ matrix.rid }}
+      ARCHIVE: ${{ matrix.archive }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       # Framework-dependent single-file CLI: one binary per runtime, no .NET runtime
-      # embedded. Target machines install the .NET 10 Runtime; each bundle is smoke
+      # embedded. Target machines install the .NET 11 Runtime; each bundle is smoke
       # tested on a native runner so a broken apphost cannot ship.
       - name: Publish
         run: >
-          dotnet publish RVZSharp.Cli/RVZSharp.Cli.csproj -c Release -f net10.0
+          dotnet publish RVZSharp.Cli/RVZSharp.Cli.csproj -c Release -f net11.0
           -r ${{ matrix.rid }} --self-contained false
           -p:Version=${{ needs.version.outputs.version }}
           -p:PublishSingleFile=true
           -o artifacts/publish/${{ matrix.rid }}
       - name: Smoke test
         run: ./artifacts/publish/${{ matrix.rid }}/${{ matrix.exe }} --help
-      - name: Bundle zip
+      - name: Bundle archive
         shell: pwsh
         run: |
           $bundle = "artifacts/bundle/rvzsharp_v$($env:VERSION)_$($env:RID)"
           New-Item -ItemType Directory -Path $bundle -Force | Out-Null
           Copy-Item "artifacts/publish/$env:RID/*" $bundle
           Copy-Item LICENSE, THIRD-PARTY-NOTICES.md, README.md, WhatsNew.md $bundle
-          if ($IsWindows) {
-            Compress-Archive -Path "$bundle/*" -DestinationPath "$bundle.zip" -CompressionLevel Optimal
-          } else {
-            # zip(1) keeps the executable bit that Compress-Archive drops on Unix.
-            Push-Location $bundle
-            & zip -r -q "../rvzsharp_v$($env:VERSION)_$($env:RID).zip" .
-            Pop-Location
+          $archive = Join-Path $PWD.Path "artifacts/bundle/rvzsharp_v$($env:VERSION)_$($env:RID).$($env:ARCHIVE)"
+          switch ($env:ARCHIVE) {
+            'zip' {
+              if ($IsWindows) {
+                Compress-Archive -Path "$bundle/*" -DestinationPath $archive -CompressionLevel Optimal
+              } else {
+                # zip(1) keeps the executable bit that Compress-Archive drops on Unix.
+                Push-Location $bundle
+                & zip -r -q $archive .
+                Pop-Location
+              }
+            }
+            'tar.gz' {
+              # tar preserves the executable bit and Unix file metadata.
+              & tar -czf $archive -C $bundle .
+            }
+            'dmg' {
+              hdiutil create -volname "RVZSharp $env:VERSION" -srcfolder $bundle -ov -format UDZO $archive
+            }
+            default {
+              throw "Unknown archive format: $env:ARCHIVE"
+            }
           }
-          Get-Item "$bundle.zip"
+          Get-Item $archive
       - name: Upload bundle
         uses: actions/upload-artifact@v7
         with:
           name: rvzsharp-${{ needs.version.outputs.version }}-${{ matrix.rid }}
-          path: artifacts/bundle/rvzsharp_v${{ needs.version.outputs.version }}_${{ matrix.rid }}.zip
+          path: artifacts/bundle/rvzsharp_v${{ needs.version.outputs.version }}_${{ matrix.rid }}.${{ matrix.archive }}
           if-no-files-found: error
           retention-days: 30
 
   package:
-    name: Pack NuGet
+    name: Pack NuGet packages
     needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -150,15 +178,14 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
-      # Runs EnablePackageValidation (baseline: last published release) and embeds the
-      # SPDX SBOM (Microsoft.Sbom.Targets, Release only).
+          dotnet-version: 11.0.x
+      # Runs EnablePackageValidation (baseline: last published release), embeds the
+      # SPDX SBOM in the library package (Microsoft.Sbom.Targets, Release only) and
+      # builds the CLI .NET tool package.
       - name: Pack
-        run: >
-          dotnet pack RVZSharp/RVZSharp.csproj -c Release
-          -p:Version=${{ needs.version.outputs.version }}
-          -p:ContinuousIntegrationBuild=true
-          -o artifacts/packages
+        run: |
+          dotnet pack RVZSharp/RVZSharp.csproj -c Release -p:Version=${{ needs.version.outputs.version }} -p:ContinuousIntegrationBuild=true -o artifacts/packages
+          dotnet pack RVZSharp.Cli/RVZSharp.Cli.csproj -c Release -p:Version=${{ needs.version.outputs.version }} -p:ContinuousIntegrationBuild=true -o artifacts/packages
       - name: Upload packages
         uses: actions/upload-artifact@v7
         with:
@@ -196,7 +223,8 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           Set-Location artifacts/release
-          Get-ChildItem *.zip | ForEach-Object {
+          Remove-Item SHA256SUMS.txt -ErrorAction SilentlyContinue
+          Get-ChildItem -File | Where-Object { $_.Name -match '\.(zip|tar\.gz|dmg)$' } | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             "$hash  $($_.Name)" >> SHA256SUMS.txt
           }
@@ -220,8 +248,64 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             artifacts/release/*.zip
+            artifacts/release/*.tar.gz
+            artifacts/release/*.dmg
             artifacts/release/SHA256SUMS.txt
             artifacts/release/*.nupkg
+
+  winget:
+    name: Submit WinGet manifest
+    needs: [version, release]
+    if: github.ref_type == 'tag' && needs.version.outputs.prerelease == 'false'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RELEASE_TAG: ${{ needs.version.outputs.tag }}
+      WINGETCREATE_VERSION: 1.28.1.0
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+      - name: Download Windows bundles
+        uses: actions/download-artifact@v8
+        with:
+          pattern: rvzsharp-${{ needs.version.outputs.version }}-win-*
+          path: artifacts/winget
+          merge-multiple: true
+      - name: Generate WinGet manifests
+        shell: pwsh
+        run: >
+          ./scripts/Generate-WingetManifests.ps1
+          -Version $env:VERSION
+          -ReleaseTag $env:RELEASE_TAG
+          -InputDirectory artifacts/winget
+          -OutputDirectory artifacts/winget-manifests
+      - name: Attach manifests to release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Compress-Archive -Path artifacts/winget-manifests/* -DestinationPath "artifacts/rvzsharp_v$($env:VERSION)_winget.zip" -Force
+          gh release upload $env:RELEASE_TAG "artifacts/rvzsharp_v$($env:VERSION)_winget.zip" --clobber
+      - name: Download WinGetCreate
+        shell: pwsh
+        run: >
+          Invoke-WebRequest
+          -Uri "https://github.com/microsoft/winget-create/releases/download/v$env:WINGETCREATE_VERSION/wingetcreate.exe"
+          -OutFile wingetcreate.exe
+      - name: Submit to winget-pkgs (skipped without WINGET_TOKEN)
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINGET_TOKEN)) {
+            Write-Warning 'WINGET_TOKEN is not set; manifests were attached to the release for manual submission.'
+            exit 0
+          }
+          ./wingetcreate.exe submit --prtitle "Update PureLogicCode.RVZSharp to $env:VERSION" --token $env:WINGET_TOKEN --no-open artifacts/winget-manifests
 
   nuget:
     name: Push to nuget.org
@@ -232,7 +316,7 @@ jobs:
     steps:
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - name: Download packages
         uses: actions/download-artifact@v8
         with:

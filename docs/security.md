@@ -8,7 +8,8 @@ built into the repository.
 
 | Version | Supported |
 |---|---|
-| 1.2.x | Yes - active development |
+| 1.3.x | Yes - active development |
+| 1.2.x | Security fixes only |
 | 1.1.x | Security fixes only |
 | 1.0.x | Security fixes only |
 | Older | No |
@@ -44,6 +45,8 @@ at the repository root.
 | Dependency review on pull requests | `.github/workflows/dependency-review.yml` |
 | Dependabot updates + security updates | `.github/dependabot.yml` |
 | Secret scanning and push protection | GitHub repository settings |
+| Private vulnerability reporting | GitHub Security → Advisories |
+| Branch protection: required CI/CodeQL/DocFX/dependency checks, no force pushes or deletions | `master` branch protection |
 | API compatibility and package validation | `RVZSharp/RVZSharp.csproj` |
 | SPDX SBOM on Release builds | `Microsoft.Sbom.Targets` |
 | Least-privilege CI permissions | `.github/workflows/*.yml` |

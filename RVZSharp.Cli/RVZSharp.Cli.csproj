@@ -2,6 +2,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\RVZSharp\RVZSharp.csproj" />
+        <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="11.0.0" />
         <PackageReference Include="Roslynator.Analyzers" Version="5.0.1">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

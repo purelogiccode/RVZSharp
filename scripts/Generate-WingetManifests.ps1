@@ -108,7 +108,7 @@ PublisherSupportUrl: https://github.com/$repository/issues
 PackageName: RVZSharp
 PackageUrl: https://github.com/$repository
 License: GPL-2.0-or-later
-LicenseUrl: https://github.com/$repository/blob/master/LICENSE
+LicenseUrl: https://raw.githubusercontent.com/$repository/master/LICENSE
 Copyright: Copyright (c) Peterson Fernandes
 ShortDescription: Convert, inspect, verify and extract GameCube/Wii disc images.
 Description: >-

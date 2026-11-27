@@ -231,6 +231,8 @@ container magic).
 
 ### CLI
 
+[![RVZSharp.Cli on NuGet](https://img.shields.io/nuget/v/RVZSharp.Cli?color=blue&label=RVZSharp.Cli)](https://www.nuget.org/packages/RVZSharp.Cli/)
+
 Install it as a .NET tool (or `winget install PureLogicCode.RVZSharp` on Windows):
 
 ```bash

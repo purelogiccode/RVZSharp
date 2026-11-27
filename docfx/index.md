@@ -29,5 +29,7 @@ of the `RVZSharp` library. The public API is stable across the `1.x` line.
 ## Source
 
 - [GitHub repository](https://github.com/purelogiccode/RVZSharp)
-- [NuGet package](https://www.nuget.org/packages/RVZSharp/)
+- [Library NuGet package](https://www.nuget.org/packages/RVZSharp/)
+- [CLI NuGet tool package](https://www.nuget.org/packages/RVZSharp.Cli/)
+- [WinGet package](https://github.com/microsoft/winget-pkgs/tree/master/manifests/p/PureLogicCode/RVZSharp)
 - [Releases](https://github.com/purelogiccode/RVZSharp/releases)

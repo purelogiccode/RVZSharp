@@ -1,6 +1,6 @@
 # Library usage guide
 
-`RVZSharp` is a pure managed library (no native code) for **.NET 8, .NET 9 and .NET 10**.
+`RVZSharp` is a pure managed library (no native code) for **.NET 8, 9, 10 and 11** (C# 15).
 It reads and writes Dolphin **RVZ** and **WIA** disc images, writes the legacy **GCZ** format,
 reads the remaining legacy GameCube/Wii formats (**CISO/WBI, WBFS, TGC, NFS**), and exposes
 every format through one interface that serves the original disc bytes.
@@ -724,8 +724,9 @@ foreach (var partition in WiiVolume.GetPartitions(blob))
 
 ## Compatibility notes
 
-- Target frameworks: `net8.0`, `net9.0`, `net10.0` — the same assembly API on all three
-  (enforced by `EnablePackageValidation` at pack time).
+- Target frameworks: `net8.0`, `net9.0`, `net10.0` and `net11.0` (C# 15); the package
+  ships the same assembly API on all four and is validated at pack time by
+  `EnablePackageValidation`.
 - Dependencies: `LZMA-SDK` (encoding), `SharpZipLib` (BZip2), `ZstdSharp.Port`
   (Zstandard) — all pure managed, all netstandard-compatible.
 - The RVZ/WIA container logic is derived from Dolphin; the library is

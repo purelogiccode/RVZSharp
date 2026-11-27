@@ -24,8 +24,11 @@ permalink: /
 
 # RVZSharp Documentation
 
-RVZSharp is a .NET 8 / 9 / 10 library and command-line tool for **GameCube and Wii disc
+RVZSharp is a .NET 8 / 9 / 10 / 11 library and command-line tool for **GameCube and Wii disc
 images**.
+> [RVZStudio](https://github.com/purelogiccode/RVZStudio) is the companion desktop GUI for
+> RVZSharp, maintained alongside this repository.
+
 It reads the modern **RVZ** container (and its predecessor **WIA**), decodes the classic
 legacy formats (**GCZ, CISO/WBI, WBFS, TGC, NFS**) into a canonical ISO view, and **writes
 RVZ, WIA and GCZ files** from any of them — mirroring the behaviour of the reference
@@ -35,9 +38,9 @@ implementations in
 
 | | |
 |---|---|
-| Target frameworks | `net8.0`, `net9.0`, `net10.0` |
+| Target frameworks | `net8.0`, `net9.0`, `net10.0`, `net11.0` (C# 15) |
 | Solution file | `CSharp_RVZSharp.sln` |
-| Tests | 613 fast library tests (every framework, ~1 min) + 97 CLI tests + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
+| Tests | 613 fast library tests per framework (~1 min each) + 106 CLI tests + 276 real-file slow tests — the solution runs fast-only by default (`dotnet test CSharp_RVZSharp.sln -c Release`); run the slow suite explicitly with `dotnet test RVZSharp.Slow.Tests -c Release` |
 | Read support | RVZ, WIA, GCZ, CISO/WBI, WBFS, TGC, NFS, plain ISO |
 | Write support | RVZ (None, Zstd, Bzip2, LZMA1, LZMA2; optional PRNG-junk packing), WIA (None, PURGE, Bzip2, LZMA1, LZMA2) and GCZ (zlib deflate) |
 | Reference sources | `References/dolphin-master/` (C++), `References/rvz-1.0.3/` (Go) |
@@ -46,9 +49,9 @@ implementations in
 
 | Page | What it covers |
 |---|---|
-| [What's new](whats-new.md) | Release highlights (1.2.0, 1.1.1, 1.1.0, 1.0.0) |
+| [What's new](whats-new.md) | Release highlights (1.3.0, 1.2.0, 1.1.1, 1.1.0, 1.0.0) |
 | [Getting started](getting-started.md) | Prerequisites, build, test, first commands |
-| [Packaging & distribution](packaging.md) | NuGet package contents, build, publish, versioning |
+| [Packaging & distribution](packaging.md) | Library + CLI NuGet packages, WinGet, build, publish, versioning |
 | [CLI reference](usage-cli.md) | `convert`, `header`, `verify`, `extract` (+ legacy `info`/`decode`) — options and examples |
 | [Library API](usage-library.md) | `Blob`, `RvzReader`, `RvzWriter`, `WiaWriter`, `GczWriter`, `DiscFileSystem`, `DiscHasher`, codecs, packing API |
 | [Architecture](architecture.md) | Module map, read/write pipelines, design decisions |
@@ -60,7 +63,7 @@ implementations in
 | [Contributing](contributing.md) | Development setup, conventions, tests and pull requests |
 | [Security](security.md) | Vulnerability reporting, supported versions and repository protections |
 | [API reference](https://purelogiccode.github.io/RVZSharp/api/) | Generated DocFX reference for the public library API |
-| [Release notes](release-notes-1.2.0.md) | 1.2.0, [1.1.1](release-notes-1.1.1.md), [1.1.0](release-notes-1.1.0.md) and [1.0.0](release-notes-1.0.0.md) announcement content (GitHub release posts) |
+| [Release notes](release-notes-1.3.0.md) | 1.3.0, [1.2.0](release-notes-1.2.0.md), [1.1.1](release-notes-1.1.1.md), [1.1.0](release-notes-1.1.0.md) and [1.0.0](release-notes-1.0.0.md) announcement content (GitHub release posts) |
 | [Roadmap & status](roadmap.md) | Milestones, limitations, open questions |
 | [FAQ](faq.md) | Common questions |
 
@@ -87,8 +90,8 @@ These pages are published twice from the same files, automatically:
   are rewritten to the extensionless wiki form. The wiki is fully
   generated — edit these files, never the wiki pages.
 
-Releases (bundled CLI zips, NuGet publishing) and the automation setup are documented
-in [Packaging & distribution](packaging.md).
+Releases (bundled CLI archives, library and CLI NuGet packages, WinGet) and the automation
+setup are documented in [Packaging & distribution](packaging.md).
 
 ## Feature overview
 

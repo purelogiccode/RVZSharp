@@ -33,6 +33,11 @@ internal static class Program
     {
         LogSetup.Initialize();
 
+        // Some launchers pass the quote characters as literal argument text (for example
+        // ProcessStartInfo.ArgumentList.Add("\"C:\\path\\game.rvz\"")). Accept both quoted
+        // and unquoted values instead of treating the quotes as part of the file name.
+        args = args.Select(UnquoteArgument).ToArray();
+
         // Last-resort logging: exceptions that escape Main or a background task are still
         // routed through Serilog (and therefore to the bug-report sink) before the process
         // exits or the finalizer thread swallows them.
@@ -195,6 +200,25 @@ internal static class Program
         Log.Information("Command failed: {Message}", message);
         Console.Error.WriteLine($"Error: {message}");
         return 1;
+    }
+
+    /// <summary>
+    /// Removes one pair of matching single or double quotes surrounding an argument.
+    /// Scripts and process launchers sometimes pass quoted values as literal argument text,
+    /// which would otherwise become part of the file name.
+    /// </summary>
+    /// <param name="argument">The raw command-line argument.</param>
+    /// <returns>The argument without one matching outer quote pair.</returns>
+    internal static string UnquoteArgument(string argument)
+    {
+        if (argument.Length >= 2 &&
+            ((argument[0] == '"' && argument[^1] == '"') ||
+             (argument[0] == '\'' && argument[^1] == '\'')))
+        {
+            return argument[1..^1];
+        }
+
+        return argument;
     }
 
     /// <summary>
@@ -569,7 +593,10 @@ internal static class Program
                 continue;
             }
 
-            var value = inlineValue ?? (i + 1 < args.Count ? args[++i] : string.Empty);
+            // Inline values (--input="path") keep the quotes until here because the whole
+            // argument starts with '-'; strip one matching pair for direct ParseArgs callers.
+            var value = UnquoteArgument(
+                inlineValue ?? (i + 1 < args.Count ? args[++i] : string.Empty));
             if (value.Length == 0)
             {
                 throw new CliErrorException($"option {arg} requires an argument");
@@ -812,7 +839,7 @@ internal static class Program
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
                 Log.Information(e, "Failed to open input file '{InputPath}'", inputPath);
-                return Fail("The input file could not be opened.");
+                return Fail($"The input file could not be opened: '{originalInput}'");
             }
 
             using (blob)
@@ -1240,7 +1267,7 @@ internal static class Program
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
                 Log.Information(e, "Failed to open input file '{InputPath}'", path);
-                return Fail("Unable to open disc image");
+                return Fail($"Unable to open disc image: '{inputPath}'");
             }
 
             using (blob)
@@ -1439,7 +1466,7 @@ internal static class Program
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
                 Log.Information(e, "Failed to open input file '{InputPath}'", path);
-                return Fail("Unable to open input file");
+                return Fail($"Unable to open input file: '{inputPath}'");
             }
 
             using (blob)
@@ -1691,7 +1718,7 @@ internal static class Program
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or RvzException)
             {
                 Log.Information(e, "Failed to open input file '{InputPath}'", path);
-                return Fail("The input file could not be opened.");
+                return Fail($"The input file could not be opened: '{inputPath}'");
             }
 
             using (blob)

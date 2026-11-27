@@ -2,9 +2,10 @@
 [![CodeQL](https://github.com/purelogiccode/RVZSharp/actions/workflows/codeql.yml/badge.svg)](https://github.com/purelogiccode/RVZSharp/actions/workflows/codeql.yml)
 [![Docs](https://github.com/purelogiccode/RVZSharp/actions/workflows/pages.yml/badge.svg)](https://purelogiccode.github.io/RVZSharp/)
 [![API reference](https://img.shields.io/badge/API-DocFX-blue)](https://purelogiccode.github.io/RVZSharp/api/)
-[![.NET](https://img.shields.io/badge/.NET-8.0_%7C_9.0_%7C_10.0-blueviolet)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8.0_%7C_9.0_%7C_10.0_%7C_11.0-blueviolet)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/RVZSharp?color=blue)](https://www.nuget.org/packages/RVZSharp/)
+[![NuGet CLI](https://img.shields.io/nuget/v/RVZSharp.Cli?color=blue&label=cli)](https://www.nuget.org/packages/RVZSharp.Cli/)
 [![Release](https://img.shields.io/github/v/release/purelogiccode/RVZSharp?color=blue&label=release)](https://github.com/purelogiccode/RVZSharp/releases)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green)](https://github.com/purelogiccode/RVZSharp/blob/master/LICENSE)
 [![Tests](https://img.shields.io/badge/tests-xUnit-brightgreen)](https://github.com/purelogiccode/RVZSharp/blob/master/docs/testing.md)
@@ -20,13 +21,16 @@
 
 # RVZSharp
 
-A pure managed C# library and CLI (**.NET 8 / 9 / 10**) for decoding and encoding **Dolphin
+A pure managed C# library and CLI (**.NET 8 / 9 / 10 / 11**, C# 15) for decoding and encoding **Dolphin
 RVZ/WIA** disc images (GameCube/Wii), encoding the legacy **GCZ** format, and decoding the
 remaining legacy formats (CISO/WBI, WBFS, TGC, NFS). RVZSharp decodes RVZ/WIA files back to
 the original disc image (`.iso`) **byte-for-byte**, including:
 
+> **Companion GUI:** [RVZStudio](https://github.com/purelogiccode/RVZStudio) is the desktop
+> GUI for RVZSharp, maintained alongside this repository.
+
 ```
-dotnet add package RVZSharp
+dotnet add package RVZSharp --version 1.3.0
 ```
 
 - all six compression methods: NONE, PURGE (WIA), BZIP2, LZMA, LZMA2, Zstandard (100% managed
@@ -227,6 +231,14 @@ container magic).
 
 ### CLI
 
+Install it as a .NET tool (or `winget install PureLogicCode.RVZSharp` on Windows):
+
+```bash
+dotnet tool install -g RVZSharp.Cli --version 1.3.0
+```
+
+Or run the project from source:
+
 ```
 dotnet run --project RVZSharp.Cli -- header -i <file.rvz|.wia|.gcz|.ciso|.wbfs|.tgc|.nfs|.iso>
 dotnet run --project RVZSharp.Cli -- verify -i <file> [-a crc32|md5|sha1] [--partitions] [--json]
@@ -286,22 +298,22 @@ highlights are summarized in [WhatsNew.md](https://github.com/purelogiccode/RVZS
   XML documentation (shipped in the package as `RVZSharp.xml` for IntelliSense).
 - `RVZSharp.Cli` — the `header`/`verify`/`convert`/`extract` tool (DolphinTool-compatible
   surface, plus the legacy `info`/`decode` commands, `--json` output, `-` stdin/stdout and
-  shell completions).
-- `RVZSharp.Tests` — 613 synthetic tests (net8.0 + net9.0 + net10.0): unit (headers,
+  shell completions); published as the `RVZSharp.Cli` .NET tool package.
+- `RVZSharp.Tests` — 613 synthetic tests (net8.0 + net9.0 + net10.0 + net11.0): unit (headers,
   tables, codecs, PRNG, packing, exceptions, region rebuild, metadata/offset edge cases,
   low-level IO helpers) and end-to-end round-trips of synthetic RVZ files built by
   `TestRvzBuilder`, plus writer round trips (every codec × packing, GC + Wii, legacy → RVZ,
   split WBFS, scrubbing), GCZ writer tests, parallel write/decode determinism tests,
   FST/file-system validation tests, async API tests, package-facing API tests (path open,
   ReadFully, progress, cancellation).
-- `RVZSharp.Cli.Tests` — 97 tests (net10.0) for the CLI's option parser, extract path guards,
+- `RVZSharp.Cli.Tests` — 106 tests (net8.0 + net9.0 + net10.0 + net11.0) for the CLI's option parser, extract path guards,
   shell-completion scripts, update checker, ApplicationStats telemetry and the Serilog
   bug-report sink/layout.
 - `RVZSharp.Slow.Tests` — 276 real-file tests (`RealRvzFileTests`) that decode 90 real
   GameCube/Wii RVZ images byte-for-byte against their official No-Intro DAT SHA-1s.
   Kept out of the solution, so a plain `dotnet test` never runs them (~30 min); run
   explicitly with `dotnet test RVZSharp.Slow.Tests` (details in [docs/testing.md](https://github.com/purelogiccode/RVZSharp/blob/master/docs/testing.md)).
-- `RVZSharp.Benchmarks` — BenchmarkDotNet suite (net10.0): encode/decode throughput per
+- `RVZSharp.Benchmarks` — BenchmarkDotNet suite (net11.0): encode/decode throughput per
   codec and writer thread scaling, on a synthetic 16 MiB GameCube image
   (`dotnet run -c Release --project RVZSharp.Benchmarks`).
 
@@ -348,11 +360,13 @@ instead of the RVZ partition-table key (No-Intro dumps carry re-signed tickets w
 differs), producing files the reader rejected. `RvzWriter` now prefers the container's
 partition-table key and falls back to the ticket key for plain ISO inputs.
 
-**Packaging & CI**: the NuGet package is API-compat validated against the last published
-release (`PackageValidationBaselineVersion` 1.0.0) and carries an embedded SPDX 2.2 SBOM;
-GitHub Actions (`.github/workflows/ci.yml`) builds and tests on `net8.0`/`net9.0`/`net10.0`
-with coverage, repeats the net10.0 build/tests on Windows and macOS, builds the DocFX API
-reference, packs, and publishes a smoke-tested framework-dependent single-file CLI artifact.
+**Packaging & CI**: the library NuGet package is API-compat validated against the last
+published release (`PackageValidationBaselineVersion` 1.0.0) and carries an embedded SPDX
+2.2 SBOM; the CLI ships as the `RVZSharp.Cli` .NET tool package and a WinGet package;
+GitHub Actions (`.github/workflows/ci.yml`) builds and tests on
+`net8.0`/`net9.0`/`net10.0`/`net11.0` with coverage, repeats the net11.0 build/tests on
+Windows and macOS, builds the DocFX API reference, packs both NuGet packages, and publishes
+a smoke-tested framework-dependent single-file CLI artifact.
 CodeQL `security-extended`, dependency review, Dependabot, secret scanning and push
 protection run on the repository; `docs/` is mirrored to the wiki and deployed to Pages with
 a side menu. Dependabot keeps NuGet and Actions dependencies current.
@@ -374,6 +388,13 @@ one-shot, so level 22 no longer reserves ~128 MiB per parallel worker (output ve
 byte-identical in Dolphin's `dolphin-tool`, including a full codec interop matrix in
 both directions), and the NuGet package ships without the empty symbols package
 (assemblies carry embedded PDBs). The public API stays compatible with 1.0.0.
+
+**1.3.0 (2026-11-27)** is a distribution release: the library, CLI and tests target
+.NET 8 through .NET 11 with C# 15, the CLI ships as the multi-target `RVZSharp.Cli` .NET
+tool package and a WinGet package, Linux bundles use `.tar.gz`, Apple Silicon macOS uses
+`.dmg`, and literal surrounding quotes are stripped from CLI path arguments. Dependency
+updates include Microsoft.NET.Test.Sdk 18.12.0 (CVE-2026-105544). The public API stays
+compatible with 1.0.0.
 
 **1.2.0 (2026-11-06)** is a security, robustness and tooling release. `convert` now uses
 Dolphin-compatible defaults (`-f rvz`, 128 KiB RVZ/GCZ blocks, 2 MiB WIA/CISO/WBFS blocks,

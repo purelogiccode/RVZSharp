@@ -36,7 +36,7 @@ dotnet test RVZSharp.Slow.Tests -c Release
 - The **library** (`RVZSharp/`) has no logging, telemetry or UI dependencies. Serilog,
   ApplicationStats and bug reporting belong to `RVZSharp.Cli/` only.
 - Warnings are errors and analyzers are enabled; the build must stay clean on
-  `net8.0`, `net9.0` and `net10.0`.
+  `net8.0`, `net9.0`, `net10.0` and `net11.0`.
 - Asynchronous methods end in `Async`; library async methods take a `CancellationToken`.
 - Public API is XML-documented and must remain compatible with the published package
   baseline. Additive changes are preferred.

@@ -17,9 +17,24 @@ rvzsharp decode <FILE> <OUT> [--sha1 <hex>] [--threads <int>]  (decode any blob 
 
 A FILE argument of `-` reads the disc image from stdin (`convert`, `header`, `verify`,
 `extract`, `info`, `decode`); `convert -o -` and `decode <in> -` write the image to stdout.
+Arguments may also arrive with literal surrounding quotes from a script or process launcher;
+the CLI strips one matching pair, so `"C:\path\game.rvz"` and `C:\path\game.rvz` both work.
 Help works per command (`rvzsharp convert -h` prints the command's usage and exits 0).
 
-Run the CLI with:
+Install the CLI as a .NET tool:
+
+```bash
+dotnet tool install -g RVZSharp.Cli --version 1.3.0
+rvzsharp --help
+```
+
+On Windows, WinGet installs the release bundle and the .NET 11 runtime:
+
+```powershell
+winget install PureLogicCode.RVZSharp
+```
+
+Or run the CLI from source:
 
 ```bash
 dotnet run --project RVZSharp.Cli -c Release -- <command> [args…]
@@ -333,8 +348,8 @@ command runs. When a newer version exists and the console is interactive, the co
 finishes with a notice and a prompt to open the release page:
 
 ```
-A new version of RVZSharp.Cli is available: v1.2.0 (you have 1.1.1).
-Release page: https://github.com/purelogiccode/RVZSharp/releases/tag/v1.2.0
+A new version of RVZSharp.Cli is available: v1.3.0 (you have 1.2.0).
+Release page: https://github.com/purelogiccode/RVZSharp/releases/tag/v1.3.0
 Open the release page in your browser? [y/N]
 ```
 

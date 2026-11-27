@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- [.NET SDK 10](https://dotnet.microsoft.com/download) (or newer). The library and the
-  test suite target **`net8.0`, `net9.0` and `net10.0`**; the CLI targets `net10.0`.
+- [.NET SDK 11](https://dotnet.microsoft.com/download) to build (C# 15). The library, CLI
+  and test suite target **`net8.0`, `net9.0`, `net10.0` and `net11.0`**.
 - A disc image to experiment with: a plain `.iso`, or a `.rvz`/`.wia`/`.gcz`/`.ciso`/
   `.wbfs`/`.tgc`/`.nfs` file.
 
@@ -11,38 +11,62 @@
 
 ## Install the CLI
 
-Download `rvzsharp_v<version>_<rid>.zip` from the
-[GitHub Releases](https://github.com/purelogiccode/RVZSharp/releases) page, unzip it
-and run `RVZSharp` (`RVZSharp.exe` on Windows):
+Install the .NET tool (runs on .NET 8 or newer, picking the matching `net8.0`–`net11.0`
+asset):
+
+```bash
+dotnet tool install -g RVZSharp.Cli
+rvzsharp --help
+```
+
+On Windows, WinGet installs the release bundle and the .NET 11 runtime:
+
+```powershell
+winget install PureLogicCode.RVZSharp
+```
+
+Or download the platform archive from the
+[GitHub Releases](https://github.com/purelogiccode/RVZSharp/releases) page:
 
 | | |
 |---|---|
 | `rvzsharp_v<version>_win-x64.zip` | Windows 10/11, x64 |
 | `rvzsharp_v<version>_win-arm64.zip` | Windows 11, arm64 |
-| `rvzsharp_v<version>_linux-x64.zip` | Linux, x64 |
-| `rvzsharp_v<version>_linux-arm64.zip` | Linux, arm64 |
+| `rvzsharp_v<version>_linux-x64.tar.gz` | Linux, x64 |
+| `rvzsharp_v<version>_linux-arm64.tar.gz` | Linux, arm64 |
 | `rvzsharp_v<version>_osx-x64.zip` | macOS, Intel |
-| `rvzsharp_v<version>_osx-arm64.zip` | macOS, Apple Silicon |
+| `rvzsharp_v<version>_osx-arm64.dmg` | macOS, Apple Silicon |
 
-Each bundle holds the single-file executable plus `LICENSE`, `README.md`, `WhatsNew.md`
-and `THIRD-PARTY-NOTICES.md`. The executables are framework-dependent — the .NET runtime
-is not embedded — so install the
-[.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) first (the SDK
+Extract the archive (`unzip`/`Expand-Archive` for `.zip`, `tar -xzf` for `.tar.gz`, open
+the `.dmg` and copy the executable on Apple Silicon), then run `RVZSharp`
+(`RVZSharp.exe` on Windows). Each bundle holds the single-file executable plus `LICENSE`,
+`README.md`, `WhatsNew.md` and `THIRD-PARTY-NOTICES.md`. The executables are
+framework-dependent — the .NET runtime is not embedded — so install the
+[.NET 11 Runtime](https://dotnet.microsoft.com/download/dotnet/11.0) first (the SDK
 works too). Verify with `RVZSharp --help` (also prints the product version). Each
 release page also carries `SHA256SUMS.txt` to verify a download. To build from source
 instead, see [Building](#building) below.
+
+## Install the library
+
+The library package supports .NET 8 through .NET 11:
+
+```bash
+dotnet add package RVZSharp --version 1.3.0
+```
 
 ## Repository layout
 
 ```
 CSharp_RVZSharp.sln        solution file (fast test suite runs solution-wide)
-Directory.Build.props       net8.0/net9.0/net10.0, Nullable, ImplicitUsings, TreatWarningsAsErrors
-RVZSharp/                   the library
-RVZSharp.Cli/               the header/verify/convert/extract tool
-RVZSharp.Tests/             fast unit + end-to-end tests (613, ×3 frameworks)
-RVZSharp.Cli.Tests/         CLI tests (97: parsing, extract paths, completions, update checker, logging)
+Directory.Build.props       net8.0/net9.0/net10.0/net11.0, C# 15, warnings as errors
+RVZSharp/                   the library (NuGet package RVZSharp)
+RVZSharp.Cli/               the CLI (NuGet tool package RVZSharp.Cli)
+RVZSharp.Tests/             fast unit + end-to-end tests (613 per framework)
+RVZSharp.Cli.Tests/         CLI tests (106 per framework: parsing, extract paths, completions, update checker, logging)
 RVZSharp.Slow.Tests/        real-file tests (276) — kept out of the solution; run explicitly
-RVZSharp.Benchmarks/        BenchmarkDotNet throughput suite (net10.0, in the solution)
+RVZSharp.Benchmarks/        BenchmarkDotNet throughput suite (net11.0, in the solution)
+scripts/                    WinGet manifest generator
 References/dolphin-master/  Dolphin source (C++) — format reference
 References/rvz-1.0.3/       Go RVZ reader — cross-check reference
 docs/                       the wiki (this documentation)
@@ -62,9 +86,9 @@ The build treats warnings as errors, so a clean build means zero warnings.
 dotnet test CSharp_RVZSharp.sln -c Release
 ```
 
-Expected result: `Passed: 613, Failed: 0` on **each** of `net8.0`, `net9.0` and `net10.0`
-(the suite runs once per target framework). The real-file suite is not part of the solution
-and runs only when requested:
+Expected result: `Passed: 613` library tests and `Passed: 106` CLI tests on each of
+`net8.0`, `net9.0`, `net10.0` and `net11.0`. The real-file suite is not part of the
+solution and runs only when requested:
 
 ```bash
 dotnet test RVZSharp.Slow.Tests -c Release   # 276 real-game tests, ~30 min when mounted

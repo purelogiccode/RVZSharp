@@ -24,7 +24,7 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
 
       # Generate the public API reference from the library XML comments and publish it
       # under /api/. Jekyll copies the generated static site as part of docs/.

@@ -7,14 +7,16 @@ are handled privately until a fix is available.
 
 | Version | Supported |
 |---|---|
-| 1.2.x | :white_check_mark: Active |
+| 1.3.x | :white_check_mark: Active |
+| 1.2.x | :white_check_mark: Security fixes only |
 | 1.1.x | :white_check_mark: Security fixes only |
 | 1.0.x | :white_check_mark: Security fixes only |
 | &lt; 1.0 | :x: Not supported |
 
-The latest release is published on [GitHub Releases](https://github.com/purelogiccode/RVZSharp/releases)
-and [NuGet](https://www.nuget.org/packages/RVZSharp/). Upgrade to the newest supported version
-before reporting an issue whenever possible.
+The latest release is published on [GitHub Releases](https://github.com/purelogiccode/RVZSharp/releases),
+[NuGet](https://www.nuget.org/packages/RVZSharp/) (library and CLI tool) and
+[WinGet](https://github.com/microsoft/winget-pkgs/tree/master/manifests/p/PureLogicCode/RVZSharp).
+Upgrade to the newest supported version before reporting an issue whenever possible.
 
 ## Reporting a vulnerability
 
@@ -69,6 +71,9 @@ Out of scope:
   introduce high/critical vulnerable dependencies.
 - **Dependabot** tracks NuGet and GitHub Actions updates, with security updates enabled.
 - **Secret scanning and push protection** are enabled for the repository.
+- **Private vulnerability reporting** is enabled (Security → Advisories).
+- **Branch protection** on `master` requires the CI, CodeQL, DocFX and dependency-review
+  checks, blocks force pushes and deletions, and requires conversation resolution.
 - **NuGet package validation** checks API compatibility and target-framework assets; Release
   builds embed an SPDX SBOM.
 - **Least-privilege workflows**: CI has read-only contents; only the release workflow gets

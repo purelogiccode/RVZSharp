@@ -6,8 +6,8 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <!-- CP1252 / Shift-JIS decoders for the disc internal name: provided in-box on net10.0
-         (Dolphin: Volume::DecodeString). -->
+        <!-- CP1252 / Shift-JIS decoders for the disc internal name: provided in-box on every
+         supported target framework (Dolphin: Volume::DecodeString). -->
         <PackageReference Include="Serilog" Version="4.4.0" />
         <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
         <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
@@ -19,16 +19,35 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <!-- The CLI targets net10.0 (current LTS-aligned runtime); release binaries are
-         framework-dependent single-file, so target machines install the .NET 10 runtime. -->
-        <TargetFrameworks>net10.0</TargetFrameworks>
+        <!-- The CLI ships as a multi-target .NET tool (net8.0 through net11.0) and as
+         framework-dependent single-file release binaries. -->
+        <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <IsPackable>false</IsPackable>
+        <IsPackable>true</IsPackable>
+        <!-- NuGet tool package, installed with: dotnet tool install -g RVZSharp.Cli -->
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>rvzsharp</ToolCommandName>
+        <PackageId>RVZSharp.Cli</PackageId>
+        <Title>RVZSharp CLI</Title>
+        <Description>
+            Command-line tool for Dolphin RVZ/WIA, GCZ, CISO/WBI, WBFS, TGC, NFS and ISO
+            disc images. Convert, inspect, verify and extract GameCube/Wii disc images.
+        </Description>
+        <PackageTags>dolphin;rvz;wia;gcz;ciso;wbfs;tgc;nfs;gamecube;wii;iso;disc-image;cli;tool</PackageTags>
+        <PackageLicenseExpression>GPL-2.0-or-later</PackageLicenseExpression>
+        <PackageIcon>icon.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <RepositoryUrl>https://github.com/purelogiccode/RVZSharp</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/purelogiccode/RVZSharp</PackageProjectUrl>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <!-- Embedded PDBs mean no symbols package is useful (same policy as the library). -->
+        <IncludeSymbols>false</IncludeSymbols>
         <!-- Icon embedded in the built rvzsharp executable (Windows explorer). -->
         <ApplicationIcon>icon\icon.ico</ApplicationIcon>
         <Company>PureLogicCode.com</Company>
-        <!-- AssemblyVersion/FileVersion follow Directory.Build.props' Version (1.2.0), so
+        <!-- AssemblyVersion/FileVersion follow Directory.Build.props' Version (1.3.0), so
          the binary, telemetry and the update check all report the same product version. -->
         <NeutralLanguage>en</NeutralLanguage>
         <!-- No XML docs for the CLI: the publish output ships the single binary only. -->
@@ -38,6 +57,15 @@
         <EnableAotAnalyzer>true</EnableAotAnalyzer>
         <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     </PropertyGroup>
+
+    <!-- NuGet tool package payload. The CLI is a .NET tool, so the readme, license,
+         notices and icon travel with the package. -->
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\" />
+        <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+        <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+        <None Include="..\RVZSharp\icon\icon.png" Pack="true" PackagePath="\" Link="icon.png" />
+    </ItemGroup>
 
     <!-- Single-file distribution: drop the (*.xml) documentation sidecars from the publish
        folder so each runtime directory contains just the executable. -->

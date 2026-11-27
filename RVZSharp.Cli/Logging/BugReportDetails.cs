@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -39,7 +40,7 @@ internal static class BugReportDetails
         var now = timestamp ?? DateTimeOffset.Now;
         var sb = new StringBuilder();
         sb.AppendLine("=== Environment Details ===");
-        sb.AppendLine("Date: " + now.ToString("yyyy-MM-dd HH:mm:ss zzz"));
+        sb.AppendLine("Date: " + now.ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture));
         sb.AppendLine($"Application Name: {applicationName}");
         sb.AppendLine($"Application Version: {version}");
         sb.AppendLine($"OS Version: {Truncate(Environment.OSVersion.ToString(), 200)}");
